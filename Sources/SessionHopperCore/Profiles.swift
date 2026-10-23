@@ -12,9 +12,12 @@ public enum Profiles {
                 let dir = home.appendingPathComponent(entry)
                 var isDir: ObjCBool = false
                 guard fm.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else { return nil }
-                // A profile has at least one of these; plain `.claude-something` tool folders don't.
-                let markers = ["settings.json", "projects", ".claude.json", "sessions"]
-                guard entry == ".claude" || markers.contains(where: { fm.fileExists(atPath: dir.appendingPathComponent($0).path) }) else { return nil }
+                // A profile has at least one of these (what Claude Code writes into CLAUDE_CONFIG_DIR);
+                // plain `.claude-something` tool folders don't. Backup/scratch copies of a profile do, so skip them by name.
+                let markers = ["settings.json", "projects", ".claude.json"]
+                let lower = entry.lowercased()
+                guard entry == ".claude" || !["backup", "swap", "bak", "tmp"].contains(where: lower.contains),
+                      entry == ".claude" || markers.contains(where: { fm.fileExists(atPath: dir.appendingPathComponent($0).path) }) else { return nil }
                 return Profile(name: name(forDir: entry), dir: dir.path, exportConfigDir: entry != ".claude")
             }
     }
