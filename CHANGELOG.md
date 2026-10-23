@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - not yet released
+## [0.1.0] - 2026-10-23
+
+First public release, **BETA**: not fully tested; real account hand-offs are new.
 
 ### Added
 
@@ -22,3 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `install-hooks` / `uninstall-hooks`, and `shim` for cmux and IDEs.
 - Usage from Claude Code's status-line input; limit stops from the `StopFailure` hook. No network
   requests, no credential access.
+
+[Unreleased]: https://github.com/roypadina/AgentsSessionHopper/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/roypadina/AgentsSessionHopper/releases/tag/v0.1.0

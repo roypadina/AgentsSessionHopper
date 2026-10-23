@@ -46,6 +46,8 @@ struct OnboardingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Profiles for Claude Code").font(.title2.bold())
+            Text("⚠️ " + HopperInfo.betaNotice).font(.callout.bold()).foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
             Text("Keep your own Claude accounts side by side, one Claude Code profile each. When one runs low, you are asked whether to continue the conversation on another. Nothing moves until you confirm.")
                 .fixedSize(horizontal: false, vertical: true)
 

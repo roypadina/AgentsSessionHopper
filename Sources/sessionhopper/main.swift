@@ -378,7 +378,7 @@ let commands: [String: ([String]) -> Int32] = [
     "config": configCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },
-    "version": { _ in out("sessionhopper \(HopperInfo.version)"); return 0 }
+    "version": { _ in out("sessionhopper \(HopperInfo.version) (\(HopperInfo.stage))"); return 0 }
 ]
 
 // Invoked through a link named `*-shim` (e.g. ~/bin/sessionhopper-shim): shim mode, for tools that take one path.

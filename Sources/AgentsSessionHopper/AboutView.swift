@@ -29,7 +29,9 @@ struct AboutView: View {
 
             VStack(spacing: 2) {
                 Text("AgentsSessionHopper").font(.title.bold())
-                Text("Version \(HopperInfo.version)").font(.callout).foregroundStyle(.secondary)
+                Text("Version \(HopperInfo.version) \(HopperInfo.stage)").font(.callout).foregroundStyle(.secondary)
+                Text(HopperInfo.betaNotice).font(.caption.bold()).foregroundStyle(.orange)
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }
 
             Text("Profiles for Claude Code. Keep your own accounts side by side, and when one runs low, continue the conversation on another with one click.")

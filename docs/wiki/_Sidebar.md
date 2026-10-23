@@ -1,5 +1,7 @@
 ### AgentsSessionHopper
 
+**⚠️ BETA** — please [report issues](https://github.com/roypadina/AgentsSessionHopper/issues).
+
 - [Home](Home)
 - [Installation](Installation)
 - [Getting started](Getting-started)
