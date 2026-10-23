@@ -34,7 +34,7 @@ final class ScreenshotRenderTests: XCTestCase {
     /// Sample state: three profiles, two live sessions (one with a suggestion), a few hand-offs.
     private func sampleModel() throws -> (AppModel, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("hopper-shots-\(UUID().uuidString.prefix(6))")
-        let env = HopperEnvironment(home: URL(fileURLWithPath: "/Users/me"), stateDir: root, selfPath: "/x/sessionhopper")
+        let env = HopperEnvironment(home: URL(fileURLWithPath: "/Users/me"), stateDir: root, selfPath: "/Applications/AgentsSessionHopper.app/Contents/Helpers/sessionhopper")
         let p = env.paths
         var c = HopperConfig()
         c.profiles = [Profile(name: "personal", dir: "/Users/me/.claude", exportConfigDir: false),
@@ -67,9 +67,13 @@ final class ScreenshotRenderTests: XCTestCase {
         }
         let (model, root) = try sampleModel()
         defer { try? FileManager.default.removeItem(at: root) }
+        AboutView.iconOverride = NSImage(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().appendingPathComponent("../../Assets/icons/AppIcon-1024.png").standardizedFileURL)
+        try render(OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "onboarding.png", dir: dir)
         try render(PopoverView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "popover.png", dir: dir)
         // The tab strip's selected label does not render offscreen: crop it off.
-        for (tab, name) in [(SettingsView.Tab.handOff, "settings-handoff.png"), (.profiles, "settings-profiles.png"), (.log, "settings-log.png")] {
+        for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.profiles, "settings-profiles.png"),
+                          (.commandLine, "settings-command-line.png"), (.log, "settings-log.png")] {
             try render(SettingsView(model: model, tab: tab), name: name, dir: dir, cropTop: 46)
         }
         try render(AboutView().background(Color(nsColor: .windowBackgroundColor)), name: "about.png", dir: dir)

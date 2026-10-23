@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct AgentsSessionHopperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var model = AppModel(env: .current(selfPath: AgentsSessionHopperApp.cliPath))
+    @StateObject private var model = AgentsSessionHopperApp.makeModel()
 
     var body: some Scene {
         MenuBarExtra {
@@ -28,23 +28,49 @@ struct AgentsSessionHopperApp: App {
             SettingsView(model: model)
         }
     }
+
+    @MainActor static func makeModel() -> AppModel {
+        let model = AppModel(env: .current(selfPath: cliPath))
+        EventLog.prune(model.env.paths, days: 90)
+        model.notifier = Notifier(model: model)
+        DispatchQueue.main.async {
+            OnboardingWindow.showIfNeeded(model: model)
+            model.checkLogins()
+        }
+        return model
+    }
 }
 
-/// Icon reflects state: plain, a dot when something needs you, a warning past the park threshold.
+/// Template glyph; a badge when a session needs you, a warning past the park threshold.
 struct MenuBarLabel: View {
+    static let showPercentKey = "showPercentInMenuBar"
     @ObservedObject var model: AppModel
+    @AppStorage(showPercentKey) private var showPercent = true
 
     var body: some View {
         let s = model.snapshot
-        let symbol = !s.needsAttention.isEmpty ? "arrow.triangle.2.circlepath.circle.fill"
-            : (s.worstLivePercent ?? 0) >= model.config.hardThreshold ? "exclamationmark.arrow.triangle.2.circlepath"
-            : "arrow.triangle.swap"
+        let full = (s.worstLivePercent ?? 0) >= model.config.hardThreshold
         HStack(spacing: 3) {
-            Image(systemName: symbol)
-            if let p = s.worstLivePercent { Text(percentText(p)).monospacedDigit() }
+            if !s.needsAttention.isEmpty {
+                Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
+            } else if full {
+                Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+            } else {
+                Image(nsImage: Self.glyph)
+            }
+            if showPercent, let p = s.worstLivePercent { Text(percentText(p)).monospacedDigit() }
         }
         .accessibilityLabel(s.needsAttention.isEmpty ? "AgentsSessionHopper" : "AgentsSessionHopper: a session needs you")
     }
+
+    /// Bundled by Scripts/package_app.sh; `swift run` has no bundle resources, so it falls back to an SF Symbol.
+    static let glyph: NSImage = {
+        let image = NSImage(named: "menubar")
+            ?? NSImage(systemSymbolName: "arrow.triangle.swap", accessibilityDescription: nil)
+            ?? NSImage()
+        image.isTemplate = true
+        return image
+    }()
 }
 
 extension AgentsSessionHopperApp {

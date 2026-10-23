@@ -25,6 +25,7 @@ rm -rf "$APP_DIR"
 mkdir -p "$CONTENTS_DIR/MacOS" "$CONTENTS_DIR/Helpers" "$CONTENTS_DIR/Resources"
 
 cp "$BIN_DIR/AgentsSessionHopper" "$CONTENTS_DIR/MacOS/$APP_NAME"
+cp Assets/icons/menubar.png Assets/icons/menubar@2x.png "$CONTENTS_DIR/Resources/"
 # The CLI lives in Helpers/, not MacOS/: the cask links it with a `binary` stanza.
 cp "$BIN_DIR/sessionhopper" "$CONTENTS_DIR/Helpers/sessionhopper"
 [[ -f Assets/icons/AppIcon.icns ]] && cp Assets/icons/AppIcon.icns "$CONTENTS_DIR/Resources/"

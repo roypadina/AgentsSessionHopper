@@ -22,12 +22,9 @@ import SwiftUI
 struct AboutView: View {
     var body: some View {
         VStack(spacing: 12) {
-            // shortcut: SF Symbol until the app icon lands (M4), then NSApp.applicationIconImage.
-            Image(systemName: "arrow.triangle.swap")
-                .font(.system(size: 56, weight: .medium))
-                .foregroundStyle(.white)
+            Image(nsImage: AboutView.icon)
+                .resizable()
                 .frame(width: 96, height: 96)
-                .background(RoundedRectangle(cornerRadius: 22).fill(Color.accentColor.gradient))
                 .accessibilityHidden(true)
 
             VStack(spacing: 2) {
@@ -68,5 +65,16 @@ struct AboutView: View {
         }
         .padding(24)
         .frame(width: 400)
+    }
+}
+
+extension AboutView {
+    /// Set by the screenshot renderer, which runs outside the app bundle.
+    nonisolated(unsafe) static var iconOverride: NSImage?
+
+    static var icon: NSImage {
+        if let iconOverride { return iconOverride }
+        if Bundle.main.bundleIdentifier != nil, let app = NSApp { return app.applicationIconImage }
+        return NSImage(systemSymbolName: "arrow.triangle.swap", accessibilityDescription: nil)!
     }
 }

@@ -20,9 +20,13 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Set by the app (not in tests); told about every new snapshot.
+    var notifier: Notifier?
+
     func refresh() {
         let s = HopperSnapshot.load(env.paths, events: 200)
         if s != snapshot { snapshot = s }
+        notifier?.update(s)
     }
 
     var config: HopperConfig { snapshot.config }
@@ -53,6 +57,63 @@ final class AppModel: ObservableObject {
             let j = min(max(i + delta, 0), c.profiles.count - 1)
             c.profiles.swapAt(i, j)
         }
+    }
+
+    // MARK: Profiles and logins
+
+    /// Logged-in state per profile from `claude auth status` (nil = not checked or claude not found).
+    @Published private(set) var loggedIn: [String: Bool] = [:]
+    @Published private(set) var checkingLogins = false
+
+    /// Profiles on disk that are not in the list yet.
+    var discovered: [Profile] {
+        let known = Set(config.profiles.map(\.dir))
+        return Profiles.discover(home: env.home).filter { !known.contains($0.dir) }
+    }
+
+    func importDiscovered() { update { $0.profiles += discovered } }
+
+    /// Creates the folder (history linked to the first profile) and adds it. Login is a separate, user-run step.
+    @discardableResult
+    func addProfile(name: String, shareSetup: Bool) -> Profile? {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard config.profile(named: name) == nil else { lastError = "profile '\(name)' exists"; return nil }
+        let dir = env.home.appendingPathComponent(".claude-\(name)")
+        do {
+            _ = try Profiles.create(name: name, dir: dir, base: config.profiles.first, home: env.home, shareSetup: shareSetup)
+        } catch {
+            lastError = "\(error)"
+            return nil
+        }
+        let p = Profile(name: name, dir: dir.path, exportConfigDir: true)
+        update { $0.profiles.append(p) }
+        return p
+    }
+
+    func checkLogins() {
+        guard !checkingLogins else { return }
+        checkingLogins = true
+        let env = env, profiles = config.profiles
+        Task.detached {
+            var out: [String: Bool] = [:]
+            for p in profiles { if let v = Claude.isLoggedIn(p, env: env) { out[p.name] = v } }
+            await MainActor.run {
+                self.loggedIn = out
+                self.checkingLogins = false
+            }
+        }
+    }
+
+    func loginCommand(_ p: Profile) -> String { Profiles.loginCommand(for: p, tilde: env.tilde) }
+
+    func copyLoginCommand(_ p: Profile) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(loginCommand(p), forType: .string)
+    }
+
+    /// Opens Terminal on a script that runs Claude Code's own `claude auth login` for this profile.
+    func openLoginInTerminal(_ p: Profile) {
+        act { NSWorkspace.shared.open(try Claude.loginScript(p, env: env)) }
     }
 
     func revealLog() { NSWorkspace.shared.activateFileViewerSelecting([env.paths.events]) }
