@@ -9,17 +9,45 @@ public enum LaunchPlan {
     /// and writes no file; hook arrays merge with the user's own hooks instead of replacing them
     /// (https://code.claude.com/docs/en/settings, "Settings precedence"). Our status line replaces the
     /// user's for the session and runs theirs itself (see `StatusLineBridge`).
-    public static func settingsJSON(selfPath: String, userStatusLine: [String: Any]?) -> String {
+    /// `caller`: settings passed to us with `--settings` (see `extractSettings`); merged in, not passed twice.
+    public static func settingsJSON(selfPath: String, userStatusLine: [String: Any]?, caller: [String: Any]? = nil) -> String {
         let bin = FileIO.shellQuote(selfPath)
-        var hooks: [String: Any] = [:]
+        var obj = caller ?? [:]
+        var hooks = obj["hooks"] as? [String: Any] ?? [:]
         for ev in hookEvents {
-            hooks[ev] = [["hooks": [["type": "command", "command": "\(bin) hook", "timeout": 10]]]]
+            hooks[ev] = (hooks[ev] as? [Any] ?? []) + [["hooks": [["type": "command", "command": "\(bin) hook", "timeout": 10]]]]
         }
         var statusLine: [String: Any] = ["type": "command", "command": "\(bin) statusline"]
         for key in ["padding", "refreshInterval", "hideVimModeIndicator"] { statusLine[key] = userStatusLine?[key] }
-        let obj: [String: Any] = ["hooks": hooks, "statusLine": statusLine]
+        obj["hooks"] = hooks
+        // shortcut: a caller's own statusLine is replaced, not chained; chain it if a tool ever sends one.
+        obj["statusLine"] = statusLine
         let data = (try? JSONSerialization.data(withJSONObject: obj, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data()
         return String(data: data, encoding: .utf8) ?? "{}"
+    }
+
+    /// Takes `--settings <json or file>` out of the caller's args. Claude Code reads only one of several
+    /// `--settings` flags (which one changed across versions), so ours absorbs theirs: cmux passes its
+    /// hooks this way. A value that is neither a JSON object nor a readable JSON file stays in the args.
+    public static func extractSettings(_ args: [String]) -> (args: [String], settings: [String: Any]?) {
+        var rest: [String] = []
+        var merged: [String: Any]?
+        var i = 0
+        while i < args.count {
+            var value: String?
+            if args[i] == "--settings", i + 1 < args.count { value = args[i + 1] }
+            else if args[i].hasPrefix("--settings=") { value = String(args[i].dropFirst("--settings=".count)) }
+            let obj = value.flatMap { v in FileIO.jsonObject(Data(v.utf8)) ?? FileIO.jsonObject(FileIO.read(URL(fileURLWithPath: (v as NSString).expandingTildeInPath))) }
+            guard let obj else { rest.append(args[i]); i += 1; continue }
+            var m = merged ?? [:]
+            var hooks = m["hooks"] as? [String: Any] ?? [:]
+            for (ev, list) in obj["hooks"] as? [String: Any] ?? [:] { hooks[ev] = (hooks[ev] as? [Any] ?? []) + (list as? [Any] ?? []) }
+            m.merge(obj) { _, new in new }
+            if !hooks.isEmpty { m["hooks"] = hooks }
+            merged = m
+            i += args[i] == "--settings" ? 2 : 1
+        }
+        return (rest, merged)
     }
 
     /// A trailing positional is the first prompt (`sessionhopper "fix the tests"`). It belongs to the first

@@ -89,6 +89,7 @@ sessionhopper doctor                     # claude found, logins, shared history,
 sessionhopper                            # start a session on the first profile with room
 sessionhopper -P work "fix the tests"    # start on work; the others stay fallbacks
 sessionhopper -c                         # continue the newest session in this folder
+sessionhopper --resume                   # pick one from a numbered list (names included)
 sessionhopper switch                     # inside a session: move at turn end
 sessionhopper status                     # profiles, usage, live sessions
 ```

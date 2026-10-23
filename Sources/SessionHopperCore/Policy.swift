@@ -53,4 +53,18 @@ public struct Policy: Sendable {
         guard pct >= config.suggestThreshold, let to = roomy else { return .none }
         return config.autoMove && !held ? .autoMove(to: to.name, percent: pct) : .suggest(to: to.name, percent: pct)
     }
+
+    /// `moveNowAtHard`: an automatic move or park past the hard threshold happens at once, not at the turn end.
+    public func isUrgent(_ d: Decision, current: Profile) -> Bool {
+        guard config.moveNowAtHard, let pct = percent(current.name), pct >= config.hardThreshold else { return false }
+        switch d {
+        case .autoMove, .park: return true
+        default: return false
+        }
+    }
+
+    /// Profiles ahead of `chosen` in `order` that were passed over, with their usage ("work 98%").
+    public func skipped(_ order: [Profile], before chosen: Profile) -> [String] {
+        order.prefix { $0.name != chosen.name }.map { p in "\(p.name) \(percent(p.name).map { "\(Int($0.rounded()))%" } ?? "?")" }
+    }
 }
