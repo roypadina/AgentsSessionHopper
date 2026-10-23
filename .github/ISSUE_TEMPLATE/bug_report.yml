@@ -1,0 +1,40 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. sessionhopper -P work
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `sessionhopper doctor`
+      description: Remove anything private (paths, emails) before pasting.
+      render: text
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.3"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AgentsSessionHopper and Claude Code versions
+      placeholder: "0.1.0 (Homebrew), Claude Code 2.1.300"
+    validations:
+      required: true
