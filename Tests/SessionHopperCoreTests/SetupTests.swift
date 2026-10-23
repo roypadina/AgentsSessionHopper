@@ -162,3 +162,22 @@ final class TranscriptAndLogTests: XCTestCase {
         XCTAssertEqual(EventLog.read(paths, last: 1).map(\.type), ["park"])
     }
 }
+
+final class RetentionTests: XCTestCase {
+    func testPruneDropsOldEntries() {
+        let sb = Sandbox()
+        let paths = sb.env().paths
+        EventLog.append(HopperEvent(type: "switch", ts: "2020-01-01T10:00:00+00:00"), paths)
+        EventLog.append(HopperEvent(type: "park"), paths)
+        EventLog.prune(paths, days: 90)
+        XCTAssertEqual(EventLog.read(paths).map(\.type), ["park"])
+    }
+
+    func testLoginScriptRunsClaudesOwnLogin() throws {
+        let sb = Sandbox()
+        let url = try Claude.loginScript(Profile(name: "w", dir: "/h/.claude-w", exportConfigDir: true), env: sb.env())
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertTrue(text.contains("export CLAUDE_CONFIG_DIR='/h/.claude-w'"))
+        XCTAssertTrue(text.hasSuffix("auth login\n"))
+    }
+}

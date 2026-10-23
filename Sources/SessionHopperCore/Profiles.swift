@@ -93,3 +93,30 @@ public enum Profiles {
         profile.exportConfigDir ? "CLAUDE_CONFIG_DIR=\(tilde(profile.dir)) claude auth login" : "claude auth login"
     }
 }
+
+/// Finding and asking the user's own `claude`. Apps started from the Dock get a minimal PATH, so the
+/// usual install locations are tried too.
+public enum Claude {
+    public static func locate(_ env: HopperEnvironment) -> String? {
+        let extra = ["\(env.home.path)/.local/bin", "\(env.home.path)/.claude/local", "/opt/homebrew/bin", "/usr/local/bin"]
+        let path = ([env.vars["PATH"] ?? ""] + extra).joined(separator: ":")
+        return Shell.which(env.claudeBin, path: path)
+    }
+
+    /// `claude auth status` exits 0 when logged in (https://code.claude.com/docs/en/cli-reference).
+    /// Claude Code checks its own login; we only read the exit code. nil = claude not found.
+    public static func isLoggedIn(_ profile: Profile, env: HopperEnvironment) -> Bool? {
+        guard let claude = locate(env) else { return nil }
+        return Shell.run(claude, ["auth", "status"], timeout: 15, env: Profiles.environment(for: profile, base: env.vars)).status == 0
+    }
+
+    /// A double-clickable script that runs the unmodified `claude auth login` for `profile` in Terminal.
+    public static func loginScript(_ profile: Profile, env: HopperEnvironment) throws -> URL {
+        let url = env.paths.root.appendingPathComponent("login-\(profile.name).command")
+        let claude = locate(env) ?? "claude"
+        let exportLine = profile.exportConfigDir ? "export CLAUDE_CONFIG_DIR=\(FileIO.shellQuote(profile.dir))\n" : "unset CLAUDE_CONFIG_DIR\n"
+        try FileIO.write("#!/bin/sh\n# Log in profile \(profile.name) with Claude Code's own login.\n\(exportLine)exec \(FileIO.shellQuote(claude)) auth login\n", to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+        return url
+    }
+}

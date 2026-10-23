@@ -14,8 +14,7 @@ public enum Doctor {
         var out: [Check] = []
         func add(_ l: Level, _ m: String) { out.append(Check(level: l, message: m)) }
 
-        let path = env.vars["PATH"]
-        if let claude = Shell.which(env.claudeBin, path: path) {
+        if let claude = Claude.locate(env) {
             let v = Shell.run(claude, ["--version"], timeout: 10).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
             add(v.isEmpty ? .warn : .ok, "claude: \(env.tilde(claude)) \(v.isEmpty ? "(no version output)" : v)")
         } else {
@@ -39,7 +38,7 @@ public enum Doctor {
         add(.info, "thresholds: suggest \(Int(config.suggestThreshold))%, park \(Int(config.hardThreshold))% (\(config.parkBeforePaid ? "on" : "off")), move without asking: \(config.autoMove ? "on" : "off")")
 
         let now = FileIO.now()
-        let claudePath = Shell.which(env.claudeBin, path: path)
+        let claudePath = Claude.locate(env)
         for p in config.profiles {
             let tag = "\(p.name) (\(env.tilde(p.dir)))"
             guard FileManager.default.fileExists(atPath: p.dir) else { add(.fail, "\(tag): directory missing"); continue }

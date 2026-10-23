@@ -86,9 +86,9 @@ final class Harness {
 
     /// Runs the CLI in `cwd` (default: the work dir) and waits up to `timeout`.
     @discardableResult
-    func run(_ args: [String], cwd: URL? = nil, timeout: TimeInterval = 20, onStart: ((Process) -> Void)? = nil) throws -> Result {
+    func run(_ args: [String], cwd: URL? = nil, exe: URL? = nil, extraEnv: [String: String] = [:], timeout: TimeInterval = 20, onStart: ((Process) -> Void)? = nil) throws -> Result {
         let p = Process()
-        p.executableURL = Harness.binary
+        p.executableURL = exe ?? Harness.binary
         p.arguments = args
         p.currentDirectoryURL = cwd ?? work
         p.environment = [
@@ -96,7 +96,7 @@ final class Harness {
             "SESSIONHOPPER_HOME": home.path, "SESSIONHOPPER_STATE_DIR": state.path,
             "SESSIONHOPPER_CLAUDE_BIN": t.appendingPathComponent("claude").path,
             "SESSIONHOPPER_KILL_GRACE": "3", "SESSIONHOPPER_POLL": "0.05"
-        ]
+        ].merging(extraEnv) { $1 }
         let out = t.appendingPathComponent("out-\(UUID().uuidString.prefix(6))")
         FileManager.default.createFile(atPath: out.path + ".o", contents: nil)
         FileManager.default.createFile(atPath: out.path + ".e", contents: nil)

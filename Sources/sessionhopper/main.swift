@@ -52,6 +52,8 @@ let usage = """
       sessionhopper doctor                      check claude, logins, shared history, thresholds
       sessionhopper install-hooks --profile X   report usage from sessions started without sessionhopper
       sessionhopper uninstall-hooks --profile X undo install-hooks
+      sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are supervised, the rest
+                                              go straight to claude (or link the binary as *-shim)
 
     Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your login or tokens,
     and makes no network requests.
@@ -345,7 +347,32 @@ func launch(_ a: [String]) -> Int32 {
     return Supervisor(env: env, options: o, say: say).run()
 }
 
+// MARK: - Shim (cmux / IDE "Claude binary path")
+
+/// Non-interactive `claude` calls that must reach the real CLI untouched (and never start a supervised session).
+let passthroughCommands: Set<String> = [
+    "agents", "attach", "auth", "auto-mode", "daemon", "doctor", "gateway", "import", "install", "logs", "mcp", "plugin",
+    "plugins", "project", "respawn", "rm", "setup-token", "stop", "kill", "ultrareview", "update", "upgrade"
+]
+let passthroughFlags: Set<String> = [
+    "-p", "--print", "-v", "--version", "-h", "--help", "--bg", "--background", "--cloud", "--fork-session", "--from-pr", "--remote-control"
+]
+
+/// Used as a tool's "Claude binary path": interactive launches become supervised sessions, everything else
+/// (subcommands, `-p`, `--version`, and any `claude` started inside a session) runs the real `claude`.
+func shimCommand(_ a: [String]) -> Int32 {
+    let direct = env.currentSessionID != nil || a.first.map(passthroughCommands.contains) == true || a.contains(where: passthroughFlags.contains)
+    guard direct else { return launch(a) }
+    guard let claude = Claude.locate(env) else { die("claude not found on PATH") }
+    let me = URL(fileURLWithPath: env.selfPath).resolvingSymlinksInPath().path
+    guard URL(fileURLWithPath: claude).resolvingSymlinksInPath().path != me else { die("`claude` on PATH is this shim; point the shim at the real claude with SESSIONHOPPER_CLAUDE_BIN") }
+    let argv: [UnsafeMutablePointer<CChar>?] = ([claude] + a).map { strdup($0) } + [nil]
+    execv(claude, argv)
+    die("cannot run \(claude): \(String(cString: strerror(errno)))")
+}
+
 let commands: [String: ([String]) -> Int32] = [
+    "shim": shimCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "sessions": sessionsCommand,
     "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand,
     "config": configCommand, "log": logCommand, "doctor": doctorCommand,
@@ -354,6 +381,8 @@ let commands: [String: ([String]) -> Int32] = [
     "version": { _ in out("sessionhopper \(HopperInfo.version)"); return 0 }
 ]
 
+// Invoked through a link named `*-shim` (e.g. ~/bin/sessionhopper-shim): shim mode, for tools that take one path.
+if (CommandLine.arguments[0] as NSString).lastPathComponent.hasSuffix("-shim") { exit(shimCommand(args)) }
 if let first = args.first, let run = commands[first] {
     exit(run(Array(args.dropFirst())))
 }

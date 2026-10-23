@@ -80,3 +80,19 @@ public enum EventLog {
         return out
     }
 }
+
+extension EventLog {
+    /// Drops entries older than `days`. Rewrites the file (temp + rename).
+    public static func prune(_ paths: StatePaths, days: Int = 90, now: Date = Date()) {
+        guard let text = FileIO.readString(paths.events) else { return }
+        let cutoff = now.addingTimeInterval(-Double(days) * 86400)
+        let iso = ISO8601DateFormatter()
+        let lines = text.split(separator: "\n")
+        let kept = lines.filter { line in
+            guard let ts = FileIO.jsonObject(Data(line.utf8))?["ts"] as? String, let d = iso.date(from: ts) else { return true }
+            return d >= cutoff
+        }
+        guard kept.count != lines.count else { return }
+        try? FileIO.write(kept.map { $0 + "\n" }.joined(), to: paths.events)
+    }
+}
