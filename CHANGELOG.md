@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-24
+
+Still **BETA**.
+
+### Added
+- **Right-click (or control-click) menu** on the menu-bar icon: Open, Settings…, Switch log…, Request a feature, Contribute, About, Support on Ko-fi, Quit. Left click still opens the popover.
+
 ## [0.1.3] - 2026-10-24
 
 Still **BETA**.

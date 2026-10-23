@@ -88,5 +88,6 @@ extension AgentsSessionHopperApp {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
+        MainActor.assumeIsolated { StatusMenu.shared.install() }
     }
 }
