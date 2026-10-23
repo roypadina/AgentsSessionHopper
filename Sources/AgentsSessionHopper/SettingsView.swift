@@ -6,6 +6,9 @@ struct SettingsView: View {
     @State private var tab: Tab
 
     enum Tab: Hashable { case general, handOff, profiles, commandLine, log, about }
+    /// Set by the status-item menu: picks a tab whether the window is already open (notification) or not yet built (onAppear).
+    static var pendingTab: Tab?
+    static let selectTab = Notification.Name("SettingsView.selectTab")
 
     init(model: AppModel, tab: Tab = .general) {
         self.model = model
@@ -22,6 +25,10 @@ struct SettingsView: View {
             AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(Tab.about)
         }
         .frame(width: 600)
+        .onAppear { if let t = Self.pendingTab { tab = t; Self.pendingTab = nil } }
+        .onReceive(NotificationCenter.default.publisher(for: Self.selectTab)) { _ in
+            if let t = Self.pendingTab { tab = t; Self.pendingTab = nil }
+        }
     }
 }
 
