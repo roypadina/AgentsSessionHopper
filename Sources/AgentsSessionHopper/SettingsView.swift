@@ -1,6 +1,27 @@
 import SessionHopperCore
 import SwiftUI
 
+/// Own window, like AboutWindow: `showSettingsWindow:` is ignored on macOS 14+ and `openSettings`
+/// needs a SwiftUI view, so neither works from the NSMenu or the MenuBarExtra panel.
+@MainActor enum SettingsWindow {
+    static var model: AppModel?
+    private static var window: NSWindow?
+
+    static func show() {
+        guard let model else { return }
+        if window == nil {
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model).frame(height: 480)))  // grouped Forms have no ideal height outside a Settings scene
+            w.title = "AgentsSessionHopper Settings"
+            w.styleMask = [.titled, .closable]
+            w.isReleasedWhenClosed = false
+            w.center()
+            window = w
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     @State private var tab: Tab

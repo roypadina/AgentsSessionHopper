@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-24
+
+Still **BETA**.
+
+### Fixed
+- **Settings… and Switch log… now open the Settings window**, from the right-click menu and from the popover's gear button. macOS 14+ ignores the old way of opening it. Switch log… opens on the Log tab.
+
 ## [0.1.4] - 2026-10-24
 
 Still **BETA**.

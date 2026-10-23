@@ -23,14 +23,11 @@ struct AgentsSessionHopperApp: App {
             MenuBarLabel(model: model)
         }
         .menuBarExtraStyle(.window)
-
-        Settings {
-            SettingsView(model: model)
-        }
     }
 
     @MainActor static func makeModel() -> AppModel {
         let model = AppModel(env: .current(selfPath: cliPath))
+        SettingsWindow.model = model
         EventLog.prune(model.env.paths, days: 90)
         model.notifier = Notifier(model: model)
         DispatchQueue.main.async {
@@ -79,15 +76,23 @@ extension AgentsSessionHopperApp {
         Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/sessionhopper").path
     }
 
-    @MainActor static func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-    }
+    @MainActor static func openSettings() { SettingsWindow.show() }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         MainActor.assumeIsolated { StatusMenu.shared.install() }
+        #if DEBUG
+        // Test hook: ASH_DEBUG_OPEN="Settings…" (any status-menu title) fires that item exactly as a click would.
+        if let title = ProcessInfo.processInfo.environment["ASH_DEBUG_OPEN"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                MainActor.assumeIsolated {
+                    guard let i = StatusMenu.shared.menu().items.first(where: { $0.title == title }), let a = i.action else { return }
+                    NSApp.sendAction(a, to: i.target, from: i)
+                }
+            }
+        }
+        #endif
     }
 }
