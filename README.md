@@ -1,94 +1,148 @@
 <div align="center">
 
+<img src="Assets/icons/AppIcon-1024.png" alt="AgentsSessionHopper app icon" width="160">
+
 # AgentsSessionHopper
 
-**Profiles for Claude Code.** Keep your own accounts side by side, and when one runs low,
-continue the same conversation on another with one click. Nothing lost, nothing re-explained.
+### Profiles for Claude Code. One conversation, any of your accounts.
 
-[![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)](#install)
-[![Swift 6](https://img.shields.io/badge/Swift-6-orange)](Package.swift)
+Keep your own Claude accounts side by side. When one runs low, continue the same conversation on
+another with one click. Nothing lost, nothing re-explained, and nothing moves until you say so.
+
+[![macOS](https://img.shields.io/badge/macOS-14%2B-000000?logo=apple&logoColor=white)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![Universal](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-555555?logo=apple&logoColor=white)](#requirements)
+[![Release](https://img.shields.io/github/v/release/roypadina/AgentsSessionHopper?logo=github&label=release)](https://github.com/roypadina/AgentsSessionHopper/releases/latest)
+[![Homebrew](https://img.shields.io/badge/brew-roypadina%2Ftap-FBB040?logo=homebrew&logoColor=white)](https://github.com/roypadina/homebrew-tap)
 [![CI](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml/badge.svg)](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-F16061?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<img src="docs/screenshots/popover.png" width="400" alt="The menu-bar window: three profiles with their 5-hour and weekly usage, a prompt to move a session from work to personal, live sessions and recent hand-offs">
+```bash
+brew install --cask roypadina/tap/agents-session-hopper
+```
+
+<img src="docs/screenshots/popover.png" alt="The menu-bar window: three profiles with their 5-hour and weekly usage, a prompt to move a session from work to personal, live sessions and recent hand-offs" width="400">
 
 </div>
 
-> **Status: in development (pre-0.1.0).** The engine and CLI work and are tested; the menu-bar app is a first shell.
-> See [docs/ROADMAP.md](docs/ROADMAP.md).
+> AgentsSessionHopper is an independent open-source tool. It is not made by, affiliated with, or
+> endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.
 
-## What it does
+## Features
 
-- **Profiles.** Each of your Claude accounts gets its own Claude Code configuration folder, the
-  [way Claude Code documents for multiple accounts](https://code.claude.com/docs/en/authentication).
-  `sessionhopper profiles import` picks up the ones you already have.
-- **Usage from Claude Code itself.** Every session's status line reports its account's 5-hour and weekly
-  usage. AgentsSessionHopper records it per profile (and still shows your own status line).
-- **You confirm every move.** When a profile reaches 85% and another has room, you are asked:
-  *"work is near its usage limit (88%). Continue this conversation on personal?"* Confirm and the session
-  moves when the current turn ends: Claude Code restarts on the other profile and resumes the same
-  conversation. Optional, off by default: *move without asking*.
+- **Profiles.** Each of your accounts gets its own Claude Code configuration folder, the way
+  [Claude Code documents running several accounts](https://code.claude.com/docs/en/authentication).
+  Existing `~/.claude` and `~/.claude-*` folders are picked up; new ones are created with your
+  setup and history shared, and logged in through Claude Code's own `claude auth login`.
+- **Live usage per account**, from what Claude Code reports to its own status line (5-hour and weekly
+  windows). Your own status line keeps working.
+- **You confirm every move.** At 85% (adjustable), when another profile has room, a notification and
+  the menu bar ask: *"work is near its usage limit (88%). Continue this conversation on personal?"*
+  Confirm, and the session moves when the current turn ends, resuming the same conversation.
+- **Limit stops ask too.** If Claude Code stops on a usage limit, you are asked whether to continue on
+  another profile, and the work picks up where it stopped.
 - **Park before paid usage** (on by default). Past 97% with nothing confirmed, the session ends at its
   next turn end instead of running into paid extra usage, and tells you how to resume it.
-- **Switch log.** Every suggestion, move, park and limit stop is written to a log you can browse in the app.
+- **Move without asking** — optional, off by default, explained in Settings.
+- **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings.
+- **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.
+
+<div align="center">
+<img src="docs/screenshots/settings-handoff.png" alt="Settings, Hand-off tab: suggest threshold, move without asking (off), park before paid usage at 97%" width="520">
+</div>
+
+## Requirements
+
+macOS 14 Sonoma or later · Apple Silicon and Intel (universal binary) ·
+[Claude Code](https://code.claude.com/docs) installed, with a Pro or Max plan per account
+(usage numbers come only for those).
 
 ## Install
 
-Not released yet. Build from source:
+```bash
+brew install --cask roypadina/tap/agents-session-hopper
+```
+
+This installs the app and links the `sessionhopper` command.
+
+**Not notarized.** AgentsSessionHopper is self-signed (no paid Apple Developer ID), so macOS may block the
+first launch. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**, or
+clear quarantine once (this also unblocks the bundled CLI):
+
+```bash
+xattr -dr com.apple.quarantine /Applications/AgentsSessionHopper.app
+```
+
+## Quick start
+
+```bash
+sessionhopper profiles import            # find ~/.claude and ~/.claude-* profiles
+sessionhopper profiles add work          # new profile: shared history, then Claude Code's own login
+sessionhopper doctor                     # claude found, logins, shared history, thresholds
+
+sessionhopper                            # start a session on the first profile with room
+sessionhopper -P work "fix the tests"    # start on work; the others stay fallbacks
+sessionhopper -c                         # continue the newest session in this folder
+sessionhopper switch                     # inside a session: move at turn end
+sessionhopper status                     # profiles, usage, live sessions
+```
+
+Inside Claude Code you can also type `! sessionhopper switch`, or ask the agent to run it.
+To supervise every interactive `claude`, add `alias claude='sessionhopper shim'` to your shell profile;
+for cmux or an IDE, link the CLI as `sessionhopper-shim` and use that as the Claude binary path.
+Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
+
+## How it works (and what it never does)
+
+- `sessionhopper` starts the **official, unmodified `claude`** with the profile's configuration folder
+  and `--settings` that add a status line and a few hooks for that session only. No settings file is
+  written. Claude Code's traffic is never changed, proxied or inspected.
+- **Usage** comes only from the documented
+  [status-line input](https://code.claude.com/docs/en/statusline) (`rate_limits`), and limit stops
+  from the documented [`StopFailure` hook](https://code.claude.com/docs/en/hooks) (`error: "rate_limit"`).
+- **A move** waits until the turn and any background jobs finish, then restarts `claude --resume <id>`
+  under the next profile. Moving needs every profile to share one `projects/` folder, where Claude Code
+  keeps conversations. Profiles added by the app do; `doctor` checks.
+- **It never reads, copies, stores or sends** your Claude login, tokens or Keychain items. Login always
+  happens in Claude Code's own flow.
+- **It makes no network requests** at all: no usage endpoint, no telemetry, no update check.
+- **It does not change or get around any account's limits.** Each account keeps its own; you decide
+  when a conversation continues elsewhere.
+
+**Your part:** use it only with accounts that are yours, never shared with anyone. Each account is
+subject to Anthropic's Consumer Terms, Usage Policy and Claude Code usage rules, which Anthropic may
+change at any time.
+
+## Privacy
+
+No network access, no analytics. State lives in `~/Library/Application Support/AgentsSessionHopper/`
+(profile list, last-known usage percentages, the switch log). Preferences are in the defaults domain
+`com.padina.agents-session-hopper`. Optional `install-hooks` edits a profile's `settings.json` only when
+you run it, keeps a backup, and `uninstall-hooks` restores it.
+
+## Build from source
+
+Requires Xcode or the Xcode command line tools (Swift 6).
 
 ```bash
 git clone https://github.com/roypadina/AgentsSessionHopper.git
 cd AgentsSessionHopper
-Scripts/package_app.sh          # dist/AgentsSessionHopper.app, CLI in Contents/Helpers/sessionhopper
+swift test                        # unit + integration tests (fake `claude`, no real sessions)
+Scripts/package_app.sh            # dist/AgentsSessionHopper.app, CLI in Contents/Helpers/
 ```
 
-## Use
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Uninstall
 
 ```bash
-sessionhopper profiles import            # find ~/.claude and ~/.claude-* profiles
-sessionhopper profiles add work          # new profile: links shared history, then Claude Code's own login
-sessionhopper doctor                     # claude found, logins, shared history, thresholds
-
-sessionhopper                            # start a session on the first profile with room
-sessionhopper -P work "fix the tests"    # start on work (others stay fallbacks)
-sessionhopper -c                         # continue the newest session in this folder
-sessionhopper switch                     # inside a session: move to the next profile at turn end
-sessionhopper status                     # profiles, usage, live sessions
-sessionhopper log                        # the switch log
+sessionhopper uninstall-hooks --profile <name>   # only if you ran install-hooks
+brew uninstall --zap --cask agents-session-hopper
 ```
 
-Inside Claude Code you can also type `! sessionhopper switch`, or ask the agent to run it.
-
-Moving a session needs every profile to share one `projects/` folder (where Claude Code keeps
-conversations). `profiles add` sets that up; `doctor` checks it.
-
-## What it never does
-
-AgentsSessionHopper is an independent open-source tool. It is not made by, affiliated with, or endorsed
-by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.
-
-- It starts the official, unmodified `claude` and never changes or intercepts its traffic.
-- It never reads, copies, stores or sends your Claude login, tokens or Keychain items. Login always
-  happens in Claude Code's own flow (`claude auth login`).
-- It makes **no network requests** at all: no usage endpoint, no telemetry, no update check.
-- Usage numbers come only from what Claude Code gives its own status line, and limit stops from its
-  documented `StopFailure` hook.
-- It does not change or get around any account's limits: each account keeps its own.
-
-**Your part:** use it only with accounts that are yours, never shared with anyone. Each account is subject
-to Anthropic's Consumer Terms, Usage Policy and Claude Code usage rules, which Anthropic may change at any time.
-
-## How it works
-
-`sessionhopper` starts `claude --session-id <id> --settings '<hooks + status line>'` under the profile's
-config folder. `--settings` applies to that session only and writes no file. The status line records
-usage; hooks tell the engine when a turn starts and ends. A confirmed move waits for the turn (and any
-background jobs) to finish, then restarts `claude --resume <id>` under the next profile.
-
-`sessionhopper install-hooks --profile <name>` (optional, reversible) adds the same status line and
-limit-stop hook to a profile's `settings.json`, so sessions you start without `sessionhopper` report
-usage too. `uninstall-hooks` restores your settings.
+Your Claude Code profiles and conversations are untouched.
 
 ## Companion app
 

@@ -33,21 +33,27 @@ hand-offs), Settings (Hand-off: thresholds, move-without-asking with explanation
 Profiles: order; Log: table + Reveal in Finder; About), custom About window with Ko-fi.
 Offscreen renders in `docs/screenshots/`.
 
-## Next, to v0.1.0
+## Done since (toward v0.1.0)
 
-1. **M2 finish:** notifications with "Move at turn end" action (UNUserNotificationCenter), launch at
-   login, menu-bar label setting, 90-day log retention, Command-line tab (CLI path, shell snippet; the
-   app never edits rc files).
-2. **M3 onboarding:** first-run disclosure sheet, profile detection/import in the app, Add profile
-   (folder + shared items + login command / "Open in Terminal" via a `.command` file), logged-in state via
-   `claude auth status`, "history not shared" fix-up steps.
-3. **Engine follow-ups:** `shim` mode for cmux/IDE "Claude binary path" (non-interactive calls pass
-   straight to `claude`), interactive resume picker, session titles in `sessions`, optional OSC 9
-   `terminalSequence` notice on a limit stop.
-4. **M4 public package:** app + menu-bar icons, README screenshots pass, wiki, CHANGELOG, social preview,
-   privacy check, flip repo public, `v0.1.0` release, cask `agents-session-hopper` with
-   `binary "#{appdir}/AgentsSessionHopper.app/Contents/Helpers/sessionhopper"`.
-5. **Soak:** side by side with Roy's existing setup, then cut-over.
+Notifications with Move / Not now / Hold actions; first-run onboarding (disclosure, detect/import,
+Add Profile with shared history, login via Terminal `.command` or copied command, login state via
+`claude auth status`); `shim` mode (+ `*-shim` link name) for cmux/IDEs; launch at login; General and
+Command-line settings tabs; 90-day log retention; app icon + template menu-bar glyph; README landing
+page; wiki drafts in `docs/wiki/`; CHANGELOG; privacy pass. Tests: 44 unit + 26 integration + 1 app.
+
+## Left for v0.1.0 (needs Roy)
+
+1. Approve: flip the repo public, tag `v0.1.0`, release `AgentsSessionHopper.zip`.
+2. Cask `agents-session-hopper`: `app "AgentsSessionHopper.app"`,
+   `binary "#{appdir}/AgentsSessionHopper.app/Contents/Helpers/sessionhopper"`, quarantine caveat,
+   `zap trash: ["~/Library/Application Support/AgentsSessionHopper", "~/Library/Preferences/com.padina.agents-session-hopper.plist"]`.
+3. Push `docs/wiki/` to the repo wiki (wiki exists once the repo is public), social preview, branch protection.
+4. Real-world check on one spare profile (never done here: no real `claude` was run).
+
+## Later
+
+Interactive resume picker, session titles in `sessions`, OSC 9 notice on a limit stop, Codex (after a
+terms check), "show icon only while sessions run".
 
 ## Open risks
 
