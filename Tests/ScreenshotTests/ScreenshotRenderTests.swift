@@ -7,6 +7,7 @@ import XCTest
 /// Renders the app's views offscreen (a window that is never shown) into PNGs, from sample data in a
 /// temp state dir. Dev-only, skipped unless RENDER_SCREENSHOTS=<output dir>:
 ///   RENDER_SCREENSHOTS=$PWD/docs/screenshots swift test --filter ScreenshotRenderTests
+///   Scripts/strip_png_metadata.py docs/screenshots/*.png
 @MainActor
 final class ScreenshotRenderTests: XCTestCase {
     private func render<V: View>(_ view: V, name: String, dir: String, cropTop: Int = 0) throws {

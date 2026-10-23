@@ -12,3 +12,4 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns AppIcon.iconset -o AppIcon.icns
 rm -rf AppIcon.iconset
+python3 ../../Scripts/strip_png_metadata.py menubar.png menubar@2x.png AppIcon-1024.png

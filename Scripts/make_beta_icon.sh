@@ -8,3 +8,4 @@ RIBBON='<g clip-path="url(#sq)"><g transform="translate(748 276) rotate(45)"><re
 sed "s|</svg>|${RIBBON}</svg>|" Assets/icons/AppIcon.svg > docs/brand/icon-beta.svg
 rsvg-convert -w 512 -h 512 docs/brand/icon-beta.svg -o docs/brand/icon-beta.png
 echo docs/brand/icon-beta.png
+python3 Scripts/strip_png_metadata.py docs/brand/icon-beta.png
