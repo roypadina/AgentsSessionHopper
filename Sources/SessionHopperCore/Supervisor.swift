@@ -129,9 +129,11 @@ public final class Supervisor {
                 args = ["--resume", resumeID, "--settings", settings]
                 args += launches == 0 ? opts.claudeArgs : LaunchPlan.relaunchArgs(opts.claudeArgs)
                 let cutOff = FileIO.readString(files.killed)
-                if launches > 0, cutOff != nil || request?.trigger == "limit_stop" {
+                // The last turn died on an API error (a limit stop) and the user moved on: pick the work back up.
+                let died = FileIO.exists(files.interrupted) || request?.trigger == "limit_stop"
+                if launches > 0, cutOff != nil || died {
                     let jobs = (cutOff ?? "").split(separator: "\n").dropFirst().map(String.init)
-                    args.append(LaunchPlan.continuePrompt(jobs: jobs, limitStop: request?.trigger == "limit_stop"))
+                    args.append(LaunchPlan.continuePrompt(jobs: jobs, limitStop: died))
                 }
             }
             files.turnFiles.forEach(FileIO.remove)

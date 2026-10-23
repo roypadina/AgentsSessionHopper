@@ -51,6 +51,7 @@ public enum HookHandler {
         switch event {
         case "UserPromptSubmit":
             FileIO.touch(f.busy)
+            FileIO.remove(f.interrupted)
             return notice(f, event: event)
         case "PostToolUse":
             return notice(f, event: event)
@@ -59,6 +60,7 @@ public enum HookHandler {
                 .filter { ["running", "pending"].contains(($0["status"] as? String) ?? "running") }
             if running.isEmpty { FileIO.remove(f.jobs) } else { try? FileIO.write(running.map(describe).joined(), to: f.jobs) }
             FileIO.remove(f.busy)
+            FileIO.remove(f.interrupted)
         case "StopFailure":
             // The turn is over either way; a limit stop also tells the supervisor to ask (or move).
             FileIO.remove(f.busy)
