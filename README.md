@@ -17,6 +17,7 @@ another with one click. Nothing lost, nothing re-explained, and nothing moves un
 [![Release](https://img.shields.io/github/v/release/roypadina/AgentsSessionHopper?logo=github&label=release)](https://github.com/roypadina/AgentsSessionHopper/releases/latest)
 [![Homebrew](https://img.shields.io/badge/brew-roypadina%2Ftap-FBB040?logo=homebrew&logoColor=white)](https://github.com/roypadina/homebrew-tap)
 [![CI](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml/badge.svg)](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml)
+[![Website](https://img.shields.io/badge/website-apps.roypadina-2F62E6)](https://apps.roypadina.synology.me/apps/agents-session-hopper/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![Status: beta](https://img.shields.io/badge/status-BETA-FFD60A)](docs/ROADMAP.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-F16061?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
@@ -151,6 +152,14 @@ Your Claude Code profiles and conversations are untouched.
 
 [Agents Monitor](https://github.com/roypadina/AgentsMonitor) watches usage limits for Claude Code and
 Codex accounts from the menu bar. The two apps are independent.
+
+## More Mac apps by Roy
+
+Free, open-source Mac menu-bar apps and terminal tools, all on one site: **[apps.roypadina.synology.me](https://apps.roypadina.synology.me/)**.
+
+- [Agents Monitor](https://apps.roypadina.synology.me/apps/agents-monitor/) — See your Claude Code and Codex usage limits before you hit them.
+- [agentctl](https://apps.roypadina.synology.me/apps/agentctl/) — Find and resume any Claude Code or Codex session from one terminal menu.
+- [claude-jam](https://apps.roypadina.synology.me/apps/claude-jam/) — Share one real Claude Code session with other humans.
 
 ## Support
 
