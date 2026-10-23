@@ -3,15 +3,15 @@
 ```
 sessionhopper [claude args...]            start a session on the first profile with room
 sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
-sessionhopper --resume <id> | -c          adopt an existing session (bare --resume lists them)
-sessionhopper sessions [n]                resumable sessions in this directory
+sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
 sessionhopper status [--json]             profiles, last-known usage, live sessions
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper login <profile>             run `claude auth login` for that profile
-sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off]
+sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
 sessionhopper log [-n 20] [--json]        the switch log
 sessionhopper doctor                      check claude, logins, shared history, thresholds
 sessionhopper install-hooks --profile X   report usage from sessions started without sessionhopper
@@ -27,6 +27,11 @@ message shows how to resume it).
 
 - `switch` without a profile picks the next one in order with room. `--now` moves mid-turn; the
   resumed session is told what was interrupted.
+- A bare `--resume` in a terminal is a numbered picker, 10 rows a page (`m` for more, Enter cancels);
+  piped or scripted, it prints the list. `--resume "<name>"` takes the name `/resume` shows.
+- `config move-now on` (needs `auto-move on`): past the park threshold the move or park happens at
+  once, even mid-turn, instead of at the turn end. The cut-off turn is resumed with a note of what was
+  interrupted. Held sessions are never cut into.
 - `hold` keeps a session on its profile: no park, no automatic move. A move you confirm still happens.
 - `install-hooks` edits one profile's `settings.json` (with a backup) so sessions started with plain
   `claude` also report usage and limit stops. Optional; `uninstall-hooks` restores your status line.

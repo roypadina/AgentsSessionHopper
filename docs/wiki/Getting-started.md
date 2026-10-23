@@ -28,7 +28,7 @@ It must say that all profiles share one `projects/` folder, or sessions cannot m
 sessionhopper                          # like `claude`, on the first profile with room
 sessionhopper -P work "fix the tests"  # start on work
 sessionhopper -c                       # continue the newest session in this folder
-sessionhopper --resume <id>            # adopt an existing session (bare --resume lists them)
+sessionhopper --resume <id>            # adopt an existing session (bare --resume: numbered picker)
 ```
 
 Any other argument goes to `claude` unchanged. To make this the default, see

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-23
+
+Still **BETA**.
+
+### Added
+- **Resume picker.** A bare `--resume` in a terminal shows a numbered list, 10 at a time (`m` for more); pick a number to continue that conversation.
+- **Session names** in `sessions` and the picker (the name `/resume` shows), `sessions all`, `--all-dirs` for every folder, and `--sessions [n|all]` as a launch flag.
+- **Resume by name:** `--resume "<name>"` finds the conversation with that name, here first, then anywhere.
+- **Move now past the park threshold** (`config move-now on`, off by default): with "move without asking" on, a move or park past the park threshold happens at once, even mid-turn, so a long turn cannot run into paid usage. Held sessions are never cut into.
+- The start message names the profiles that were passed over and their usage. `--account` works as an alias of `-P`.
+
+### Fixed
+- A caller's own `--settings` (cmux passes its hooks this way) is merged into ours instead of being passed as a second flag. Claude Code reads only one `--settings`, so either the usage status line and hooks or cmux's notifications were lost.
+
 ## [0.1.1] - 2026-10-23
 
 Still **BETA**.

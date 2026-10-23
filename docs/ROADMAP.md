@@ -52,7 +52,7 @@ page; wiki drafts in `docs/wiki/`; CHANGELOG; privacy pass. Tests: 44 unit + 26 
 
 ## Later
 
-Interactive resume picker, session titles in `sessions`, OSC 9 notice on a limit stop, Codex (after a
+OSC 9 notice on a limit stop, Codex (after a
 terms check), "show icon only while sessions run".
 
 ## Open risks

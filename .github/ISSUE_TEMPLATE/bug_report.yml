@@ -35,6 +35,6 @@ body:
     id: version
     attributes:
       label: AgentsSessionHopper and Claude Code versions
-      placeholder: "0.1.1 (Homebrew), Claude Code 2.1.300"
+      placeholder: "0.1.2 (Homebrew), Claude Code 2.1.300"
     validations:
       required: true
