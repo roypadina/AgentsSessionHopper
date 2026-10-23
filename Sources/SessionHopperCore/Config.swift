@@ -32,10 +32,13 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public var autoMove: Bool = false
     /// End the session at its next turn end past the hard threshold, instead of running into paid usage.
     public var parkBeforePaid: Bool = true
+    /// Opt-in: past the hard threshold an automatic move or park happens at once, even mid-turn, instead of
+    /// at the next turn end (a long turn could otherwise run past 100%). Held sessions are never cut into.
+    public var moveNowAtHard: Bool = false
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -46,6 +49,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         hardThreshold = try c.decodeIfPresent(Double.self, forKey: .hardThreshold) ?? d.hardThreshold
         autoMove = try c.decodeIfPresent(Bool.self, forKey: .autoMove) ?? d.autoMove
         parkBeforePaid = try c.decodeIfPresent(Bool.self, forKey: .parkBeforePaid) ?? d.parkBeforePaid
+        moveNowAtHard = try c.decodeIfPresent(Bool.self, forKey: .moveNowAtHard) ?? d.moveNowAtHard
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {

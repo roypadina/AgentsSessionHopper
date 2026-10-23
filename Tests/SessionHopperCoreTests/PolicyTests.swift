@@ -87,6 +87,7 @@ final class PolicyTests: XCTestCase {
         XCTAssertTrue(cfg.parkBeforePaid)
         XCTAssertTrue(cfg.autoMove)
         XCTAssertFalse(HopperConfig().autoMove, "move without asking is opt-in")
+        XCTAssertFalse(HopperConfig().moveNowAtHard, "cutting into a turn is opt-in")
         var bad = HopperConfig()
         bad.suggestThreshold = 98
         let sb = Sandbox()
@@ -101,5 +102,19 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(l?.session, "s1")
         XCTAssertNil(ProfileLimits.fromStatusLine(json(#"{"model":{"id":"x"}}"#)!, now: 5), "no rate_limits before the first response")
         XCTAssertNil(ProfileLimits.fromStatusLine(json(#"{"rate_limits":{"spend_limit":{"used_percentage":50}}}"#)!, now: 5), "spend caps are not account windows")
+    }
+
+    func testPickerPagesAndPicks() {
+        let rows = (1...25).map { "row \($0)" }
+        var input = ["m", "12"]
+        var shown = ""
+        let pick = Picker.choose(count: rows.count, row: { rows[$0] }, read: { input.isEmpty ? nil : input.removeFirst() }, write: { shown += $0 })
+        XCTAssertEqual(pick, 11)
+        XCTAssertTrue(shown.contains(" 1. row 1\n") && shown.contains("20. row 20\n"))
+        XCTAssertFalse(shown.contains("row 21"))
+        input = [""]
+        XCTAssertNil(Picker.choose(count: rows.count, row: { rows[$0] }, read: { input.isEmpty ? nil : input.removeFirst() }, write: { _ in }))
+        input = ["30"]
+        XCTAssertNil(Picker.choose(count: rows.count, row: { rows[$0] }, read: { input.isEmpty ? nil : input.removeFirst() }, write: { _ in }), "only rows on screen")
     }
 }

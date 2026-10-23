@@ -199,6 +199,60 @@ final class HandOffTests: XCTestCase {
         XCTAssertTrue(h.launches[0].hasPrefix(h.workDir.path), h.launches[0])
     }
 
+    func testMoveNowAtHardCutsInMidTurn() throws {
+        try h.config { $0.autoMove = true; $0.moveNowAtHard = true }
+        try h.scenario("""
+            if [ "$N" = 1 ]; then
+              emit UserPromptSubmit
+              usage 98
+              sleep 5
+              touch "$T/turn-finished"
+            else exit 0; fi
+            """)
+        try h.run(["first prompt"])
+        XCTAssertNil(h.read("turn-finished"), "moved mid-turn, not at the turn end")
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertTrue(h.launches[1].hasPrefix(h.workDir.path), h.launches[1])
+        XCTAssertTrue(h.launches[1].contains("restarted Claude Code in the middle of your work"))
+        XCTAssertEqual(h.events().last?.trigger, "hard")
+    }
+
+    func testParkNowAtHardWhenNothingHasRoom() throws {
+        try h.config { $0.moveNowAtHard = true }
+        try h.scenario("""
+            emit UserPromptSubmit
+            usage 98
+            sleep 5
+            touch "$T/turn-finished"
+            """)
+        let r = try h.run(["--only", "default"])
+        XCTAssertEqual(r.code, 2)
+        XCTAssertNil(h.read("turn-finished"), "parked mid-turn")
+        XCTAssertEqual(h.events().last?.type, "park")
+    }
+
+    func testHeldSessionIsNotCutInAtHard() throws {
+        try h.config { $0.autoMove = true; $0.moveNowAtHard = true }
+        try h.scenario("""
+            "$SESSIONHOPPER_BIN" hold on > /dev/null
+            emit UserPromptSubmit
+            usage 99
+            sleep 1.2
+            exit 0
+            """)
+        XCTAssertEqual(try h.run([]).code, 0)
+        XCTAssertEqual(h.launches.count, 1)
+    }
+
+    func testStartSaysWhichProfilesWereSkipped() throws {
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 98, resetsAt: 4102444800), sevenDay: nil, sampledAt: 0),
+                             profile: "default", h.env.paths)
+        try h.scenario("exit 0")
+        let r = try h.run([])
+        XCTAssertTrue(r.stderr.contains("starting on work"), r.stderr)
+        XCTAssertTrue(r.stderr.contains("skipped default 98%"), r.stderr)
+    }
+
     func testSigtermIsForwardedToClaude() throws {
         try h.scenario("touch \"$T/started\"")
         let r = try h.run([]) { p in

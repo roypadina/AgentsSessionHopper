@@ -60,6 +60,11 @@ public final class Supervisor {
             sessionID = newest.id
             firstRun = false
         }
+        // `--resume "<name>"`: the name `/resume` shows, as Claude Code itself accepts.
+        if UUID(uuidString: sessionID) == nil, !firstRun,
+           let id = Transcripts.resolve(name: sessionID, cwd: cwd, projects: projects, live: Transcripts.liveIDs(config: config, paths: env.paths)) {
+            sessionID = id
+        }
         guard UUID(uuidString: sessionID) != nil else {
             say("'\(sessionID)' is not a session id. List them with: sessionhopper sessions")
             return 1
@@ -77,6 +82,7 @@ public final class Supervisor {
             }
         }
 
+        let (claudeArgs, callerSettings) = LaunchPlan.extractSettings(opts.claudeArgs)
         installSignalHandlers()
         let files = env.paths.session(sessionID)
         defer { files.all.forEach(FileIO.remove) }
@@ -116,18 +122,20 @@ public final class Supervisor {
                                             to: profile.name, trigger: request?.trigger, source: request?.source,
                                             profiles: EventLog.samples(config, env.paths, now: FileIO.now())), env.paths)
             } else if current == nil {
-                say("starting on \(profile.name) (\(pct))")
+                let skipped = request == nil ? policy.skipped(order, before: profile) : []
+                say("starting on \(profile.name) (\(pct))" + (skipped.isEmpty ? "" : ", skipped " + skipped.joined(separator: ", ")))
             }
 
             var args: [String]
             let settings = LaunchPlan.settingsJSON(
                 selfPath: env.selfPath,
-                userStatusLine: StatusLineBridge.effectiveUserStatusLine(cwd: fm.currentDirectoryPath, profile: profile, paths: env.paths))
+                userStatusLine: StatusLineBridge.effectiveUserStatusLine(cwd: fm.currentDirectoryPath, profile: profile, paths: env.paths),
+                caller: callerSettings)
             if firstRun {
-                args = ["--session-id", sessionID, "--settings", settings] + opts.claudeArgs
+                args = ["--session-id", sessionID, "--settings", settings] + claudeArgs
             } else {
                 args = ["--resume", resumeID, "--settings", settings]
-                args += launches == 0 ? opts.claudeArgs : LaunchPlan.relaunchArgs(opts.claudeArgs)
+                args += launches == 0 ? claudeArgs : LaunchPlan.relaunchArgs(claudeArgs)
                 let cutOff = FileIO.readString(files.killed)
                 // The last turn died on an API error (a limit stop) and the user moved on: pick the work back up.
                 let died = FileIO.exists(files.interrupted) || request?.trigger == "limit_stop"
@@ -207,7 +215,19 @@ public final class Supervisor {
         let config = HopperConfig.load(env.paths)
         let policy = Policy(config: config, limits: LimitStore.all(config, env.paths), now: FileIO.now())
         let pendingExists = FileIO.exists(f.pending)
-        switch policy.evaluate(current: profile, order: order, held: held(f)) {
+        let decision = policy.evaluate(current: profile, order: order, held: held(f))
+        if policy.isUrgent(decision, current: profile), !FileIO.exists(f.ctl) {
+            switch decision {
+            case .autoMove(let to, _):
+                try? FileIO.encode(PendingMove(to: to, trigger: "hard", source: "engine"), to: f.ctl)
+                return
+            case .park where !limitHit:
+                try? FileIO.encode(PendingMove(to: PendingMove.park, trigger: "park", source: "engine"), to: f.ctl)
+                return
+            default: break
+            }
+        }
+        switch decision {
         case .none:
             break
         case .suggest(let to, let pct):

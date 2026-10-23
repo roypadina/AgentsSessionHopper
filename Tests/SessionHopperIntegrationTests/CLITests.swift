@@ -45,6 +45,54 @@ final class CLITests: XCTestCase {
         XCTAssertTrue(h.launches.first?.contains("--resume aaaaaaaa-0000-0000-0000-000000000002") ?? false)
     }
 
+    func titled(_ id: String, cwd: String, prompt: String, title: String) throws {
+        try h.write(#"{"type":"user","cwd":"\#(cwd)","message":{"content":"\#(prompt)"}}"# + "\n"
+                    + #"{"type":"ai-title","aiTitle":"auto name"}"# + "\n" + #"{"type":"custom-title","customTitle":"\#(title)"}"# + "\n",
+                    "home/.claude/projects/\(Transcripts.dirName(for: cwd))/\(id).jsonl")
+    }
+
+    func testSessionsShowTitlesAllAndAllDirs() throws {
+        let other = h.t.appendingPathComponent("other")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try titled("aaaaaaaa-0000-0000-0000-000000000001", cwd: h.work.path, prompt: "here work", title: "Here Name")
+        try titled("aaaaaaaa-0000-0000-0000-000000000002", cwd: other.path, prompt: "there work", title: "There Name")
+        let here = try h.run(["--sessions", "all"])
+        XCTAssertEqual(here.code, 0)
+        XCTAssertTrue(here.stdout.contains("Here Name - here work"), here.stdout)
+        XCTAssertFalse(here.stdout.contains("There Name"))
+        let all = try h.run(["sessions", "--all-dirs"])
+        XCTAssertTrue(all.stdout.contains("There Name") && all.stdout.contains("Here Name"), all.stdout)
+        XCTAssertTrue(all.stdout.contains("other"), "rows from other folders name the folder")
+        XCTAssertTrue(h.launches.isEmpty)
+    }
+
+    func testResumeByName() throws {
+        let id = "aaaaaaaa-0000-0000-0000-000000000003"
+        try titled(id, cwd: h.work.path, prompt: "x", title: "Avendra Integration")
+        try h.scenario("exit 0")
+        XCTAssertEqual(try h.run(["--resume", "Avendra Integration"]).code, 0)
+        XCTAssertTrue(h.launches.first?.contains("--resume \(id) --settings") ?? false)
+    }
+
+    func testAccountIsAnAliasForProfile() throws {
+        try h.scenario("exit 0")
+        try h.run(["--account", "work"])
+        XCTAssertTrue(h.launches[0].hasPrefix(h.workDir.path), h.launches[0])
+        XCTAssertFalse(h.launches[0].contains("--account"))
+    }
+
+    func testCallersSettingsAreMergedIntoOneFlag() throws {
+        // cmux (and others) pass their own --settings; Claude Code keeps only one of several.
+        try h.scenario("exit 0")
+        try h.run(["--settings", #"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"cmux-stop-hook"}]}]},"model":"x"}"#, "hi"])
+        let l = h.launches[0]
+        XCTAssertEqual(l.components(separatedBy: "--settings ").count, 2, "exactly one --settings: \(l)")
+        XCTAssertTrue(l.contains("cmux-stop-hook"), l)
+        XCTAssertTrue(l.contains(#"sessionhopper' hook"#), l)
+        XCTAssertTrue(l.contains(#""model":"x""#), l)
+        XCTAssertTrue(l.contains(#""statusLine":{"command":"#), l)
+    }
+
     func testRefusesNonIdResume() throws {
         let r = try h.run(["--resume", "my-session-name"])
         XCTAssertEqual(r.code, 1)
@@ -70,6 +118,8 @@ final class CLITests: XCTestCase {
 
         XCTAssertEqual(try h.run(["config", "auto-move", "on"]).code, 0)
         XCTAssertTrue(HopperConfig.load(h.env.paths).autoMove)
+        XCTAssertEqual(try h.run(["config", "move-now", "on"]).code, 0)
+        XCTAssertTrue(HopperConfig.load(h.env.paths).moveNowAtHard)
         XCTAssertEqual(try h.run(["config", "suggest", "99"]).code, 1, "suggest must stay below park")
 
         let s = try h.run(["status", "--json"])

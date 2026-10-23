@@ -39,15 +39,15 @@ let usage = """
 
       sessionhopper [claude args...]            start a session on the first profile with room
       sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
-      sessionhopper --resume <id> | -c          adopt an existing session (bare --resume lists them)
-      sessionhopper sessions [n]                resumable sessions in this directory
+      sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+      sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
       sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
       sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
       sessionhopper status [--json]             profiles, last-known usage, live sessions
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper login <profile>             run `claude auth login` for that profile
-      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off]
+      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
       sessionhopper log [-n 20] [--json]        the switch log
       sessionhopper doctor                      check claude, logins, shared history, thresholds
       sessionhopper install-hooks --profile X   report usage from sessions started without sessionhopper
@@ -122,20 +122,47 @@ func describe(_ e: HopperEvent) -> String {
     return "\(time)  \(pad(e.type, 7)) \(sid)  \(move)\(why.isEmpty ? "" : "  (\(why))")"
 }
 
+/// `[n|all] [--all-dirs]`.
 func sessionsCommand(_ a: [String]) -> Int32 {
-    let n = a.first.flatMap(Int.init) ?? 10
-    let config = HopperConfig.load(env.paths)
+    var a = a
+    let allDirs = has("--all-dirs", in: &a)
+    let n = a.first == "all" ? Int.max : a.first.flatMap(Int.init) ?? 10
+    let list = resumable(limit: n, allDirs: allDirs)
     let cwd = FileManager.default.currentDirectoryPath
-    let list = Transcripts.list(cwd: cwd, projects: Profiles.projectsDir(config, home: env.home),
-                                live: Transcripts.liveIDs(config: config, paths: env.paths), limit: n)
-    if list.isEmpty { out("No resumable sessions in \(env.tilde(cwd))."); return 1 }
-    out("Resumable sessions in \(env.tilde(cwd)):")
-    for i in list {
-        let age = ago(i.modified.timeIntervalSince1970, now: Date().timeIntervalSince1970)
-        out("  \(i.id)  \(pad(age, 8)) \(i.firstPrompt.prefix(70))")
-    }
+    if list.isEmpty { out("No resumable sessions in \(allDirs ? "any folder" : env.tilde(cwd))."); return 1 }
+    out("Resumable sessions in \(allDirs ? "every folder" : env.tilde(cwd)):")
+    list.forEach { out("  \($0.id)  " + row($0, allDirs: allDirs)) }
     out("\n  resume:  sessionhopper --resume <id>      newest:  sessionhopper -c")
     return 0
+}
+
+func resumable(limit: Int, allDirs: Bool) -> [Transcripts.Info] {
+    let config = HopperConfig.load(env.paths)
+    return Transcripts.list(cwd: FileManager.default.currentDirectoryPath, projects: Profiles.projectsDir(config, home: env.home),
+                            live: Transcripts.liveIDs(config: config, paths: env.paths), limit: limit, allDirs: allDirs)
+}
+
+/// `age  [folder]  name - first prompt`.
+func row(_ i: Transcripts.Info, allDirs: Bool) -> String {
+    let age = ago(i.modified.timeIntervalSince1970, now: Date().timeIntervalSince1970)
+    let dir = allDirs ? "[\(env.tilde(i.cwd ?? "?"))]  " : ""
+    return "\(pad(age, 8)) \(dir)" + [i.title, i.firstPrompt].compactMap { $0 }.joined(separator: " - ").prefix(74)
+}
+
+/// Bare `--resume` in a terminal: the numbered picker. Returns the chosen id.
+func pick(allDirs: Bool) -> String? {
+    var cache: [Transcripts.Info] = []
+    func rows(_ n: Int) -> [Transcripts.Info] {
+        if cache.count < n { cache = resumable(limit: n, allDirs: allDirs) }
+        return cache
+    }
+    // Ask for one more than a page, so the picker knows whether "m" has anything behind it.
+    var known = rows(11).count
+    let choice = Picker.choose(count: known, row: { i in
+        if i + 1 >= known { known = rows(i + 11).count }
+        return row(rows(i + 1)[i], allDirs: allDirs)
+    }, read: { readLine() }, write: { FileHandle.standardError.write(Data($0.utf8)) })
+    return choice.map { cache[$0].id }
 }
 
 func sessionArg(_ a: inout [String]) -> String {
@@ -262,15 +289,17 @@ func configCommand(_ a: [String]) -> Int32 {
         case "park-at": c.hardThreshold = Double(v) ?? c.hardThreshold
         case "park": c.parkBeforePaid = v == "on"
         case "auto-move": c.autoMove = v == "on"
+        case "move-now": c.moveNowAtHard = v == "on"
         default: die("unknown setting \(a[0])")
         }
         do { try c.save(env.paths) } catch { die("\(error)") }
     } else if !a.isEmpty {
-        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off]")
+        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]")
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
     out("move without asking: \(c.autoMove ? "on" : "off")")
+    out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
     return 0
 }
 
@@ -319,6 +348,9 @@ func launch(_ a: [String]) -> Int32 {
     var o = LaunchOptions()
     var i = 0
     var listOnly = false
+    var picker = false
+    var allDirs = false
+    var listArgs: [String] = []
     func value() -> String {
         guard i + 1 < a.count else { die("\(a[i]) needs a value") }
         i += 1
@@ -327,14 +359,18 @@ func launch(_ a: [String]) -> Int32 {
     while i < a.count {
         let x = a[i]
         switch x {
-        case "-P", "--profile": o.prefer += value().split(separator: ",").map(String.init)
+        case "-P", "--profile", "--account": o.prefer += value().split(separator: ",").map(String.init)
         case "--only": o.prefer += value().split(separator: ",").map(String.init); o.only = true
         case "-c", "--continue": o.continueLast = true
         case "--session-id": o.sessionID = value(); o.sessionIsNew = true
         case "-r", "--resume":
             // The id must be known before `claude` starts for the conversation to survive a move,
-            // so a bare --resume lists instead of opening Claude Code's own picker.
-            if i + 1 < a.count, !a[i + 1].hasPrefix("-") { o.sessionID = value() } else { listOnly = true }
+            // so a bare --resume shows our own picker (or list) instead of Claude Code's.
+            if i + 1 < a.count, !a[i + 1].hasPrefix("-") { o.sessionID = value() } else { picker = true }
+        case "--all-dirs": allDirs = true
+        case "--sessions", "--list":
+            listOnly = true
+            if i + 1 < a.count, a[i + 1] == "all" || Int(a[i + 1]) != nil { listArgs = [value()] }
         case "--":
             o.claudeArgs += a[(i + 1)...]
             i = a.count
@@ -343,7 +379,12 @@ func launch(_ a: [String]) -> Int32 {
         }
         i += 1
     }
-    if listOnly { return sessionsCommand([]) }
+    if picker, !listOnly, isatty(0) == 1, isatty(2) == 1 {
+        guard let id = pick(allDirs: allDirs) else { return 1 }
+        o.sessionID = id
+    } else if picker || listOnly {
+        return sessionsCommand(listArgs + (allDirs ? ["--all-dirs"] : []))
+    }
     return Supervisor(env: env, options: o, say: say).run()
 }
 

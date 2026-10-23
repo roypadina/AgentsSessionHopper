@@ -35,7 +35,7 @@ public enum Doctor {
             add(.warn, "no profiles configured. Found \(found.count) on disk: run `sessionhopper profiles import`")
             return out
         }
-        add(.info, "thresholds: suggest \(Int(config.suggestThreshold))%, park \(Int(config.hardThreshold))% (\(config.parkBeforePaid ? "on" : "off")), move without asking: \(config.autoMove ? "on" : "off")")
+        add(.info, "thresholds: suggest \(Int(config.suggestThreshold))%, park \(Int(config.hardThreshold))% (\(config.parkBeforePaid ? "on" : "off")), move without asking: \(config.autoMove ? "on" : "off")\(config.moveNowAtHard ? ", at once past park" : "")")
 
         let now = FileIO.now()
         let claudePath = Claude.locate(env)
