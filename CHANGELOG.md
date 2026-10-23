@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-24
+
+Still **BETA**.
+
+### Fixed
+- Profile discovery no longer offers other tools' folders such as `~/.claude-swap-backup`: a folder needs a Claude Code marker (`settings.json`, `projects/` or `.claude.json`; `sessions/` alone no longer counts), and names containing `backup`, `swap`, `bak` or `tmp` are skipped.
+
 ## [0.1.2] - 2026-10-23
 
 Still **BETA**.

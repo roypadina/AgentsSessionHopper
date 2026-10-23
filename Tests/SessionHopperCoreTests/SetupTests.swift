@@ -55,6 +55,8 @@ final class ProfileTests: XCTestCase {
         sb.profileDir(".claude3")
         try! FileManager.default.createDirectory(at: sb.home.appendingPathComponent(".claude-unrelated-tool"), withIntermediateDirectories: true)
         sb.write("{}", "home/.claude.json")
+        for n in [".claude-swap-backup", ".claude-bak", ".claude-tmp", ".claude3.backup"] { sb.profileDir(n, settings: "{}") }
+        try! FileManager.default.createDirectory(at: sb.home.appendingPathComponent(".claude-sessions-only/sessions"), withIntermediateDirectories: true)
         let found = Profiles.discover(home: sb.home)
         XCTAssertEqual(found.map(\.name), ["default", "work", "claude3"])
         XCTAssertEqual(found.map(\.exportConfigDir), [false, true, true], "CLAUDE_CONFIG_DIR stays unset for ~/.claude")
