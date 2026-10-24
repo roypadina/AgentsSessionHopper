@@ -22,7 +22,7 @@ final class StatusMenuTests: XCTestCase {
         _ = NSApplication.shared  // xctest has no NSApp until something asks for it
         let item = try XCTUnwrap(StatusMenu.shared.menu().items.first { $0.title == "Switch log…" })
         NSApp.sendAction(try XCTUnwrap(item.action), to: item.target, from: item)
-        let w = try XCTUnwrap(NSApp.windows.first { $0.title == "AgentsSessionHopper Settings" })
+        let w = try XCTUnwrap(NSApp.windows.first { $0.title == "Log" })
         XCTAssertTrue(w.isVisible)
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))  // hosting controller sizes the window on a later pass
         XCTAssertGreaterThan(w.frame.height, 300)
