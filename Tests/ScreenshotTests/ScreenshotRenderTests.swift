@@ -72,10 +72,9 @@ final class ScreenshotRenderTests: XCTestCase {
             .deletingLastPathComponent().appendingPathComponent("../../Assets/icons/AppIcon-1024.png").standardizedFileURL)
         try render(OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "onboarding.png", dir: dir)
         try render(PopoverView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "popover.png", dir: dir)
-        // The tab strip's selected label does not render offscreen: crop it off.
         for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.profiles, "settings-profiles.png"),
                           (.commandLine, "settings-command-line.png"), (.log, "settings-log.png")] {
-            try render(SettingsView(model: model, tab: tab), name: name, dir: dir, cropTop: 46)
+            try render(SettingsView(model: model, nav: { let n = SettingsNav(); n.tab = tab; return n }()).background(Color(nsColor: .windowBackgroundColor)).frame(width: 600, height: 480), name: name, dir: dir)
         }
         try render(AboutView().background(Color(nsColor: .windowBackgroundColor)), name: "about.png", dir: dir)
     }

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-24
+
+Still **BETA**.
+
+### Changed
+- **Settings window uses the classic macOS preferences toolbar**: an icon and label per tab, the selected tab highlighted, and the window title follows the tab. Replaces the cramped tab strip.
+
 ## [0.1.5] - 2026-10-24
 
 Still **BETA**.
