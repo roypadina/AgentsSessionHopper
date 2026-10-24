@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-25
+
+Still **BETA**.
+
+### Changed
+- Releases are now signed with a stable identity, so permissions survive future updates. After this one update you may need to re-allow notifications once.
+
 ## [0.1.6] - 2026-10-24
 
 Still **BETA**.

@@ -4,12 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="AgentsSessionHopper"
 BUNDLE_ID="com.padina.agents-session-hopper"
-VERSION="0.1.6"
-BUILD_NUMBER="4"
+VERSION="0.1.7"
+BUILD_NUMBER="5"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
-SIGNING_IDENTITY="${CODE_SIGN_IDENTITY:-}"
+SIGNING_IDENTITY="${ASH_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:-}}"
 # RELEASE=1: also zip the app into dist/AgentsSessionHopper.zip for GitHub Releases and the Homebrew cask.
 RELEASE="${RELEASE:-}"
 
@@ -63,6 +63,11 @@ PLIST
 
 chmod +x "$CONTENTS_DIR/MacOS/$APP_NAME" "$CONTENTS_DIR/Helpers/sessionhopper"
 
+# The maintainer's stable identity first, so macOS permissions survive updates; then any local one.
+STABLE_ID="KeyLayoutSwitcher Dev"
+if [[ -z "$SIGNING_IDENTITY" ]] && security find-identity -v -p codesigning 2>/dev/null | grep -q "\"$STABLE_ID\""; then
+    SIGNING_IDENTITY="$STABLE_ID"
+fi
 if [[ -z "$SIGNING_IDENTITY" ]]; then
     SIGNING_IDENTITY="$(
         security find-identity -v -p codesigning 2>/dev/null \
