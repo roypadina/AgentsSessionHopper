@@ -6,49 +6,101 @@ import SwiftUI
 @MainActor enum SettingsWindow {
     static var model: AppModel?
     private static var window: NSWindow?
+    private static var toolbar: SettingsToolbar?
 
     static func show() {
         guard let model else { return }
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model).frame(height: 480)))  // grouped Forms have no ideal height outside a Settings scene
-            w.title = "AgentsSessionHopper Settings"
+            let nav = SettingsNav()
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model, nav: nav).frame(width: 600, height: 480)))  // grouped Forms have no ideal height outside a Settings scene
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
+            let tb = SettingsToolbar(nav: nav, window: w)
+            toolbar = tb
             w.center()
             window = w
         }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        toolbar?.applyPending()
+    }
+}
+
+final class SettingsNav: ObservableObject {
+    @Published var tab: SettingsView.Tab = .general
+}
+
+/// Classic preferences toolbar: icon + label per tab, selected one highlighted, window title follows the tab.
+@MainActor final class SettingsToolbar: NSObject, NSToolbarDelegate {
+    private static let tabs: [(SettingsView.Tab, String, String)] = [
+        (.general, "General", "gearshape"), (.handOff, "Hand-off", "arrow.triangle.swap"),
+        (.profiles, "Profiles", "person.2"), (.commandLine, "Command line", "terminal"),
+        (.log, "Log", "list.bullet.rectangle"), (.about, "About", "info.circle"),
+    ]
+    private let nav: SettingsNav
+    private let window: NSWindow
+    private let toolbar = NSToolbar(identifier: "SettingsToolbar")
+
+    init(nav: SettingsNav, window: NSWindow) {
+        self.nav = nav
+        self.window = window
+        super.init()
+        toolbar.delegate = self
+        toolbar.allowsUserCustomization = false
+        window.toolbarStyle = .preference
+        window.toolbar = toolbar
+        select(.general)
+        NotificationCenter.default.addObserver(forName: SettingsView.selectTab, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPending() }
+        }
+    }
+
+    func applyPending() {
+        if let t = SettingsView.pendingTab { select(t); SettingsView.pendingTab = nil }
+    }
+
+    private func select(_ t: SettingsView.Tab) {
+        nav.tab = t
+        toolbar.selectedItemIdentifier = NSToolbarItem.Identifier(String(describing: t))
+        window.title = Self.tabs.first { $0.0 == t }!.1
+    }
+
+    @objc private func clicked(_ sender: NSToolbarItem) {
+        if let t = Self.tabs.first(where: { NSToolbarItem.Identifier(String(describing: $0.0)) == sender.itemIdentifier })?.0 { select(t) }
+    }
+
+    private var ids: [NSToolbarItem.Identifier] { Self.tabs.map { NSToolbarItem.Identifier(String(describing: $0.0)) } }
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { ids }
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { [.flexibleSpace] + ids + [.flexibleSpace] }
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] { ids }
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier, willBeInsertedIntoToolbar: Bool) -> NSToolbarItem? {
+        guard let t = Self.tabs.first(where: { NSToolbarItem.Identifier(String(describing: $0.0)) == id }) else { return nil }
+        let item = NSToolbarItem(itemIdentifier: id)
+        item.label = t.1
+        item.image = NSImage(systemSymbolName: t.2, accessibilityDescription: t.1)
+        item.target = self
+        item.action = #selector(clicked)
+        return item
     }
 }
 
 struct SettingsView: View {
     @ObservedObject var model: AppModel
-    @State private var tab: Tab
+    @ObservedObject var nav: SettingsNav
 
     enum Tab: Hashable { case general, handOff, profiles, commandLine, log, about }
-    /// Set by the status-item menu: picks a tab whether the window is already open (notification) or not yet built (onAppear).
+    /// Set by the status-item menu; SettingsToolbar applies it (window already open → notification, else on show).
     static var pendingTab: Tab?
     static let selectTab = Notification.Name("SettingsView.selectTab")
 
-    init(model: AppModel, tab: Tab = .general) {
-        self.model = model
-        _tab = State(initialValue: tab)
-    }
-
     var body: some View {
-        TabView(selection: $tab) {
-            GeneralSettings(model: model).tabItem { Label("General", systemImage: "gearshape") }.tag(Tab.general)
-            HandOffSettings(model: model).tabItem { Label("Hand-off", systemImage: "arrow.triangle.swap") }.tag(Tab.handOff)
-            ProfilesSettings(model: model).tabItem { Label("Profiles", systemImage: "person.2") }.tag(Tab.profiles)
-            CommandLineSettings(model: model).tabItem { Label("Command line", systemImage: "terminal") }.tag(Tab.commandLine)
-            LogSettings(model: model).tabItem { Label("Log", systemImage: "list.bullet.rectangle") }.tag(Tab.log)
-            AboutSettings().tabItem { Label("About", systemImage: "info.circle") }.tag(Tab.about)
-        }
-        .frame(width: 600)
-        .onAppear { if let t = Self.pendingTab { tab = t; Self.pendingTab = nil } }
-        .onReceive(NotificationCenter.default.publisher(for: Self.selectTab)) { _ in
-            if let t = Self.pendingTab { tab = t; Self.pendingTab = nil }
+        switch nav.tab {
+        case .general: GeneralSettings(model: model)
+        case .handOff: HandOffSettings(model: model)
+        case .profiles: ProfilesSettings(model: model)
+        case .commandLine: CommandLineSettings(model: model)
+        case .log: LogSettings(model: model)
+        case .about: AboutSettings()
         }
     }
 }
