@@ -46,7 +46,11 @@ let usage = """
       sessionhopper status [--json]             profiles, last-known usage, live sessions
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
+      sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
       sessionhopper login <profile>             run `claude auth login` for that profile
+      sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
+      sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
+      sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
       sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper version | --version | -v    this tool's version (does not start claude)
@@ -242,6 +246,15 @@ func profilesCommand(_ a: [String]) -> Int32 {
         out("Added profile \(name) (\(env.tilde(dir.path))).")
         if login { return runLogin(p) }
         out("Log it in with: sessionhopper login \(name)   (or: \(Profiles.loginCommand(for: p, tilde: env.tilde)))")
+    case "share":
+        let dry = has("--dry-run", in: &a)
+        guard let name = a.first, let p = config.profile(named: name), let base = config.profiles.first else {
+            die("usage: sessionhopper profiles share <name> [--dry-run]   (links history and setup to the first profile)")
+        }
+        do {
+            try Setup.share(p, base: base, dryRun: dry).forEach { out("  \($0)") }
+        } catch { die("\(error)") }
+        if dry { out("Dry run: nothing changed. Run again without --dry-run to apply.") }
     case "remove":
         guard let name = a.first, config.profile(named: name) != nil else { die("usage: sessionhopper profiles remove <name>") }
         config.profiles.removeAll { $0.name == name }
@@ -434,13 +447,54 @@ func shimCommand(_ a: [String]) -> Int32 {
     die("cannot run \(claude): \(String(cString: strerror(errno)))")
 }
 
+/// `shell install|remove|status [--shell zsh|bash|fish|tcsh] [--force]`, `shell link-shim`.
+func shellCommand(_ a: [String]) -> Int32 {
+    var a = a
+    let force = has("--force", in: &a)
+    let kind = take("--shell", from: &a).map { v in Setup.ShellKind(rawValue: v == "csh" ? "tcsh" : v) ?? { die("unknown shell \(v): zsh, bash, fish or tcsh") }() }
+        ?? Setup.shellKind(env.vars)
+    let cli = URL(fileURLWithPath: env.selfPath).resolvingSymlinksInPath().path
+    do {
+        switch a.first ?? "status" {
+        case "install": out(try Setup.installShell(kind, cli: cli, home: env.home, vars: env.vars, force: force))
+        case "remove": out(try Setup.removeShell(kind, home: env.home, vars: env.vars))
+        case "link-shim": out(try Setup.linkShim(cli: cli, home: env.home))
+        case "status":
+            out("\(kind.rawValue) (\(env.tilde(Setup.rcFile(kind, home: env.home, vars: env.vars).path))): " + (Setup.shellInstalled(kind, home: env.home, vars: env.vars) ? "claude runs through sessionhopper" : "not set up"))
+            out("line: \(Setup.aliasLine(kind, cli: cli))")
+        default: die("usage: sessionhopper shell [install|remove|status|link-shim] [--shell zsh|bash|fish|tcsh] [--force]")
+        }
+    } catch { die("\(error)") }
+    return 0
+}
+
+/// `plugin install|status [--profile X]`: the agents-session-hopper skill in each profile.
+func pluginCommand(_ a: [String]) -> Int32 {
+    var a = a
+    let only = take("--profile", from: &a)
+    let profiles = HopperConfig.load(env.paths).profiles.filter { only == nil || $0.name == only }
+    guard !profiles.isEmpty else { die("no such profile") }
+    var rc: Int32 = 0
+    for p in profiles {
+        switch a.first ?? "status" {
+        case "install":
+            do { out(try Setup.installPlugin(p, env: env)) } catch { out("\(error)"); rc = 1 }
+        case "status":
+            let s = Setup.pluginInstalled(p, env: env)
+            out("\(pad(p.name, 10)) \(s == true ? "installed" : s == false ? "not installed (sessionhopper plugin install)" : "unknown (claude not found)")")
+        default: die("usage: sessionhopper plugin [install|status] [--profile X]")
+        }
+    }
+    return rc
+}
+
 func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version) (\(HopperInfo.stage))"); return 0 }
 
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "sessions": sessionsCommand,
     "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand,
-    "config": configCommand, "log": logCommand, "doctor": doctorCommand,
+    "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },
     "version": versionCommand, "--version": versionCommand, "-v": versionCommand

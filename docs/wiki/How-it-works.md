@@ -34,7 +34,7 @@ Hooks ([docs](https://code.claude.com/docs/en/hooks)) keep track of the turn:
 | `UserPromptSubmit` | a turn is running |
 | `Stop` | the turn ended; `background_tasks` still running; `session_crons` (scheduled tasks) |
 | `StopFailure` with `error: "rate_limit"` | the account hit its limit |
-| `SessionStart` with `source: "clear"` | `/clear` started a new conversation in the same process |
+| `SessionStart` | tells the agent (a few dozen tokens) that the session runs under AgentsSessionHopper and on which profile; with `source: "clear"`, `/clear` started a new conversation in the same process |
 
 ## A move
 

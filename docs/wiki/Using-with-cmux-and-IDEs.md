@@ -3,7 +3,8 @@
 ## Make it the default in your shell
 
 Any terminal app works (Terminal, iTerm, Ghostty, Warp, cmux, an IDE terminal): what matters is your
-shell. Add one line to your shell's startup file (the app never edits it for you):
+shell. `sessionhopper shell install` (or **Add the line** in the setup window) adds it for you, after a
+backup; or add the line yourself:
 
 | Shell | File | Line |
 |---|---|---|
@@ -22,7 +23,8 @@ subcommands (`claude mcp …`, `claude plugin …`, `claude auth …`, `claude u
 ## cmux, editors and other tools
 
 Tools that ask for a **Claude binary path** need one executable, not a command with arguments. Link the
-CLI under a name ending in `-shim`; it then behaves like `sessionhopper shim`:
+CLI under a name ending in `-shim` (`sessionhopper shell link-shim` does it); it then behaves like
+`sessionhopper shim`:
 
 ```bash
 ln -s /Applications/AgentsSessionHopper.app/Contents/Helpers/sessionhopper ~/.local/bin/sessionhopper-shim

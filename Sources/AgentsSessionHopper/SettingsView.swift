@@ -132,6 +132,7 @@ private struct HandOffSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Hold every session", isOn: Binding(get: { model.holdAll }, set: { model.setHoldAll($0) }))
             }
+            ContinuePromptSection(model: model)
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
@@ -139,6 +140,28 @@ private struct HandOffSettings: View {
 
     private func binding<T>(_ key: WritableKeyPath<HopperConfig, T>) -> Binding<T> {
         Binding(get: { model.config[keyPath: key] }, set: { v in model.update { $0[keyPath: key] = v } })
+    }
+}
+
+/// The message a session that was cut off by a move resumes with. Idle sessions resume without one.
+private struct ContinuePromptSection: View {
+    @ObservedObject var model: AppModel
+    @State private var text = ""
+
+    var body: some View {
+        Section {
+            TextEditor(text: $text).font(.system(.caption, design: .monospaced)).frame(height: 110)
+            HStack {
+                Text(model.config.continuePrompt == nil ? "Built-in" : "Your own").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                Button("Reset to built-in") { model.update { $0.continuePrompt = nil }; text = LaunchPlan.defaultContinuePrompt }
+                Button("Save") { model.update { $0.continuePrompt = text == LaunchPlan.defaultContinuePrompt ? nil : text } }
+                    .disabled(text == (model.config.continuePrompt ?? LaunchPlan.defaultContinuePrompt))
+            }
+            Text("Sent when a move cut work off. Placeholders: {reason} why it stopped, {jobs} and {crons} what was running, {from} and {to} profile names. \"[sessionhopper] \" is always put in front.")
+                .font(.caption).foregroundStyle(.secondary)
+        } header: { Text("Continue prompt") }
+        .onAppear { text = model.config.continuePrompt ?? LaunchPlan.defaultContinuePrompt }
     }
 }
 
@@ -271,7 +294,7 @@ private struct GeneralSettings: View {
             Section {
                 Text("AgentsSessionHopper makes no network requests and never reads your Claude login or tokens. Usage comes only from what Claude Code shows its own status line.")
                     .font(.caption).foregroundStyle(.secondary)
-                Button("Show the first-run guide again") { OnboardingWindow.show(model: model) }
+                Button("Run setup again") { OnboardingWindow.show(model: model) }
             }
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
@@ -299,7 +322,7 @@ private struct CommandLineSettings: View {
                     .font(.caption).foregroundStyle(.secondary)
                 CopyRow(text: "ln -s \(FileIOQuote(cli)) ~/.local/bin/sessionhopper-shim")
             } header: { Text("Use it by default (optional)") } footer: {
-                Text("The app never edits your shell files.").font(.caption).foregroundStyle(.secondary)
+                Text("The app edits your shell file only when you click Add the line in setup.").font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

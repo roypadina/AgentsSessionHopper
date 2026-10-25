@@ -13,7 +13,10 @@ accounts.
 
 - It never reads, copies, stores or sends your Claude login, OAuth tokens, `.credentials.json` or
   Keychain items. There is no Keychain code in it.
-- It makes no network requests: no usage endpoint, no telemetry, no update check.
+- It makes no network requests: no usage endpoint, no telemetry, no update check. The optional skill
+  install runs Claude Code's own `claude plugin install`, which downloads the plugin from GitHub.
+- It edits your shell's startup file only when you click **Add the line** (or run `sessionhopper shell
+  install`): one marked line, after a backup, removable the same way.
 - It never modifies, patches or wraps the `claude` binary's traffic, and never logs in for you. Login
   happens only through Claude Code's own `claude auth login` or `/login`.
 - It does not change or get around any account's limits: each account keeps its own. Usage numbers come

@@ -11,6 +11,7 @@
 - [Privacy and terms](Privacy-and-terms)
 - [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)
+- [Feature requests and contributing](Feature-requests-and-contributing)
 
 ---
 
@@ -18,5 +19,7 @@
 - [Releases](https://github.com/roypadina/AgentsSessionHopper/releases)
 
 ---
+
+[More Mac apps by Roy](https://apps.roypadina.synology.me/)
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/roypadina)

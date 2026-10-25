@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="AgentsSessionHopper"
 BUNDLE_ID="com.padina.agents-session-hopper"
 VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' "$ROOT_DIR/Sources/SessionHopperCore/Snapshot.swift")"  # one source: HopperInfo.version
-BUILD_NUMBER="6"
+BUILD_NUMBER="7"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"

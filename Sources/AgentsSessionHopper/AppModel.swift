@@ -118,6 +118,70 @@ final class AppModel: ObservableObject {
 
     func revealLog() { NSWorkspace.shared.activateFileViewerSelecting([env.paths.events]) }
 
+    // MARK: Setup (each step shows what it does; nothing runs until clicked)
+
+    /// What the last setup step did, shown under it.
+    @Published var setupLog: [String] = []
+    @Published private(set) var pluginState: [String: Bool] = [:]
+    @Published private(set) var doctor: [Doctor.Check] = []
+    @Published private(set) var busy = false
+
+    var cliPath: String { URL(fileURLWithPath: env.selfPath).resolvingSymlinksInPath().path }
+    var shellKind: Setup.ShellKind { Setup.shellKind(env.vars) }
+    var shellFile: String { tilde(Setup.rcFile(shellKind, home: env.home, vars: env.vars).path) }
+    var aliasLine: String { Setup.aliasLine(shellKind, cli: cliPath) }
+    var shellInstalled: Bool { Setup.shellInstalled(shellKind, home: env.home, vars: env.vars) }
+    var shimLinked: Bool { (try? FileManager.default.destinationOfSymbolicLink(atPath: Setup.shimLink(home: env.home).path)) == cliPath }
+
+    func share(_ p: Profile, dryRun: Bool) {
+        guard let base = config.profiles.first else { return }
+        do { setupLog = (dryRun ? ["\(p.name), would do:"] : ["\(p.name):"]) + (try Setup.share(p, base: base, dryRun: dryRun)) }
+        catch { setupLog = ["\(error)"] }
+    }
+
+    func setShell(_ on: Bool) {
+        do { setupLog = [on ? try Setup.installShell(shellKind, cli: cliPath, home: env.home, vars: env.vars)
+                            : try Setup.removeShell(shellKind, home: env.home, vars: env.vars)] }
+        catch { setupLog = ["\(error)"] }
+        objectWillChange.send()
+    }
+
+    func linkShim() {
+        do { setupLog = [try Setup.linkShim(cli: cliPath, home: env.home)] } catch { setupLog = ["\(error)"] }
+        objectWillChange.send()
+    }
+
+    /// `claude plugin …` per profile takes seconds each: off the main thread.
+    func checkPlugins(install: Bool = false) {
+        guard !busy else { return }
+        busy = true
+        let env = env, profiles = config.profiles
+        Task.detached {
+            var state: [String: Bool] = [:], log: [String] = []
+            for p in profiles {
+                if install, Setup.pluginInstalled(p, env: env) != true {
+                    do { log.append(try Setup.installPlugin(p, env: env)) } catch { log.append("\(error)") }
+                }
+                if let v = Setup.pluginInstalled(p, env: env) { state[p.name] = v }
+            }
+            await MainActor.run {
+                self.pluginState = state
+                if install { self.setupLog = log.isEmpty ? ["The skill is in every profile."] : log }
+                self.busy = false
+            }
+        }
+    }
+
+    func runDoctor() {
+        guard !busy else { return }
+        busy = true
+        let env = env
+        Task.detached {
+            let checks = Doctor.run(env: env)
+            await MainActor.run { self.doctor = checks; self.busy = false }
+        }
+    }
+
     private func act(_ f: () throws -> Void) {
         do {
             try f()
