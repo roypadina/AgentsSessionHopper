@@ -79,6 +79,18 @@ public enum Doctor {
             }.map(\.name)
             add(.warn, "projects/ not shared by: \(apart.joined(separator: ", ")). Sessions cannot move to or from them. Move their projects/ contents into \(env.tilde(base)), then replace the folder with a link to it.")
         }
+        // Not required for a move, but without them the todo list and /rewind checkpoints stay behind.
+        let base = config.profiles[0]
+        for p in config.profiles.dropFirst() {
+            let apart = ["todos", "file-history"].filter {
+                URL(fileURLWithPath: p.dir).appendingPathComponent($0).resolvingSymlinksInPath() != URL(fileURLWithPath: base.dir).appendingPathComponent($0).resolvingSymlinksInPath()
+            }
+            if !apart.isEmpty { add(.info, "\(p.name): \(apart.joined(separator: ", ")) not shared with \(base.name), so todo lists and /rewind stay behind on a move. Share: sessionhopper profiles share \(p.name)") }
+        }
+        let shell = Setup.shellKind(env.vars)
+        add(.info, Setup.shellInstalled(shell, home: env.home, vars: env.vars)
+            ? "\(shell.rawValue): `claude` runs through sessionhopper"
+            : "\(shell.rawValue): no AgentsSessionHopper alias, so plain `claude` is supervised only if your own setup routes it. Start sessions with `sessionhopper`, or run: sessionhopper shell install")
         if config.suggestThreshold >= config.hardThreshold { add(.fail, "suggest threshold must be below the park threshold") }
         return out
     }

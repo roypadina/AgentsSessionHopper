@@ -80,6 +80,28 @@ clear quarantine once (this also unblocks the bundled CLI):
 xattr -dr com.apple.quarantine /Applications/AgentsSessionHopper.app
 ```
 
+## Set up
+
+Open the app: its **setup window** walks through everything, one click per step, and shows what each
+step changes before it does it:
+
+1. **Profiles**: finds your Claude Code folders (`~/.claude`, `~/.claude-*`) or adds new ones, and logs
+   each in with Claude Code's own login.
+2. **Share history**: links conversation history, todo lists, `/rewind` checkpoints and your
+   CLAUDE.md/agents/commands/skills, so a conversation can continue on any profile. Existing folders are
+   moved to a backup and merged, never deleted.
+3. **Make `claude` use it**: adds one marked alias line to your shell's startup file (zsh, bash, fish or
+   tcsh), after a backup. Remove it with one click.
+4. **cmux and JetBrains** (optional): a `sessionhopper-shim` link to use as the Claude binary path.
+5. **Teach Claude about it**: installs the
+   [`agents-session-hopper`](https://github.com/roypadina/padina-claude-code-plugins/tree/main/agents-session-hopper)
+   skill into every profile with Claude Code's own `claude plugin install`.
+6. **Check**: the same checks as `sessionhopper doctor`.
+
+The same from the terminal: `sessionhopper profiles share <name>`, `sessionhopper shell install`,
+`sessionhopper shell link-shim`, `sessionhopper plugin install`, `sessionhopper doctor`. Run setup again any
+time from Settings → General.
+
 ## Quick start
 
 ```bash
@@ -96,8 +118,9 @@ sessionhopper status                     # profiles, usage, live sessions
 ```
 
 Inside Claude Code you can also type `! sessionhopper switch`, or ask the agent to run it.
-To supervise every interactive `claude`, add `alias claude='sessionhopper shim'` to your shell profile;
-for cmux or an IDE, link the CLI as `sessionhopper-shim` and use that as the Claude binary path.
+To supervise every interactive `claude` without the setup window: `sessionhopper shell install` (or add
+`alias claude='sessionhopper shim'` to your shell's startup file yourself); for cmux or JetBrains,
+`sessionhopper shell link-shim` and use `~/.local/bin/sessionhopper-shim` as the Claude binary path.
 
 **Only sessions started through `sessionhopper` can move.** A `claude` that is already running, or one
 started some other way, stays on its account; `install-hooks` alone only records limit stops. Restart
@@ -122,7 +145,8 @@ Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
   keeps conversations. Profiles added by the app do; `doctor` checks.
 - **It never reads, copies, stores or sends** your Claude login, tokens or Keychain items. Login always
   happens in Claude Code's own flow.
-- **It makes no network requests** at all: no usage endpoint, no telemetry, no update check.
+- **It makes no network requests** at all: no usage endpoint, no telemetry, no update check. (The
+  optional skill install runs Claude Code's own `claude plugin install`, which downloads it from GitHub.)
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
   when a conversation continues elsewhere.
 

@@ -10,7 +10,12 @@ sessionhopper hold on|off [--all]         never park or auto-move this session (
 sessionhopper status [--json]             profiles, last-known usage, live sessions
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
+sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
 sessionhopper login <profile>             run `claude auth login` for that profile
+sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
+                                          one marked `alias claude=… shim` line in your shell's startup file
+sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
+sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
 sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
@@ -38,6 +43,13 @@ message shows how to resume it).
 - `hold` keeps a session on its profile: no park, no automatic move. A move you confirm still happens.
 - `install-hooks` edits one profile's `settings.json` (with a backup) so sessions started with plain
   `claude` also report usage and limit stops. Optional; `uninstall-hooks` restores your status line.
+- `profiles share` never deletes: a folder with content becomes `<item>.ash-backup-<time>`, its files are
+  merged into the first profile (newer copy wins; the replaced one stays in the backup). It refuses while
+  `claude` runs on that profile. `--dry-run` shows the plan.
+- `shell install` picks the file from `$SHELL`: zsh `~/.zshrc` (or `$ZDOTDIR`), bash `~/.bash_profile` (else
+  `~/.bashrc`), tcsh `~/.tcshrc` (else `~/.cshrc`), fish its own `~/.config/fish/conf.d/sessionhopper.fish`.
+  A symlinked startup file is edited at its target. `--force` adds the line even if you define `claude`
+  yourself.
 - `profiles remove` only removes the entry from the list; the folder and its login stay.
 - `config prompt` prints the continue prompt in use. `--file F` sets your own (placeholders `{reason}`
   why it stopped, `{jobs}` and `{crons}` with their own headings or empty, `{from}` and `{to}` profile

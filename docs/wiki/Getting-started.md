@@ -1,5 +1,19 @@
 # Getting started
 
+The quickest way: open the app and follow its **setup window** (Settings → General → **Run setup
+again** brings it back). It covers everything on this page plus three extras, each shown before it
+changes anything:
+
+- **Share history** for profiles you already had: `sessionhopper profiles share <name>`. Links
+  `projects/`, `todos/`, `file-history/` (/rewind), CLAUDE.md, agents, commands and skills to your first
+  profile. A folder with content is moved to `<name>.ash-backup-<time>` and its files merged in (the newer
+  copy wins; the other is kept in the backup). Quit sessions on that profile first.
+- **Make `claude` use it**: `sessionhopper shell install` adds one marked alias line to the startup file of
+  your shell (zsh, bash, fish or tcsh), after a backup; `sessionhopper shell remove` takes it out.
+  An existing `claude` alias or function of yours is never overridden.
+- **Teach Claude about it**: `sessionhopper plugin install` puts the `agents-session-hopper` skill in
+  every profile, with Claude Code's own `claude plugin install`.
+
 ## 1. Profiles
 
 A profile is a Claude Code configuration folder with its own login. Claude Code documents this as the

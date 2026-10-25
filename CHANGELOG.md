@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-25
+
+Still **BETA**.
+
+### Added
+- **Setup window** that sets up the whole multi-account setup, one click per step, showing what each
+  step changes first: profiles and logins, shared history, the `claude` alias, the shim link for cmux
+  and JetBrains, the Claude skill in every profile, and a final check. Run it again from Settings →
+  General.
+- **Share history for profiles you already had** (`sessionhopper profiles share <name>`): links
+  conversation history, todo lists, `/rewind` checkpoints, CLAUDE.md, agents, commands and skills to the
+  first profile. Existing folders are moved to a backup and merged (the newer file wins), never deleted;
+  refuses while `claude` runs on that profile.
+- **`sessionhopper shell install | remove | status`**: one marked `alias claude=… shim` line in your shell's
+  startup file (zsh, bash, fish or tcsh), after a backup; a symlinked startup file is edited at its
+  target, and your own `claude` alias or function is never overridden. `shell link-shim` creates
+  `~/.local/bin/sessionhopper-shim`.
+- **`sessionhopper plugin install | status`**: installs the `agents-session-hopper` Claude skill into every
+  profile with Claude Code's own `claude plugin install`.
+- **Continue prompt editor** in Settings → Hand-off (with Reset to built-in).
+- Supervised sessions are told at start that they run under AgentsSessionHopper and on which profile.
+- `doctor` shows whether `todos/` and `file-history/` are shared and whether the shell alias is set.
+
+### Changed
+- New profiles also share `todos/` and `file-history/` with the first profile.
+
 ## [0.1.8] - 2026-10-25
 
 Still **BETA**.

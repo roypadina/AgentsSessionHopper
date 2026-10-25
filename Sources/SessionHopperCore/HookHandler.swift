@@ -44,7 +44,7 @@ public enum HookHandler {
         let sid = ev["session_id"] as? String
         if event == "SessionStart" {
             if ev["source"] as? String == "clear", let sid { try? FileIO.write(sid, to: f.current) }
-            return nil
+            return sessionContext(env: env)
         }
         // A different conversation (e.g. a nested `claude` that inherited our environment) is not ours.
         if let sid, sid != conversation { return nil }
@@ -83,6 +83,17 @@ public enum HookHandler {
         let id = (t["id"] as? String) ?? ""
         let short = what.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(160)
         return [kind, id, "-", String(short)].filter { !$0.isEmpty }.joined(separator: " ") + "\n"
+    }
+
+    /// Tells the agent it runs supervised (once per start, resume, /clear or compact; a few dozen tokens).
+    static func sessionContext(env: HopperEnvironment) -> String? {
+        guard let profile = env.vars["SESSIONHOPPER_PROFILE"] else { return nil }
+        let order = HopperConfig.load(env.paths).profiles.map(\.name).joined(separator: ", ")
+        let text = "This session runs under AgentsSessionHopper on profile \(profile) (profiles in order: \(order)). "
+            + "Near a usage limit it may move to another of the user's own Claude accounts; the conversation continues there. "
+            + "For usage, switching or holding, use the sessionhopper skill or run `$SESSIONHOPPER_BIN help`."
+        let out: [String: Any] = ["hookSpecificOutput": ["hookEventName": "SessionStart", "additionalContext": text]]
+        return (try? JSONSerialization.data(withJSONObject: out)).flatMap { String(data: $0, encoding: .utf8) }
     }
 
     /// `session_crons[]` entry (`id`, `schedule`, `recurring`, `prompt`) as one line.

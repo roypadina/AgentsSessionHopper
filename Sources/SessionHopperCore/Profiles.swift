@@ -41,7 +41,8 @@ public enum Profiles {
 
     /// Items shared with the base profile when "share my setup" is on. `settings.json` is copied instead:
     /// Claude Code rewrites it by temp file + rename, which would replace a symlink.
-    public static let sharedSetup = ["CLAUDE.md", "agents", "commands", "skills"]
+    /// `todos` and `file-history` carry a session's todo list and /rewind checkpoints across a move.
+    public static let sharedSetup = ["CLAUDE.md", "agents", "commands", "skills", "todos", "file-history"]
 
     /// Creates a new profile directory next to `base`. Never overwrites anything that exists.
     /// `projects/` is always linked to the base's (required for hand-off). Returns what it did.
