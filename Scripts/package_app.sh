@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="AgentsSessionHopper"
 BUNDLE_ID="com.padina.agents-session-hopper"
-VERSION="0.1.7"
+VERSION="$(sed -n 's/.*static let version = "\(.*\)".*/\1/p' "$ROOT_DIR/Sources/SessionHopperCore/Snapshot.swift")"  # one source: HopperInfo.version
 BUILD_NUMBER="5"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"

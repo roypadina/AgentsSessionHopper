@@ -12,8 +12,11 @@ sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-logi
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper login <profile>             run `claude auth login` for that profile
 sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
+sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
+sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log
-sessionhopper doctor                      check claude, logins, shared history, thresholds
+sessionhopper doctor                      check claude (2.1.145+), logins, shared history, thresholds,
+                                          sessions running without sessionhopper
 sessionhopper install-hooks --profile X   report usage from sessions started without sessionhopper
 sessionhopper uninstall-hooks --profile X undo install-hooks
 sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are supervised, the rest
@@ -36,3 +39,6 @@ message shows how to resume it).
 - `install-hooks` edits one profile's `settings.json` (with a backup) so sessions started with plain
   `claude` also report usage and limit stops. Optional; `uninstall-hooks` restores your status line.
 - `profiles remove` only removes the entry from the list; the folder and its login stay.
+- `config prompt` prints the continue prompt in use. `--file F` sets your own (placeholders `{reason}`
+  why it stopped, `{jobs}` and `{crons}` with their own headings or empty, `{from}` and `{to}` profile
+  names); `[sessionhopper] ` is always put in front. An empty file or `--reset` restores the built-in one.

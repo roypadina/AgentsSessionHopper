@@ -32,7 +32,7 @@ Hooks ([docs](https://code.claude.com/docs/en/hooks)) keep track of the turn:
 | Hook | What it records |
 |---|---|
 | `UserPromptSubmit` | a turn is running |
-| `Stop` | the turn ended; `background_tasks` still running |
+| `Stop` | the turn ended; `background_tasks` still running; `session_crons` (scheduled tasks) |
 | `StopFailure` with `error: "rate_limit"` | the account hit its limit |
 | `SessionStart` with `source: "clear"` | `/clear` started a new conversation in the same process |
 
@@ -40,9 +40,23 @@ Hooks ([docs](https://code.claude.com/docs/en/hooks)) keep track of the turn:
 
 1. You confirm (menu, notification, `sessionhopper switch`, or the agent runs it).
 2. When the turn is over and no background job is left, the engine ends `claude` (SIGTERM, then SIGKILL
-   after 10 s).
-3. It starts `claude --resume <id>` with the next profile's folder. An idle session resumes silently;
-   one that was cut off (`switch --now`, or a limit stop) gets a short prompt to pick the work back up.
+   after 10 s). "Over" means the hooks say so **and** the transcript ends with Claude's reply, so a
+   reply still being written is never cut off.
+3. It starts `claude --resume <id>` with the next profile's folder.
+
+## What a move looks like
+
+- **Idle session** (the turn is over, no background jobs): it comes back silently and waits for your
+  next message. Nothing is lost and no turn runs.
+- **Work in flight** (`switch --now`, the hard threshold with move-now on, a usage-limit stop, or a
+  transcript that ends without Claude's reply): it comes back with one `[sessionhopper]` message telling
+  the agent to redo the interrupted step, restart unfinished subagents and background jobs, and carry on.
+  The message lists the background jobs and scheduled tasks that were running.
+- **Scheduled tasks**: Claude Code restores `CronCreate` tasks on resume; a self-paced `/loop` and
+  wakeups are not restored. The continue message asks the agent to check with `CronList` and re-create
+  only what is missing.
+- **Your own continue message**: `sessionhopper config prompt --file my-prompt.txt` (placeholders
+  `{reason}` `{jobs}` `{crons}` `{from}` `{to}`); `--reset` goes back to the built-in one.
 
 Resuming under another profile works because all profiles share one `projects/` folder, where Claude
 Code keeps conversation transcripts. This sharing is not a documented Claude Code interface;

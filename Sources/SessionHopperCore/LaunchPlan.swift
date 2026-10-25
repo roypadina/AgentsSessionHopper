@@ -79,22 +79,34 @@ public enum LaunchPlan {
         return e
     }
 
+    /// The built-in continue prompt. A user's own (`HopperConfig.continuePrompt`) uses the same placeholders:
+    /// `{reason}` why it stopped, `{jobs}` / `{crons}` background jobs and scheduled tasks (each with its own
+    /// heading, or empty), `{from}` / `{to}` profile names. `[sessionhopper] ` always goes in front.
+    public static let defaultContinuePrompt = """
+        {reason}{jobs}{crons}
+
+        Do this, in order:
+        1. Re-read the end of the conversation to find exactly where you stopped.
+        2. Redo the interrupted step, and restart every subagent and background job that had not finished.
+        3. Carry on with the original work.
+        Reply with one status line: what you restarted and what you are continuing. Only the account changed; do not ask whether to continue.
+        """
+
     /// Sent only when a move cut work off (or the last turn died on an error). An idle session resumes
-    /// with no prompt, so no turn runs.
-    public static func continuePrompt(jobs: [String], limitStop: Bool) -> String {
-        var s = limitStop
-            ? "[sessionhopper] The last turn stopped on a usage limit. The user moved this conversation to another of their Claude accounts so the work can go on."
-            : "[sessionhopper] This conversation was moved to another of the user's Claude accounts. The move restarted Claude Code in the middle of your work, so everything that was running stopped with it."
-        if !jobs.isEmpty { s += "\n\nBackground jobs that were still running:\n" + jobs.map { "- \($0)" }.joined(separator: "\n") }
-        s += """
-
-
-            Do this, in order:
-            1. Re-read the end of the conversation to find exactly where you stopped.
-            2. Redo the interrupted step, and restart every subagent and background job that had not finished.
-            3. Carry on with the original work.
-            Reply with one status line: what you restarted and what you are continuing. Only the account changed; do not ask whether to continue.
-            """
-        return s
+    /// with no prompt, so no turn runs. An empty `template` means the default.
+    public static func continuePrompt(jobs: [String], crons: [String] = [], limitStop: Bool,
+                                      from: String = "", to: String = "", template: String? = nil) -> String {
+        let reason = limitStop
+            ? "The last turn stopped on a usage limit. The user moved this conversation to another of their Claude accounts so the work can go on."
+            : "This conversation was moved to another of the user's Claude accounts. The move restarted Claude Code in the middle of your work, so everything that was running stopped with it."
+        let jobText = jobs.isEmpty ? "" : "\n\nBackground jobs that were still running:\n" + jobs.map { "- \($0)" }.joined(separator: "\n")
+        let cronText = crons.isEmpty ? "" : "\n\nScheduled tasks before the move (Claude Code restores most on resume; a self-paced /loop and wakeups are not). Run CronList first and re-create only what is missing:\n"
+            + crons.map { "- \($0)" }.joined(separator: "\n")
+        let own = template?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        var s = own.isEmpty ? defaultContinuePrompt : own
+        for (key, value) in [("{reason}", reason), ("{jobs}", jobText), ("{crons}", cronText), ("{from}", from), ("{to}", to)] {
+            s = s.replacingOccurrences(of: key, with: value)
+        }
+        return "[sessionhopper] " + s
     }
 }

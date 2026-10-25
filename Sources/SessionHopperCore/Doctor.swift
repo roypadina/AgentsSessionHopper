@@ -16,9 +16,19 @@ public enum Doctor {
 
         if let claude = Claude.locate(env) {
             let v = Shell.run(claude, ["--version"], timeout: 10).stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-            add(v.isEmpty ? .warn : .ok, "claude: \(env.tilde(claude)) \(v.isEmpty ? "(no version output)" : v)")
+            if v.isEmpty {
+                add(.warn, "claude: \(env.tilde(claude)) (no version output)")
+            } else if atLeast(v, minClaude) == false {
+                add(.warn, "claude: \(env.tilde(claude)) \(v): \(minClaude) or newer needed. Older versions don't report background work at turn end, so a move can cut it off. Update: claude update")
+            } else {
+                add(.ok, "claude: \(env.tilde(claude)) \(v)")
+            }
         } else {
             add(.fail, "claude not found on PATH. Install Claude Code first.")
+        }
+        let loose = unsupervised(ps: Shell.run("/bin/ps", ["-axo", "pid=,ppid=,command="], timeout: 10).stdout)
+        if !loose.isEmpty {
+            add(.warn, "\(loose.count) claude session(s) running without sessionhopper (pid \(loose.map(String.init).joined(separator: ", "))): they won't move. Restart each once: /exit, then `sessionhopper -c` in its folder (or `sessionhopper --resume <id>`)")
         }
 
         let probe = env.paths.root.appendingPathComponent(".doctor-probe")
@@ -71,5 +81,48 @@ public enum Doctor {
         }
         if config.suggestThreshold >= config.hardThreshold { add(.fail, "suggest threshold must be below the park threshold") }
         return out
+    }
+
+    /// `Stop.background_tasks` / `session_crons`, which keep a move from cutting work off.
+    public static let minClaude = "2.1.145"
+
+    /// nil when `version` has no leading x.y.z (e.g. "2.1.300 (Claude Code)" parses).
+    static func atLeast(_ version: String, _ min: String) -> Bool? {
+        func parts(_ s: String) -> [Int]? {
+            let p = s.split(separator: " ").first?.split(separator: ".").map { Int($0) } ?? []
+            return p.count >= 3 && !p.contains(nil) ? p.compactMap { $0 } : nil
+        }
+        guard let v = parts(version), let m = parts(min) else { return nil }
+        return !v.lexicographicallyPrecedes(m)
+    }
+
+    /// Interactive `claude` processes with no `sessionhopper` above them (`ps -axo pid=,ppid=,command=`).
+    /// A `claude` under another `claude` (a nested run) and print/subcommand runs are not sessions of their own.
+    static func unsupervised(ps: String) -> [Int32] {
+        var procs: [Int32: (ppid: Int32, cmd: String)] = [:]
+        for line in ps.split(separator: "\n") {
+            let f = line.split(separator: " ", maxSplits: 2, omittingEmptySubsequences: true)
+            guard f.count == 3, let pid = Int32(f[0]), let ppid = Int32(f[1]) else { continue }
+            procs[pid] = (ppid, String(f[2]))
+        }
+        func isClaude(_ cmd: String) -> Bool {
+            let exe = cmd.split(separator: " ").first.map(String.init) ?? ""
+            return (exe as NSString).lastPathComponent == "claude" || exe.contains("/claude/versions/")
+        }
+        let subcommands: Set<String> = ["mcp", "plugin", "plugins", "auth", "update", "doctor", "install", "setup-token"]
+        let flags: Set<String> = ["-p", "--print", "--version", "-v", "--help", "-h"]
+        return procs.compactMap { pid, p -> Int32? in
+            guard isClaude(p.cmd) else { return nil }
+            let args = p.cmd.split(separator: " ").dropFirst().map(String.init)
+            if args.first.map(subcommands.contains) == true || args.contains(where: flags.contains) { return nil }
+            var up = p.ppid
+            var seen = 0
+            while up > 1, let parent = procs[up], seen < 64 {
+                if parent.cmd.contains("sessionhopper") || isClaude(parent.cmd) { return nil }
+                up = parent.ppid
+                seen += 1
+            }
+            return pid
+        }.sorted()
     }
 }

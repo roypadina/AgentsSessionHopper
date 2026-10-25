@@ -48,6 +48,8 @@ let usage = """
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper login <profile>             run `claude auth login` for that profile
       sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
+      sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
+      sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
       sessionhopper doctor                      check claude, logins, shared history, thresholds
       sessionhopper install-hooks --profile X   report usage from sessions started without sessionhopper
@@ -282,6 +284,7 @@ func loginCommand(_ a: [String]) -> Int32 {
 
 func configCommand(_ a: [String]) -> Int32 {
     var c = HopperConfig.load(env.paths)
+    if a.first == "prompt" { return promptCommand(Array(a.dropFirst()), &c) }
     if a.count == 2 {
         let v = a[1]
         switch a[0] {
@@ -300,6 +303,25 @@ func configCommand(_ a: [String]) -> Int32 {
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
     out("move without asking: \(c.autoMove ? "on" : "off")")
     out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
+    out("continue prompt:     \(c.continuePrompt == nil ? "built-in" : "your own") (sessionhopper config prompt)")
+    return 0
+}
+
+/// Shows the continue prompt; `--file F` sets your own, `--reset` goes back to the built-in one.
+func promptCommand(_ a: [String], _ c: inout HopperConfig) -> Int32 {
+    if a == ["--reset"] {
+        c.continuePrompt = nil
+    } else if a.count == 2, a[0] == "--file" {
+        guard let text = try? String(contentsOfFile: (a[1] as NSString).expandingTildeInPath, encoding: .utf8) else { die("cannot read \(a[1])") }
+        c.continuePrompt = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+    } else if !a.isEmpty {
+        die("usage: sessionhopper config prompt [--file F | --reset]")
+    }
+    if !a.isEmpty { do { try c.save(env.paths) } catch { die("\(error)") } }
+    out(c.continuePrompt == nil ? "continue prompt: built-in" : "continue prompt: your own (back to the built-in one: sessionhopper config prompt --reset)")
+    out("placeholders: {reason} {jobs} {crons} {from} {to}; \"[sessionhopper] \" is always put in front")
+    out("")
+    out(c.continuePrompt ?? LaunchPlan.defaultContinuePrompt)
     return 0
 }
 
@@ -412,6 +434,8 @@ func shimCommand(_ a: [String]) -> Int32 {
     die("cannot run \(claude): \(String(cString: strerror(errno)))")
 }
 
+func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version) (\(HopperInfo.stage))"); return 0 }
+
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "sessions": sessionsCommand,
@@ -419,7 +443,7 @@ let commands: [String: ([String]) -> Int32] = [
     "config": configCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },
-    "version": { _ in out("sessionhopper \(HopperInfo.version) (\(HopperInfo.stage))"); return 0 }
+    "version": versionCommand, "--version": versionCommand, "-v": versionCommand
 ]
 
 // Invoked through a link named `*-shim` (e.g. ~/bin/sessionhopper-shim): shim mode, for tools that take one path.

@@ -109,8 +109,10 @@ public struct SessionFiles: Sendable {
     public var limited: URL { f("limited") }
     /// Conversation id after `/clear` (Claude Code starts a new one in the same process).
     public var current: URL { f("current") }
+    /// Scheduled tasks (`Stop.session_crons`) at the last Stop, one per line.
+    public var crons: URL { f("crons") }
 
     /// Turn state cleared on every (re)launch.
-    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited] }
+    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited, crons] }
     public var all: [URL] { turnFiles + [record, hold, current] }
 }
