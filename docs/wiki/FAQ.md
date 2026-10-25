@@ -10,6 +10,18 @@ numbers Claude Code gives its own status line, so a profile with no running sess
 Otherwise every move is your click or command. **Park before paid usage** only ever ends a session; it
 never moves one.
 
+**It moved my session but the agent didn't continue.** The session was idle when it moved: the turn
+was over, so there was nothing to continue and it waits for your next message (see
+[What a move looks like](How-it-works#what-a-move-looks-like)). `sessionhopper log` shows the move. If
+a session was cut off mid-work and got no `[sessionhopper]` message, please report it as a bug.
+
+**My session didn't move at all.** Only sessions started through `sessionhopper` (or the alias / shim)
+can move. `sessionhopper doctor` lists `claude` sessions running without it. Terminals that restore
+panes (cmux, tmux-resurrect, iTerm) re-run each pane's original command: restart those panes once.
+
+**Do I need cmux, or a particular shell?** No. Any terminal and any shell work; cmux and IDEs are
+optional and use the same shim.
+
 **Can I use it with someone else's account?** No. Use it only with accounts that are yours, never
 shared. See [Privacy and terms](Privacy-and-terms).
 

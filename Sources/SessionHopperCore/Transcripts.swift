@@ -76,6 +76,45 @@ public enum Transcripts {
 
     public static func cwd(of url: URL) -> String? { scan(url).cwd }
 
+    /// Did the conversation's last turn end with Claude Code's reply written? Decided by the last main-thread
+    /// message or turn-end marker in the transcript tail: an `end_turn` reply, a user interrupt or a Stop
+    /// marker = finished; a tool result, an unanswered prompt or a pending tool call = cut off. Slash commands,
+    /// `<…>` system-injected prompts and meta entries don't decide. No transcript, or nothing recognisable
+    /// = finished: the format is not a documented interface, so unknown means "today's behavior".
+    public static func turnFinished(_ url: URL?) -> Bool {
+        guard let url, let h = try? FileHandle(forReadingFrom: url) else { return true }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        try? h.seek(toOffset: size > 524_288 ? size - 524_288 : 0)
+        // A cut-off first line fails to parse and is skipped.
+        for line in ((try? h.readToEnd()) ?? Data()).split(separator: UInt8(ascii: "\n")).reversed() {
+            guard let rec = FileIO.jsonObject(Data(line)), rec["isSidechain"] as? Bool != true else { continue }
+            switch rec["type"] as? String {
+            case "system":
+                if ["turn_duration", "stop_hook_summary"].contains(rec["subtype"] as? String ?? "") { return true }
+            case "assistant":
+                if rec["isApiErrorMessage"] as? Bool == true { return false }
+                // "No response requested." is what Claude Code writes on resume after a cut-off: that one was handled.
+                return (rec["message"] as? [String: Any])?["stop_reason"] as? String == "end_turn"
+                    || text(of: rec).trimmingCharacters(in: .whitespacesAndNewlines) == "No response requested."
+            case "user":
+                if ["isMeta", "isCompactSummary", "isVisibleInTranscriptOnly"].contains(where: { rec[$0] as? Bool == true }) { continue }
+                let t = text(of: rec).trimmingCharacters(in: .whitespacesAndNewlines)
+                if t.hasPrefix("<") || t.hasPrefix("/") { continue }
+                return t.hasPrefix("[Request interrupted by user")
+            default:
+                continue
+            }
+        }
+        return true
+    }
+
+    static func text(of rec: [String: Any]) -> String {
+        let msg = rec["message"] as? [String: Any]
+        if let s = msg?["content"] as? String { return s }
+        return (msg?["content"] as? [[String: Any]] ?? []).compactMap { $0["text"] as? String }.joined(separator: " ")
+    }
+
     /// First user prompt and cwd, from the first 256 KB.
     static func scan(_ url: URL) -> (prompt: String?, cwd: String?, sidechain: Bool) {
         guard let h = try? FileHandle(forReadingFrom: url) else { return (nil, nil, false) }

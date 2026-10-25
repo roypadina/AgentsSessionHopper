@@ -139,9 +139,13 @@ public final class Supervisor {
                 let cutOff = FileIO.readString(files.killed)
                 // The last turn died on an API error (a limit stop) and the user moved on: pick the work back up.
                 let died = FileIO.exists(files.interrupted) || request?.trigger == "limit_stop"
-                if launches > 0, cutOff != nil || died {
+                // The transcript shows a turn that never got its reply, even if the hooks' turn state missed it.
+                let unfinished = !Transcripts.turnFinished(Transcripts.find(resumeID, projects: projects))
+                if launches > 0, cutOff != nil || died || unfinished {
                     let jobs = (cutOff ?? "").split(separator: "\n").dropFirst().map(String.init)
-                    args.append(LaunchPlan.continuePrompt(jobs: jobs, limitStop: died))
+                    let crons = (FileIO.readString(files.crons) ?? "").split(separator: "\n").map(String.init)
+                    args.append(LaunchPlan.continuePrompt(jobs: jobs, crons: crons, limitStop: died, from: current?.name ?? "",
+                                                          to: profile.name, template: config.continuePrompt))
                 }
             }
             files.turnFiles.forEach(FileIO.remove)
@@ -185,7 +189,7 @@ public final class Supervisor {
                     FileIO.remove(files.ctl)
                     if now.to != profile.name { end(pid, files: files); return .handoff(now) }
                 }
-                if let p = FileIO.decode(PendingMove.self, from: files.pending), idle(files) {
+                if let p = FileIO.decode(PendingMove.self, from: files.pending), idle(files), turnFinished(sessionID) {
                     if p.to == profile.name {
                         FileIO.remove(files.pending)
                     } else {
@@ -208,6 +212,11 @@ public final class Supervisor {
     }
 
     private func idle(_ f: SessionFiles) -> Bool { !FileIO.exists(f.busy) && !FileIO.hasContent(f.jobs) }
+
+    /// The transcript agrees the turn is over: the busy flag alone once let a move cut a reply off.
+    private func turnFinished(_ id: String) -> Bool {
+        Transcripts.turnFinished(Transcripts.find(id, projects: Profiles.projectsDir(HopperConfig.load(env.paths), home: env.home)))
+    }
 
     private func held(_ f: SessionFiles) -> Bool { FileIO.exists(env.paths.holdAll) || FileIO.exists(f.hold) }
 

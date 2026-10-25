@@ -87,6 +87,44 @@ final class HandOffTests: XCTestCase {
         XCTAssertEqual(h.events().last?.trigger, "auto")
     }
 
+    /// 2026-10-25: a move ended a session mid-reply because the busy flag was gone. The transcript now has a say.
+    func testAutoMoveWaitsForTheReplyEvenWhenHooksMissTheTurn() throws {
+        try h.config { $0.autoMove = true }
+        try h.scenario("""
+            if [ "$N" = 1 ]; then
+              P="$T/home/.claude/projects/-w"; mkdir -p "$P"
+              printf '%s\\n' '{"type":"user","message":{"content":"go"}}' '{"type":"assistant","message":{"stop_reason":"tool_use","content":[]}}' \\
+                '{"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}' > "$P/$SID.jsonl"
+              usage 90
+              sleep 1.5
+              touch "$T/alive-mid-turn"
+              printf '%s\\n' '{"type":"assistant","message":{"stop_reason":"end_turn","content":[{"type":"text","text":"Done."}]}}' >> "$P/$SID.jsonl"
+              sleep 5
+            else exit 0; fi
+            """)
+        try h.run([])
+        XCTAssertNotNil(h.read("alive-mid-turn"), "no move while the transcript shows the reply still coming")
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertFalse(h.launches[1].contains("[sessionhopper]"), "the reply landed: resume silently")
+    }
+
+    func testCutOffShownByTheTranscriptResumesWithTheUsersOwnPrompt() throws {
+        try h.config { $0.continuePrompt = "Custom {from}->{to}. {reason}" }
+        try h.scenario("""
+            if [ "$N" = 1 ]; then
+              P="$T/home/.claude/projects/-w"; mkdir -p "$P"
+              printf '%s\\n' '{"type":"user","message":{"content":"go"}}' '{"type":"assistant","message":{"stop_reason":"tool_use","content":[]}}' \\
+                '{"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}' > "$P/$SID.jsonl"
+              usage 50
+              "$SESSIONHOPPER_BIN" switch work --now > /dev/null
+              sleep 5
+            else exit 0; fi
+            """)
+        try h.run([])
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertTrue(h.launches[1].contains("[sessionhopper] Custom default->work. This conversation was moved"), h.launches[1])
+    }
+
     func testParkBeforePaidUsageAtTurnEnd() throws {
         try h.scenario("""
             emit UserPromptSubmit

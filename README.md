@@ -60,8 +60,9 @@ brew install --cask roypadina/tap/agents-session-hopper
 ## Requirements
 
 macOS 14 Sonoma or later · Apple Silicon and Intel (universal binary) ·
-[Claude Code](https://code.claude.com/docs) installed, with a Pro or Max plan per account
-(usage numbers come only for those).
+[Claude Code](https://code.claude.com/docs) **2.1.145 or newer** installed, with a Pro or Max plan per
+account (usage numbers come only for those). Any terminal and any shell: nothing depends on cmux or a
+particular shell setup.
 
 ## Install
 
@@ -97,6 +98,13 @@ sessionhopper status                     # profiles, usage, live sessions
 Inside Claude Code you can also type `! sessionhopper switch`, or ask the agent to run it.
 To supervise every interactive `claude`, add `alias claude='sessionhopper shim'` to your shell profile;
 for cmux or an IDE, link the CLI as `sessionhopper-shim` and use that as the Claude binary path.
+
+**Only sessions started through `sessionhopper` can move.** A `claude` that is already running, or one
+started some other way, stays on its account; `install-hooks` alone only records limit stops. Restart
+open sessions once: `/exit`, then `sessionhopper -c` in the same folder (or `sessionhopper --resume <id>`).
+Terminals that **restore** sessions (cmux, tmux-resurrect, iTerm arrangements) re-run the command each
+pane was first opened with, so restart those panes once too. The alias covers interactive shells only;
+scripts and cron jobs still run plain `claude`.
 Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
 
 ## How it works (and what it never does)
@@ -107,8 +115,10 @@ Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
 - **Usage** comes only from the documented
   [status-line input](https://code.claude.com/docs/en/statusline) (`rate_limits`), and limit stops
   from the documented [`StopFailure` hook](https://code.claude.com/docs/en/hooks) (`error: "rate_limit"`).
-- **A move** waits until the turn and any background jobs finish, then restarts `claude --resume <id>`
-  under the next profile. Moving needs every profile to share one `projects/` folder, where Claude Code
+- **A move** waits until the turn and any background jobs finish (the hooks and the conversation
+  transcript must both agree), then restarts `claude --resume <id>` under the next profile. An idle
+  session comes back silently; one that was cut off gets a short continue prompt, which you can replace
+  with your own (`sessionhopper config prompt`). Moving needs every profile to share one `projects/` folder, where Claude Code
   keeps conversations. Profiles added by the app do; `doctor` checks.
 - **It never reads, copies, stores or sends** your Claude login, tokens or Keychain items. Login always
   happens in Claude Code's own flow.

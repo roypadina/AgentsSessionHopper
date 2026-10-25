@@ -10,6 +10,7 @@ import Foundation
 /// - common input: `hook_event_name`, `session_id`
 /// - `SessionStart.source` == "clear": `/clear` started a new conversation in the same process
 /// - `Stop.background_tasks[]` (`id`, `type`, `status`, `description`, `command`): work still in flight
+/// - `Stop.session_crons[]` (`id`, `schedule`, `recurring`, `prompt`): scheduled tasks, listed in a continue prompt
 /// - `StopFailure.error` == "rate_limit" (not `error_type`)
 /// - output: top-level `systemMessage` (shown to the user) and `hookSpecificOutput.additionalContext`
 ///   (given to the model) on UserPromptSubmit / PostToolUse. StopFailure output is ignored by Claude Code.
@@ -59,6 +60,8 @@ public enum HookHandler {
             let running = (ev["background_tasks"] as? [[String: Any]] ?? [])
                 .filter { ["running", "pending"].contains(($0["status"] as? String) ?? "running") }
             if running.isEmpty { FileIO.remove(f.jobs) } else { try? FileIO.write(running.map(describe).joined(), to: f.jobs) }
+            let crons = (ev["session_crons"] as? [[String: Any]] ?? []).map(describeCron)
+            if crons.isEmpty { FileIO.remove(f.crons) } else { try? FileIO.write(crons.joined(), to: f.crons) }
             FileIO.remove(f.busy)
             FileIO.remove(f.interrupted)
         case "StopFailure":
@@ -80,6 +83,13 @@ public enum HookHandler {
         let id = (t["id"] as? String) ?? ""
         let short = what.split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(160)
         return [kind, id, "-", String(short)].filter { !$0.isEmpty }.joined(separator: " ") + "\n"
+    }
+
+    /// `session_crons[]` entry (`id`, `schedule`, `recurring`, `prompt`) as one line.
+    static func describeCron(_ c: [String: Any]) -> String {
+        let schedule = (c["schedule"] as? String) ?? "?"
+        let what = ((c["prompt"] as? String) ?? "").split(whereSeparator: \.isWhitespace).joined(separator: " ").prefix(160)
+        return "\(schedule)\(c["recurring"] as? Bool == true ? " (recurring)" : "") - \(what)\n"
     }
 
     /// One-time messages: to the agent once a move is pending, to the user once a move is suggested.

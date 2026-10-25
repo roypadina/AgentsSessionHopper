@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-10-25
+
+Still **BETA**.
+
+### Fixed
+- **A move no longer cuts off a reply that is still being written.** Besides the hooks' turn state, the
+  engine now checks that the conversation transcript ends with Claude's reply before ending `claude`.
+- **A session that was cut off anyway now always resumes with the continue prompt**, also when the hooks
+  missed the turn (the transcript shows a turn that never got its reply).
+- `sessionhopper --version` and `-v` print the version instead of starting a session; the version shown
+  everywhere now comes from one place.
+
+### Added
+- **Your own continue prompt**: `sessionhopper config prompt` shows it, `--file F` sets yours,
+  `--reset` restores the built-in one. Placeholders `{reason}` `{jobs}` `{crons}` `{from}` `{to}`.
+- The continue prompt lists scheduled tasks (`CronCreate`, `/loop`) that were active and asks the
+  agent to re-create only the ones Claude Code did not restore.
+- `doctor` warns when Claude Code is older than 2.1.145 and lists `claude` sessions running without
+  sessionhopper (they cannot move).
+
 ## [0.1.7] - 2026-10-25
 
 Still **BETA**.
