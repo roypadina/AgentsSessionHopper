@@ -125,7 +125,7 @@ struct SuggestionCard: View {
 
     private func headline(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
-        let head = s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
+        let head = s.reason == "login" ? "\(s.from)'s Claude login expired." : s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
         return head + (s.to.map { " Continue this conversation on \($0)?" } ?? " No other profile has room right now.")
     }
 }

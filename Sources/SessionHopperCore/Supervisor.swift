@@ -29,6 +29,9 @@ public final class Supervisor {
     private let say: (String) -> Void
     private let child = ChildBox()
     private var signalSources: [DispatchSourceSignal] = []
+    /// The profile the user explicitly moved this session to: no threshold suggestion or auto-move away from it
+    /// (only the hard threshold still acts), so a deliberate choice is not undone a second later.
+    private var userTarget: String?
     /// Status-line samples are re-read this often.
     private let evalInterval: TimeInterval
 
@@ -138,13 +141,13 @@ public final class Supervisor {
                 args += launches == 0 ? claudeArgs : LaunchPlan.relaunchArgs(claudeArgs)
                 let cutOff = FileIO.readString(files.killed)
                 // The last turn died on an API error (a limit stop) and the user moved on: pick the work back up.
-                let died = FileIO.exists(files.interrupted) || request?.trigger == "limit_stop"
+                let died = FileIO.exists(files.interrupted) || ["limit_stop", "login_stop"].contains(request?.trigger ?? "")
                 // The transcript shows a turn that never got its reply, even if the hooks' turn state missed it.
                 let unfinished = !Transcripts.turnFinished(Transcripts.find(resumeID, projects: projects))
                 if launches > 0, cutOff != nil || died || unfinished {
                     let jobs = (cutOff ?? "").split(separator: "\n").dropFirst().map(String.init)
                     let crons = (FileIO.readString(files.crons) ?? "").split(separator: "\n").map(String.init)
-                    args.append(LaunchPlan.continuePrompt(jobs: jobs, crons: crons, limitStop: died, from: current?.name ?? "",
+                    args.append(LaunchPlan.continuePrompt(jobs: jobs, crons: crons, limitStop: died, loginFailed: request?.trigger == "login_stop", from: current?.name ?? "",
                                                           to: profile.name, template: config.continuePrompt))
                 }
             }
@@ -160,6 +163,7 @@ public final class Supervisor {
                 return 127
             }
             child.set(pid)
+            userTarget = request.flatMap { ["now", "confirm"].contains($0.trigger) && $0.to == profile.name ? profile.name : nil }
             firstRun = false
             launches += 1
             current = profile
@@ -189,7 +193,8 @@ public final class Supervisor {
                     FileIO.remove(files.ctl)
                     if now.to != profile.name { end(pid, files: files); return .handoff(now) }
                 }
-                if let p = FileIO.decode(PendingMove.self, from: files.pending), idle(files), turnFinished(sessionID) {
+                // A turn that died on an API error (StopFailure) is over even if the transcript has no reply.
+                if let p = FileIO.decode(PendingMove.self, from: files.pending), idle(files), FileIO.exists(files.interrupted) || turnFinished(sessionID) {
                     if p.to == profile.name {
                         FileIO.remove(files.pending)
                     } else {
@@ -197,7 +202,7 @@ public final class Supervisor {
                         return .handoff(p)
                     }
                 }
-                if FileIO.exists(files.limited) {
+                if FileIO.exists(files.limited) || FileIO.exists(files.loginFailed) {
                     limitHit = true
                     onLimit(profile: profile, order: order, files: files, sessionID: sessionID)
                     continue
@@ -240,13 +245,13 @@ public final class Supervisor {
         case .none:
             break
         case .suggest(let to, let pct):
-            guard !pendingExists, !FileIO.exists(f.suggest) else { return }
+            guard !pendingExists, !FileIO.exists(f.suggest), userTarget != profile.name else { return }
             try? FileIO.encode(Suggestion(from: profile.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
             EventLog.append(HopperEvent(type: "suggest", session: sessionID, cwd: FileManager.default.currentDirectoryPath,
                                         from: profile.name, to: to, trigger: "threshold", source: "engine",
                                         profiles: EventLog.samples(config, env.paths, now: policy.now)), env.paths)
         case .autoMove(let to, _):
-            guard !pendingExists else { return }
+            guard !pendingExists, userTarget != profile.name else { return }
             try? FileIO.encode(PendingMove(to: to, trigger: "auto", source: "engine"), to: f.pending)
             FileIO.remove(f.suggest)
         case .park:
@@ -256,30 +261,34 @@ public final class Supervisor {
         }
     }
 
-    /// StopFailure with `rate_limit`: the turn already ended. Move if the user confirmed or opted in, else ask.
+    /// StopFailure with `rate_limit`, or a login error (this profile cannot run): the turn already ended.
+    /// Move if the user confirmed or opted in, else ask.
     private func onLimit(profile: Profile, order: [Profile], files f: SessionFiles, sessionID: String) {
-        let detail = FileIO.readString(f.limited)
+        let login = !FileIO.exists(f.limited)
+        let (kind, stop) = login ? ("login", "login_stop") : ("limit", "limit_stop")
+        let detail = FileIO.readString(login ? f.loginFailed : f.limited)
         FileIO.remove(f.limited)
+        FileIO.remove(f.loginFailed)
         let config = HopperConfig.load(env.paths)
         let policy = Policy(config: config, limits: LimitStore.all(config, env.paths), now: FileIO.now())
         let samples = EventLog.samples(config, env.paths, now: policy.now)
         let cwd = FileManager.default.currentDirectoryPath
-        EventLog.append(HopperEvent(type: "limit", session: sessionID, cwd: cwd, from: profile.name, trigger: "limit",
+        EventLog.append(HopperEvent(type: kind, session: sessionID, cwd: cwd, from: profile.name, trigger: kind,
                                     source: "hook", detail: detail, profiles: samples), env.paths)
         if var p = FileIO.decode(PendingMove.self, from: f.pending), p.to != PendingMove.park {
-            p.trigger = "limit_stop"
+            p.trigger = stop
             try? FileIO.encode(p, to: f.pending)
             return
         }
         let to = policy.pick(order, excluding: profile.name)
         if config.autoMove, !held(f), let to {
-            try? FileIO.encode(PendingMove(to: to.name, trigger: "limit_stop", source: "engine"), to: f.pending)
+            try? FileIO.encode(PendingMove(to: to.name, trigger: stop, source: "engine"), to: f.pending)
         } else {
             FileIO.remove(f.pending)
             FileIO.remove(f.suggestShown)
-            try? FileIO.encode(Suggestion(from: profile.name, to: to?.name, percent: policy.percent(profile.name), reason: "limit"), to: f.suggest)
+            try? FileIO.encode(Suggestion(from: profile.name, to: to?.name, percent: policy.percent(profile.name), reason: kind), to: f.suggest)
             EventLog.append(HopperEvent(type: "suggest", session: sessionID, cwd: cwd, from: profile.name, to: to?.name,
-                                        trigger: "limit", source: "engine", profiles: samples), env.paths)
+                                        trigger: kind, source: "engine", profiles: samples), env.paths)
         }
     }
 

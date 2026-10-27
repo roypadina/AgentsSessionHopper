@@ -34,6 +34,7 @@ Hooks ([docs](https://code.claude.com/docs/en/hooks)) keep track of the turn:
 | `UserPromptSubmit` | a turn is running |
 | `Stop` | the turn ended; `background_tasks` still running; `session_crons` (scheduled tasks) |
 | `StopFailure` with `error: "rate_limit"` | the account hit its limit |
+| `StopFailure` with `authentication_failed`, `oauth_org_not_allowed` or `account_on_hold` | this profile cannot run (for example its login expired): handled like a limit stop |
 | `SessionStart` | tells the agent (a few dozen tokens) that the session runs under AgentsSessionHopper and on which profile; with `source: "clear"`, `/clear` started a new conversation in the same process |
 
 ## A move
@@ -52,6 +53,10 @@ Hooks ([docs](https://code.claude.com/docs/en/hooks)) keep track of the turn:
   transcript that ends without Claude's reply): it comes back with one `[sessionhopper]` message telling
   the agent to redo the interrupted step, restart unfinished subagents and background jobs, and carry on.
   The message lists the background jobs and scheduled tasks that were running.
+- **A profile you chose** (`switch <profile>`) is not moved away from by a threshold suggestion or
+  "move without asking"; only the park threshold still acts.
+- **A profile whose login expired**: the turn fails, and the session moves on (or you are asked) with a
+  "login expired" continue prompt. Log that profile in with `sessionhopper login <profile>`.
 - **Scheduled tasks**: Claude Code restores `CronCreate` tasks on resume; a self-paced `/loop` and
   wakeups are not restored. The continue message asks the agent to check with `CronList` and re-create
   only what is missing.

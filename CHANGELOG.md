@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-27
+
+Still **BETA**.
+
+### Fixed
+- **A move onto a profile whose Claude login expired no longer leaves the session dead.** A login error
+  at the end of a turn (`authentication_failed`, `oauth_org_not_allowed`, `account_on_hold`) is handled
+  like a usage-limit stop: with "move without asking" the session moves on to the next profile and
+  resumes with a "login expired" continue prompt; otherwise you are asked, and told to log that profile in.
+- **A profile you move a session to yourself is respected**: no threshold suggestion or automatic move
+  away from it a moment later. The park threshold still protects against paid usage.
+- A turn that ended on an API error counts as finished for a pending move.
+
 ## [0.2.0] - 2026-10-25
 
 Still **BETA**.

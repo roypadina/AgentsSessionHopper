@@ -94,9 +94,11 @@ public enum LaunchPlan {
 
     /// Sent only when a move cut work off (or the last turn died on an error). An idle session resumes
     /// with no prompt, so no turn runs. An empty `template` means the default.
-    public static func continuePrompt(jobs: [String], crons: [String] = [], limitStop: Bool,
+    public static func continuePrompt(jobs: [String], crons: [String] = [], limitStop: Bool, loginFailed: Bool = false,
                                       from: String = "", to: String = "", template: String? = nil) -> String {
-        let reason = limitStop
+        let reason = loginFailed
+            ? "The last turn failed because that Claude account's login expired. The user's conversation was moved to another of their Claude accounts so the work can go on."
+            : limitStop
             ? "The last turn stopped on a usage limit. The user moved this conversation to another of their Claude accounts so the work can go on."
             : "This conversation was moved to another of the user's Claude accounts. The move restarted Claude Code in the middle of your work, so everything that was running stopped with it."
         let jobText = jobs.isEmpty ? "" : "\n\nBackground jobs that were still running:\n" + jobs.map { "- \($0)" }.joined(separator: "\n")

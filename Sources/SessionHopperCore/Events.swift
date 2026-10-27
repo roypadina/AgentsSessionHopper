@@ -11,7 +11,7 @@ public struct HopperEvent: Codable, Equatable, Sendable, Identifiable {
     public var cwd: String?
     public var from: String?
     public var to: String?
-    /// confirm | auto | limit_stop | park | now | threshold | limit
+    /// confirm | auto | limit_stop | login_stop | park | now | threshold | limit | login
     public var trigger: String?
     /// menu | notification | cli | engine | hook
     public var source: String?

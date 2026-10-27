@@ -23,6 +23,9 @@ public enum HookHandler {
         itself. Do not mention this unless the user asks.
         """
 
+    /// `StopFailure.error` values that mean this profile cannot run at all: move on, like a limit stop.
+    static let loginErrors: Set<String> = ["authentication_failed", "oauth_org_not_allowed", "account_on_hold"]
+
     /// Returns what to print on stdout (nil = nothing).
     public static func handle(input: Data, env: HopperEnvironment, installedProfile: String?) -> String? {
         guard let ev = FileIO.jsonObject(input), let event = ev["hook_event_name"] as? String else { return nil }
@@ -70,6 +73,8 @@ public enum HookHandler {
             FileIO.touch(f.interrupted)
             if ev["error"] as? String == "rate_limit" {
                 try? FileIO.write((ev["error_details"] as? String) ?? "rate_limit", to: f.limited)
+            } else if let e = ev["error"] as? String, loginErrors.contains(e) {
+                try? FileIO.write(e, to: f.loginFailed)
             }
         default:
             break
@@ -124,7 +129,8 @@ public enum HookHandler {
 
     public static func suggestionText(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
-        let head = s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
+        let head = s.reason == "login" ? "\(s.from) can't run: its Claude login expired (sessionhopper login \(s.from))."
+            : s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
         return "[sessionhopper] " + head + (s.to.map { " \($0) has room." } ?? "")
     }
 }
