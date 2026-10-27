@@ -107,12 +107,14 @@ public struct SessionFiles: Sendable {
     public var interrupted: URL { f("interrupted") }
     /// The last turn died on `rate_limit`.
     public var limited: URL { f("limited") }
+    /// The last turn died because this profile cannot run (login expired, org not allowed, account on hold).
+    public var loginFailed: URL { f("login-failed") }
     /// Conversation id after `/clear` (Claude Code starts a new one in the same process).
     public var current: URL { f("current") }
     /// Scheduled tasks (`Stop.session_crons`) at the last Stop, one per line.
     public var crons: URL { f("crons") }
 
     /// Turn state cleared on every (re)launch.
-    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited, crons] }
+    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited, loginFailed, crons] }
     public var all: [URL] { turnFiles + [record, hold, current] }
 }

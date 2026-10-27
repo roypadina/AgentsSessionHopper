@@ -192,6 +192,56 @@ final class HandOffTests: XCTestCase {
         XCTAssertTrue(h.launches[1].contains("stopped on a usage limit"))
     }
 
+    /// 2026-10-26: a move landed on a profile whose login had expired; the session sat dead on "Login expired".
+    func testLoginFailureMovesOnWhenOptedIn() throws {
+        try h.config { $0.autoMove = true }
+        try h.scenario("""
+            if [ "$N" = 1 ]; then
+              emit UserPromptSubmit
+              emit StopFailure ',"error":"authentication_failed"'
+              sleep 5
+            else exit 0; fi
+            """)
+        try h.run([])
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertEqual(h.events().map(\.type), ["login", "switch"])
+        XCTAssertEqual(h.events().last?.trigger, "login_stop")
+        XCTAssertTrue(h.launches[1].contains("login expired"), h.launches[1])
+    }
+
+    func testLoginFailureAsksByDefault() throws {
+        try h.scenario("""
+            emit UserPromptSubmit
+            emit StopFailure ',"error":"authentication_failed"'
+            sleep 1
+            [ -f "$SESSIONHOPPER_STATE_DIR/sessions/$SID.suggest" ] && grep -q '"login"' "$SESSIONHOPPER_STATE_DIR/sessions/$SID.suggest" && touch "$T/asked"
+            exit 0
+            """)
+        try h.run([])
+        XCTAssertNotNil(h.read("asked"), "confirm-first: a login failure asks, it does not move by itself")
+        XCTAssertEqual(h.launches.count, 1)
+    }
+
+    /// 2026-10-26: `switch claude1` landed on claude1 (over the suggest threshold) and auto-move undid it a second later.
+    func testExplicitTargetIsNotUndoneByAutoMove() throws {
+        try h.config { $0.autoMove = true }
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 90, resetsAt: 4102444800), sevenDay: nil, sampledAt: 0),
+                             profile: "work", h.env.paths)
+        try h.scenario("""
+            if [ "$N" = 1 ]; then
+              usage 10
+              "$SESSIONHOPPER_BIN" switch work --now > /dev/null
+              sleep 5
+            elif [ "$N" = 2 ]; then
+              usage 90
+              sleep 2
+              exit 0
+            else exit 0; fi
+            """)
+        try h.run([])
+        XCTAssertEqual(h.launches.count, 2, "no automatic move away from the profile the user chose")
+    }
+
     func testSwitchNowCutsInAndListsRunningJobs() throws {
         try h.scenario("""
             if [ "$N" = 1 ]; then

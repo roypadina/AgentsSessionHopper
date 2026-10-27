@@ -17,7 +17,7 @@ public struct SessionRecord: Codable, Equatable, Sendable {
 public struct PendingMove: Codable, Equatable, Sendable {
     /// Profile name, "-" for "the next one with room", or "park".
     public var to: String
-    /// confirm | auto | hard | limit_stop | park | now
+    /// confirm | auto | hard | limit_stop | login_stop | park | now
     public var trigger: String
     /// menu | notification | cli | engine
     public var source: String

@@ -34,6 +34,14 @@ final class HookTests: XCTestCase {
         XCTAssertEqual(FileIO.readString(f.limited), "429 Too Many Requests")
     }
 
+    func testLoginFailureIsRecorded() {
+        hook(ev("UserPromptSubmit"))
+        hook(ev("StopFailure", #","error":"authentication_failed""#))
+        XCTAssertEqual(FileIO.readString(f.loginFailed), "authentication_failed")
+        XCTAssertFalse(FileIO.exists(f.limited))
+        XCTAssertTrue(FileIO.exists(f.interrupted))
+    }
+
     func testOtherFailureIsNotALimit() {
         hook(ev("StopFailure", #","error":"overloaded""#))
         XCTAssertFalse(FileIO.exists(f.limited))
