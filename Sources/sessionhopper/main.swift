@@ -491,7 +491,7 @@ func pluginCommand(_ a: [String]) -> Int32 {
     return rc
 }
 
-func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version) (\(HopperInfo.stage))"); return 0 }
+func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version)"); return 0 }
 
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand,

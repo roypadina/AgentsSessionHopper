@@ -374,7 +374,7 @@ private struct AboutSettings: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("AgentsSessionHopper", value: "Version \(HopperInfo.version) \(HopperInfo.stage)")
+                LabeledContent("AgentsSessionHopper", value: "Version \(HopperInfo.version)")
                 HStack {
                     Button("About…") { AboutWindow.show() }
                     Link("Support on Ko-fi ☕", destination: HopperInfo.koFi)

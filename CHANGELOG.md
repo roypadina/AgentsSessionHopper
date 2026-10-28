@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 First stable release: out of BETA.
 
+### Removed
+- The BETA labels: the version no longer carries "BETA" in the app, the About and setup windows, the
+  popover, `sessionhopper --version`, the README and the wiki.
+
 ### Added
 - **Wait for a reset instead of stopping.** When a park leaves no profile to run on without paid usage,
   the session now waits for the first known usage-window reset (plus a minute, so it never lands before
