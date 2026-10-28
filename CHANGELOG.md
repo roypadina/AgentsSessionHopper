@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-28
+
+First stable release: out of BETA.
+
 ### Added
 - **Wait for a reset instead of stopping.** When a park leaves no profile to run on without paid usage,
   the session now waits for the first known usage-window reset (plus a minute, so it never lands before
