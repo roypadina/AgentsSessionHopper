@@ -16,7 +16,7 @@ sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--forc
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
 sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
-sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
+sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log
@@ -28,8 +28,8 @@ sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are su
                                           go straight to claude (or link the binary as *-shim)
 ```
 
-Exit codes: a session returns Claude Code's own exit code; `2` means the session was parked (the
-message shows how to resume it).
+Exit codes: a session returns Claude Code's own exit code; `2` means the session was parked and no
+reset time was known to wait for (the message shows how to resume it).
 
 ## Notes
 
@@ -40,6 +40,10 @@ message shows how to resume it).
 - `config move-now on` (needs `auto-move on`): past the park threshold the move or park happens at
   once, even mid-turn, instead of at the turn end. The cut-off turn is resumed with a note of what was
   interrupted. Held sessions are never cut into.
+- `config wait on` (default): when a park leaves nowhere to run without paid usage, the session waits for
+  the first known window reset (plus a minute) and carries on by itself; nothing runs, so nothing is billed.
+  It waits for its own profile unless "move without asking" is on. Ctrl-C stops waiting;
+  `switch <profile> --session <id>` moves it now. `wait off` exits with code 2 as before.
 - `hold` keeps a session on its profile: no park, no automatic move. A move you confirm still happens.
 - `install-hooks` edits one profile's `settings.json` (with a backup) so sessions started with plain
   `claude` also report usage and limit stops. Optional; `uninstall-hooks` restores your status line.

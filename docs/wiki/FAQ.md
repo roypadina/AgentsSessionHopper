@@ -7,8 +7,8 @@ notifications and settings.
 numbers Claude Code gives its own status line, so a profile with no running session shows "unknown".
 
 **Does it move sessions on its own?** Only if you turn on **Move without asking** (off by default).
-Otherwise every move is your click or command. **Park before paid usage** only ever ends a session; it
-never moves one.
+Otherwise every move is your click or command. **Park before paid usage** only ever ends a session (and
+then waits for its own profile's usage window to reset); it never moves one.
 
 **It moved my session but the agent didn't continue.** The session was idle when it moved: the turn
 was over, so there was nothing to continue and it waits for your next message (see

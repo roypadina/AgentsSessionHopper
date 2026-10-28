@@ -39,10 +39,14 @@ final class Harness {
         try write("""
             #!/bin/bash
             T='\(t.path)'
+            if [ "$1" = auth ]; then
+              echo "${CLAUDE_CONFIG_DIR:-<unset>} $*" >> "$T/auths"
+              [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/logged-out" ] && exit 1; exit 0
+            fi
             echo $$ >> "$T/pids"
             { printf '%s %s' "${CLAUDE_CONFIG_DIR:-<unset>}" "$*" | tr '\\n' ' '; echo; } >> "$T/launches"
             pwd >> "$T/cwds"
-            case "$1" in --version) echo "9.9.9 (stub)"; exit 0;; auth) exit 0;; esac
+            case "$1" in --version) echo "9.9.9 (stub)"; exit 0;; esac
             SID=""; prev=""
             for a in "$@"; do { [ "$prev" = "--session-id" ] || [ "$prev" = "--resume" ]; } && SID="$a"; prev="$a"; done
             N=$(wc -l < "$T/launches" | tr -d ' ')

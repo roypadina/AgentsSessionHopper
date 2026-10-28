@@ -34,6 +34,11 @@ final class HookTests: XCTestCase {
         XCTAssertEqual(FileIO.readString(f.limited), "429 Too Many Requests")
     }
 
+    func testLimitSuggestionNamesTheLimit() {
+        let s = Suggestion(from: "work", to: "personal", percent: 60, reason: "limit", detail: "Fable limit reached")
+        XCTAssertEqual(HookHandler.suggestionText(s), "[sessionhopper] work hit its usage limit (Fable limit reached). personal has room.")
+    }
+
     func testLoginFailureIsRecorded() {
         hook(ev("UserPromptSubmit"))
         hook(ev("StopFailure", #","error":"authentication_failed""#))

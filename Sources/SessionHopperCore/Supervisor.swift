@@ -95,15 +95,18 @@ public final class Supervisor {
         var request: PendingMove?
         var current: Profile?
         var launches = 0
+        /// Profiles whose login failed the pre-check of this move; probed again on the next move.
+        var loggedOut: Set<String> = []
         while true {
             if child.terminating { return 128 + SIGTERM }
             config = HopperConfig.load(env.paths)
-            let order = (try? config.order(prefer: opts.prefer, only: opts.only)) ?? config.profiles
+            let order = ((try? config.order(prefer: opts.prefer, only: opts.only)) ?? config.profiles).filter { !loggedOut.contains($0.name) }
             let policy = Policy(config: config, limits: LimitStore.all(config, env.paths), now: FileIO.now())
             let resumeID = FileIO.readString(files.current) ?? sessionID
 
             if request?.to == PendingMove.park {
-                return park(sessionID: resumeID, from: current, request: request, policy: policy, order: order, files: files)
+                if let code = park(sessionID: resumeID, from: current, request: &request, policy: policy, order: order, files: files) { return code }
+                continue
             }
             var target: Profile?
             if let r = request, r.to != PendingMove.anywhere {
@@ -115,7 +118,15 @@ public final class Supervisor {
                 target = order.first { $0.name != current?.name } ?? order.first
             }
             guard let profile = target else {
-                return park(sessionID: resumeID, from: current, request: request, policy: policy, order: order, files: files)
+                if let code = park(sessionID: resumeID, from: current, request: &request, policy: policy, order: order, files: files) { return code }
+                continue
+            }
+            // A move lands only where Claude Code's own `claude auth status` says the login works (as `doctor` checks).
+            if let from = current, from.name != profile.name, Claude.isLoggedIn(profile, env: env) == false {
+                say("\(profile.name): not logged in (sessionhopper login \(profile.name)), skipping it")
+                loggedOut.insert(profile.name)
+                request = PendingMove(to: PendingMove.anywhere, trigger: request?.trigger ?? "auto", source: request?.source ?? "engine")
+                continue
             }
 
             let pct = policy.percent(profile.name).map { "\(Int($0.rounded()))%" } ?? "usage unknown"
@@ -123,6 +134,7 @@ public final class Supervisor {
                 say("moving to \(profile.name) (\(pct)), resuming the same conversation")
                 EventLog.append(HopperEvent(type: "switch", session: resumeID, cwd: fm.currentDirectoryPath, from: from.name,
                                             to: profile.name, trigger: request?.trigger, source: request?.source,
+                                            detail: loggedOut.isEmpty ? nil : "skipped \(loggedOut.sorted().joined(separator: ", ")): not logged in",
                                             profiles: EventLog.samples(config, env.paths, now: FileIO.now())), env.paths)
             } else if current == nil {
                 let skipped = request == nil ? policy.skipped(order, before: profile) : []
@@ -163,6 +175,7 @@ public final class Supervisor {
                 return 127
             }
             child.set(pid)
+            loggedOut = []
             userTarget = request.flatMap { ["now", "confirm"].contains($0.trigger) && $0.to == profile.name ? profile.name : nil }
             firstRun = false
             launches += 1
@@ -286,7 +299,9 @@ public final class Supervisor {
         } else {
             FileIO.remove(f.pending)
             FileIO.remove(f.suggestShown)
-            try? FileIO.encode(Suggestion(from: profile.name, to: to?.name, percent: policy.percent(profile.name), reason: kind), to: f.suggest)
+            // Which limit it was (e.g. a model's own limit, fixable with /model): Claude Code's words, when it gave any.
+            try? FileIO.encode(Suggestion(from: profile.name, to: to?.name, percent: policy.percent(profile.name), reason: kind,
+                                          detail: login || detail == "rate_limit" ? nil : detail), to: f.suggest)
             EventLog.append(HopperEvent(type: "suggest", session: sessionID, cwd: cwd, from: profile.name, to: to?.name,
                                         trigger: kind, source: "engine", profiles: samples), env.paths)
         }
@@ -307,10 +322,17 @@ public final class Supervisor {
         _ = Spawn.reap(pid, block: true)
     }
 
-    private func park(sessionID: String, from: Profile?, request: PendingMove?, policy: Policy, order: [Profile], files: SessionFiles) -> Int32 {
+    /// Nowhere to run without paid usage. With `waitForReset` and a known reset, waits for it (Ctrl-C stops the
+    /// wait) and returns nil with `request` set to carry on there, or to a move the user confirms meanwhile;
+    /// otherwise the exit code.
+    private func park(sessionID: String, from: Profile?, request: inout PendingMove?, policy: Policy, order: [Profile], files: SessionFiles) -> Int32? {
         let config = policy.config
+        // Moving to another profile needs the user's OK unless they opted in: else wait for this one.
+        let candidates = config.autoMove || from == nil ? order : order.filter { $0.name == from?.name }
+        let next = config.waitForReset ? policy.nextRoom(candidates).map { (profile: $0.profile, at: $0.at + env.resetSlack) } : nil
         EventLog.append(HopperEvent(type: "park", session: sessionID, cwd: FileManager.default.currentDirectoryPath,
-                                    from: from?.name, trigger: request?.trigger ?? "launch", source: request?.source ?? "engine",
+                                    from: from?.name, to: next?.profile.name, trigger: request?.trigger ?? "launch", source: request?.source ?? "engine",
+                                    detail: next.map { "waiting for a reset, continues on \($0.profile.name) at \(ProfileLimits.clock($0.at))" },
                                     profiles: EventLog.samples(config, env.paths, now: policy.now)), env.paths)
         if let from, request?.trigger == "park" {
             say("parked: \(from.name) reached \(Int(config.hardThreshold))% and \"park before paid usage\" is on")
@@ -320,20 +342,44 @@ public final class Supervisor {
             say("no profile with room (all at \(Int(config.hardThreshold))%+ of a window); not starting, so nothing runs into paid usage")
         }
         for p in order {
-            let w = policy.limits[p.name]?.blocking(now: policy.now)
-            let usage = w.map { "\($0.name) \(Int($0.window.usedPercentage.rounded()))%" } ?? "unknown"
-            let reset = w?.window.resetsAt.map { "resets \(Self.clock($0))" } ?? ""
-            say("  \(p.name.padding(toLength: 10, withPad: " ", startingAt: 0)) \(usage)  \(reset)")
+            say("  \(p.name.padding(toLength: 10, withPad: " ", startingAt: 0)) \(ProfileLimits.label(policy.limits[p.name], now: policy.now))")
+        }
+        if let next {
+            say("waiting for a reset: continues on \(next.profile.name) at \(ProfileLimits.clock(next.at)). Nothing runs meanwhile, so nothing is billed.")
+            say("Ctrl-C stops waiting (continue later: sessionhopper --resume \(sessionID)). To move it now instead: sessionhopper switch <profile> --session \(files.id)")
+            try? FileIO.encode(SessionRecord(session: files.id, resume: sessionID, pid: getpid(), child: 0, profile: from?.name ?? next.profile.name,
+                                             cwd: FileManager.default.currentDirectoryPath, started: FileIO.isoNow()), to: files.record)
+            try? FileIO.write(String(next.at), to: files.waiting)
+            // The park request came from one of these; from here on they hold only a move the user confirms.
+            FileIO.remove(files.ctl)
+            FileIO.remove(files.pending)
+            signal(SIGINT, SIG_DFL) // no Claude Code runs to own Ctrl-C
+            defer {
+                signal(SIGINT, SIG_IGN)
+                FileIO.remove(files.waiting)
+            }
+            while !child.terminating {
+                if let move = FileIO.decode(PendingMove.self, from: files.ctl) ?? FileIO.decode(PendingMove.self, from: files.pending) {
+                    FileIO.remove(files.ctl)
+                    FileIO.remove(files.pending)
+                    request = move
+                    return nil
+                }
+                let c = HopperConfig.load(env.paths)
+                let p = Policy(config: c, limits: LimitStore.all(c, env.paths), now: FileIO.now() - env.resetSlack)
+                if let room = p.pick(candidates) {
+                    say("\(room.name) has room again, resuming")
+                    request = PendingMove(to: room.name, trigger: "wait", source: "engine")
+                    return nil
+                }
+                if p.nextRoom(candidates) == nil { break }
+                Thread.sleep(forTimeInterval: evalInterval)
+            }
+            if child.terminating { return 128 + SIGTERM }
         }
         say("session kept. Continue later:  sessionhopper --resume \(sessionID)")
         say("or on a chosen profile now:     sessionhopper -P <profile> --resume \(sessionID)")
         return 2
-    }
-
-    static func clock(_ epoch: Double) -> String {
-        let f = DateFormatter()
-        f.dateFormat = Calendar.current.isDateInToday(Date(timeIntervalSince1970: epoch)) ? "HH:mm" : "EEE HH:mm"
-        return f.string(from: Date(timeIntervalSince1970: epoch))
     }
 
     private func installSignalHandlers() {

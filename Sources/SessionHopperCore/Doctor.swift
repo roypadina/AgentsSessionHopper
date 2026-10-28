@@ -61,9 +61,15 @@ public enum Doctor {
                 let pct = l.percent(now: now).map { "\(Int($0.rounded()))%" } ?? "reset since"
                 add(.info, "\(p.name): last usage sample \(age) min ago, \(pct)")
             } else {
-                add(.info, "\(p.name): no usage sample yet (comes with the first status-line update of a session)")
+                add(.warn, "\(p.name): no usage sample yet, so it counts as having room until a session on it reports (comes with the first status-line update)")
             }
             if HookInstaller.isInstalled(p) { add(.info, "\(p.name): hooks installed (sessions started without sessionhopper report usage too)") }
+        }
+
+        // An exported key overrides every profile's login: usage bills the key and the status line carries no `rate_limits`.
+        let keys = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"].filter { !(env.vars[$0] ?? "").isEmpty }
+        if !keys.isEmpty {
+            add(.warn, "\(keys.joined(separator: ", ")) set in this environment: sessions use it on every profile instead of the profile's login, report no usage limits, and hand-offs never trigger. Unset it to use your Claude logins")
         }
 
         // Hand-off resumes the conversation under another profile: they must share one transcript store.

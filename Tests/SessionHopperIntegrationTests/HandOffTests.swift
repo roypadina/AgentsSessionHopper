@@ -126,6 +126,7 @@ final class HandOffTests: XCTestCase {
     }
 
     func testParkBeforePaidUsageAtTurnEnd() throws {
+        try h.config { $0.waitForReset = false }
         try h.scenario("""
             emit UserPromptSubmit
             usage 98
@@ -164,7 +165,7 @@ final class HandOffTests: XCTestCase {
               usage 100
               emit StopFailure ',"error":"rate_limit","error_details":"429 Too Many Requests"'
               sleep 1
-              [ -f "$SESSIONHOPPER_STATE_DIR/sessions/$SID.suggest" ] && touch "$T/asked"
+              [ -f "$SESSIONHOPPER_STATE_DIR/sessions/$SID.suggest" ] && cp "$SESSIONHOPPER_STATE_DIR/sessions/$SID.suggest" "$T/asked"
               "$SESSIONHOPPER_BIN" switch work > /dev/null
               sleep 5
             else exit 0; fi
@@ -175,6 +176,7 @@ final class HandOffTests: XCTestCase {
         XCTAssertTrue(h.launches[1].contains("stopped on a usage limit"), "resumes with a prompt to pick the work back up")
         XCTAssertEqual(h.events().map(\.type), ["limit", "suggest", "switch"])
         XCTAssertEqual(h.events().first?.detail, "429 Too Many Requests")
+        XCTAssertEqual(FileIO.decode(Suggestion.self, from: h.t.appendingPathComponent("asked"))?.detail, "429 Too Many Requests", "the suggestion names the limit")
     }
 
     func testLimitStopMovesAtOnceWhenOptedIn() throws {
@@ -275,6 +277,7 @@ final class HandOffTests: XCTestCase {
     }
 
     func testOnlyParksWithoutLaunchingWhenFull() throws {
+        try h.config { $0.waitForReset = false }
         try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: 4102444800), sevenDay: nil, sampledAt: 0),
                              profile: "default", h.env.paths)
         let r = try h.run(["--only", "default"])
@@ -306,7 +309,7 @@ final class HandOffTests: XCTestCase {
     }
 
     func testParkNowAtHardWhenNothingHasRoom() throws {
-        try h.config { $0.moveNowAtHard = true }
+        try h.config { $0.moveNowAtHard = true; $0.waitForReset = false }
         try h.scenario("""
             emit UserPromptSubmit
             usage 98
@@ -317,6 +320,73 @@ final class HandOffTests: XCTestCase {
         XCTAssertEqual(r.code, 2)
         XCTAssertNil(h.read("turn-finished"), "parked mid-turn")
         XCTAssertEqual(h.events().last?.type, "park")
+    }
+
+    func testFullAtLaunchWaitsForTheResetThenStarts() throws {
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: FileIO.now() + 1), sevenDay: nil, sampledAt: 0),
+                             profile: "default", h.env.paths)
+        try h.scenario("exit 0")
+        let r = try h.run(["--only", "default"], extraEnv: ["SESSIONHOPPER_RESET_SLACK": "0"])
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertTrue(r.stderr.contains("waiting for a reset: continues on default"), r.stderr)
+        XCTAssertEqual(h.launches.count, 1, "started once the window reset")
+        XCTAssertEqual(h.events().last?.type, "park")
+        XCTAssertEqual(h.events().last?.to, "default")
+    }
+
+    func testAllFullMidSessionWaitsAndMovesWhereRoomComesBackWhenOptedIn() throws {
+        try h.config { $0.autoMove = true }
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: FileIO.now() + 3), sevenDay: nil, sampledAt: 0),
+                             profile: "work", h.env.paths)
+        try h.scenario("""
+            if [ "$N" = 1 ]; then usage 98; sleep 10; else exit 0; fi
+            """)
+        let r = try h.run([], extraEnv: ["SESSIONHOPPER_RESET_SLACK": "0"])
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertTrue(h.launches[1].hasPrefix(h.workDir.path), h.launches[1])
+        XCTAssertEqual(h.events().map(\.type), ["park", "switch"])
+        XCTAssertEqual(h.events().last?.trigger, "wait")
+    }
+
+    func testWaitStaysOnItsProfileWithoutConsentButTakesAConfirmedMove() throws {
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 10, resetsAt: 4102444800), sevenDay: nil, sampledAt: 0),
+                             profile: "work", h.env.paths)
+        try h.scenario("""
+            if [ "$N" = 1 ]; then usage 98; sleep 10; else exit 0; fi
+            """)
+        var waitedOnOwnProfile = false
+        let r = try h.run([], onStart: { _ in
+            let deadline = Date().addingTimeInterval(8)
+            while Date() < deadline, !self.h.events().contains(where: { $0.type == "park" }) { Thread.sleep(forTimeInterval: 0.1) }
+            Thread.sleep(forTimeInterval: 1)
+            // work has room, but moving there needs the user's OK: it waits for its own profile.
+            waitedOnOwnProfile = self.h.launches.count == 1 && self.h.events().last?.to == "default"
+            let sid = self.h.sessionID(fromLaunch: self.h.launches[0])!
+            XCTAssertEqual(try? self.h.run(["switch", "work", "--session", sid]).code, 0)
+        })
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertTrue(waitedOnOwnProfile, r.stderr)
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertTrue(h.launches[1].hasPrefix(h.workDir.path), h.launches[1])
+        XCTAssertEqual(h.events().last?.trigger, "confirm")
+    }
+
+    func testMoveSkipsAProfileWhoseLoginIsDead() throws {
+        let spare = h.home.appendingPathComponent(".claude-spare")
+        try FileManager.default.createDirectory(at: spare, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: spare.appendingPathComponent("projects"), withDestinationURL: h.defaultDir.appendingPathComponent("projects"))
+        try h.run(["profiles", "import"])
+        FileManager.default.createFile(atPath: h.workDir.appendingPathComponent("logged-out").path, contents: nil)
+        try h.config { $0.autoMove = true }
+        try h.scenario("""
+            if [ "$N" = 1 ]; then usage 90; sleep 10; else exit 0; fi
+            """)
+        let r = try h.run([])
+        XCTAssertEqual(h.launches.count, 2)
+        XCTAssertTrue(h.launches[1].hasPrefix(spare.path), h.launches[1])
+        XCTAssertTrue(r.stderr.contains("work: not logged in"), r.stderr)
+        XCTAssertEqual(h.events().last?.detail, "skipped work: not logged in")
     }
 
     func testHeldSessionIsNotCutInAtHard() throws {
@@ -338,7 +408,7 @@ final class HandOffTests: XCTestCase {
         try h.scenario("exit 0")
         let r = try h.run([])
         XCTAssertTrue(r.stderr.contains("starting on work"), r.stderr)
-        XCTAssertTrue(r.stderr.contains("skipped default 98%"), r.stderr)
+        XCTAssertTrue(r.stderr.contains("skipped default 5h 98% · resets "), r.stderr)
     }
 
     func testSigtermIsForwardedToClaude() throws {

@@ -37,9 +37,11 @@ public struct Suggestion: Codable, Equatable, Sendable {
     public var from: String
     public var to: String?
     public var percent: Double?
-    /// threshold | limit
+    /// threshold | limit | login
     public var reason: String
     public var dismissed: Bool = false
+    /// Claude Code's own words for the stop (`StopFailure.error_details`), e.g. which model's limit it was.
+    public var detail: String?
 }
 
 public struct LiveSession: Codable, Equatable, Sendable, Identifiable {
@@ -48,6 +50,8 @@ public struct LiveSession: Codable, Equatable, Sendable, Identifiable {
     public var held: Bool
     public var pending: PendingMove?
     public var suggestion: Suggestion?
+    /// Every profile is full: the supervisor waits until this time (epoch seconds) for a window reset.
+    public var waitingUntil: Double?
     public var id: String { record.session }
 }
 
@@ -64,7 +68,8 @@ public enum Sessions {
                 let f = paths.session(r.session)
                 return LiveSession(record: r, busy: FileIO.exists(f.busy), held: holdAll || FileIO.exists(f.hold),
                                    pending: FileIO.decode(PendingMove.self, from: f.pending),
-                                   suggestion: FileIO.decode(Suggestion.self, from: f.suggest))
+                                   suggestion: FileIO.decode(Suggestion.self, from: f.suggest),
+                                   waitingUntil: FileIO.readString(f.waiting).flatMap(Double.init))
             }
     }
 

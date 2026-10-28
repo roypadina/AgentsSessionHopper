@@ -63,8 +63,14 @@ public struct Policy: Sendable {
         }
     }
 
-    /// Profiles ahead of `chosen` in `order` that were passed over, with their usage ("work 98%").
+    /// Profiles ahead of `chosen` in `order` that were passed over, with their usage ("work 5h 98% · resets 14:00").
     public func skipped(_ order: [Profile], before chosen: Profile) -> [String] {
-        order.prefix { $0.name != chosen.name }.map { p in "\(p.name) \(percent(p.name).map { "\(Int($0.rounded()))%" } ?? "?")" }
+        order.prefix { $0.name != chosen.name }.map { p in "\(p.name) \(ProfileLimits.label(limits[p.name], now: now))" }
+    }
+
+    /// Every profile is full: the one whose windows reset first, and when. nil = none has a known reset.
+    public func nextRoom(_ order: [Profile]) -> (profile: Profile, at: Double)? {
+        order.compactMap { p in limits[p.name]?.freeAt(under: config.hardThreshold, now: now).map { (p, $0) } }
+            .min { $0.1 < $1.1 }
     }
 }

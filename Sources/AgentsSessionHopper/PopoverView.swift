@@ -89,12 +89,7 @@ struct ProfileRow: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func note(_ l: ProfileLimits?, now: Double) -> String {
-        guard let l else { return "no data yet" }
-        guard let w = l.blocking(now: now) else { return "reset since last seen" }
-        if model.severity(profile.name) != .ok, let r = w.window.resetsAt { return "resets \(clock(r))" }
-        return relative(l.sampledAt, now: now)
-    }
+    private func note(_ l: ProfileLimits?, now: Double) -> String { l?.note(now: now) ?? "no data yet" }
 }
 
 /// The confirm prompt: nothing moves until the user says so (unless they opted in to moving without asking).
@@ -125,7 +120,7 @@ struct SuggestionCard: View {
 
     private func headline(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
-        let head = s.reason == "login" ? "\(s.from)'s Claude login expired." : s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
+        let head = s.reason == "login" ? "\(s.from)'s Claude login expired." : s.reason == "limit" ? "\(s.from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")." : "\(s.from) is near its usage limit\(pct)."
         return head + (s.to.map { " Continue this conversation on \($0)?" } ?? " No other profile has room right now.")
     }
 }
@@ -154,6 +149,7 @@ struct SessionRow: View {
     private var status: String {
         var parts = [session.record.profile, session.busy ? "working" : "idle"]
         if session.held { parts.append("held") }
+        if let t = session.waitingUntil { parts.append("parked, waits for a reset until \(ProfileLimits.clock(t))") }
         if let p = session.pending {
             parts.append(p.to == PendingMove.park ? "parks at turn end" : "moves to \(p.to == PendingMove.anywhere ? "next" : p.to) at turn end")
         }
@@ -177,7 +173,7 @@ struct EventRow: View {
         let dir = event.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
         switch event.type {
         case "switch": return "\(dir)  \(event.from ?? "?") → \(event.to ?? "?")  (\(event.trigger ?? ""))"
-        case "park": return "\(dir)  parked on \(event.from ?? "?")"
+        case "park": return "\(dir)  parked on \(event.from ?? "?")" + (event.to.map { ", waits for \($0)" } ?? "")
         case "limit": return "\(dir)  \(event.from ?? "?") hit its limit"
         case "suggest": return "\(dir)  suggested \(event.from ?? "?") → \(event.to ?? "–")"
         default: return event.type

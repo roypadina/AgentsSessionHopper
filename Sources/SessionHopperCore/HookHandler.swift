@@ -130,7 +130,7 @@ public enum HookHandler {
     public static func suggestionText(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
         let head = s.reason == "login" ? "\(s.from) can't run: its Claude login expired (sessionhopper login \(s.from))."
-            : s.reason == "limit" ? "\(s.from) hit its usage limit." : "\(s.from) is near its usage limit\(pct)."
+            : s.reason == "limit" ? "\(s.from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")." : "\(s.from) is near its usage limit\(pct)."
         return "[sessionhopper] " + head + (s.to.map { " \($0) has room." } ?? "")
     }
 }
