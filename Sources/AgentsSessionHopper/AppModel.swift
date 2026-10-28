@@ -217,18 +217,6 @@ extension AppModel.Severity {
 
 func percentText(_ v: Double?) -> String { v.map { "\(Int($0.rounded()))%" } ?? "–" }
 
-func relative(_ epoch: Double, now: Double) -> String {
-    let m = Int((now - epoch) / 60)
-    return m < 1 ? "just now" : m < 90 ? "\(m) min ago" : m < 48 * 60 ? "\(m / 60) h ago" : "\(m / 1440) d ago"
-}
-
-func clock(_ epoch: Double) -> String {
-    let d = Date(timeIntervalSince1970: epoch)
-    let f = DateFormatter()
-    f.dateFormat = Calendar.current.isDateInToday(d) ? "HH:mm" : "EEE HH:mm"
-    return f.string(from: d)
-}
-
 /// "2026-10-23T14:02:11+03:00" → "14:02" (today) or "Oct 23 14:02".
 func eventTime(_ iso: String) -> String {
     guard let d = ISO8601DateFormatter().date(from: iso) else { return iso }

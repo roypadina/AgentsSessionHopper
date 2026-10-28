@@ -51,7 +51,7 @@ let usage = """
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
-      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]
+      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
@@ -96,7 +96,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         let l = s.limits[p.name]
         let five = l?.fiveHour.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
         let week = l?.sevenDay.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
-        var note = l.map { "sampled \(ago($0.sampledAt, now: s.now))" } ?? "no sample yet"
+        var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let p = s.percent(p.name), p >= s.config.suggestThreshold { note += ", near limit" }
         let n = s.sessions(on: p.name).count
         out("  \(i + 1). \(pad(p.name, 10)) \(pad(env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")")
@@ -108,6 +108,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         for x in s.sessions {
             var state = x.busy ? "busy" : "idle"
             if x.held { state += ", held" }
+            if let t = x.waitingUntil { state += ", parked, waits for a reset until \(ProfileLimits.clock(t))" }
             if let p = x.pending { state += ", moving to \(p.to == "-" ? "next with room" : p.to) at turn end" }
             else if let sug = x.suggestion, !sug.dismissed { state += ", suggest: \(HookHandler.suggestionText(sug).replacingOccurrences(of: "[sessionhopper] ", with: ""))" }
             out("  \(x.record.session.prefix(8))  \(pad(x.record.profile, 10)) \(env.tilde(x.record.cwd))  \(state)")
@@ -306,16 +307,18 @@ func configCommand(_ a: [String]) -> Int32 {
         case "park": c.parkBeforePaid = v == "on"
         case "auto-move": c.autoMove = v == "on"
         case "move-now": c.moveNowAtHard = v == "on"
+        case "wait": c.waitForReset = v == "on"
         default: die("unknown setting \(a[0])")
         }
         do { try c.save(env.paths) } catch { die("\(error)") }
     } else if !a.isEmpty {
-        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off]")
+        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]")
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
     out("move without asking: \(c.autoMove ? "on" : "off")")
     out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
+    out("all full, wait for a reset: \(c.waitForReset ? "on" : "off")")
     out("continue prompt:     \(c.continuePrompt == nil ? "built-in" : "your own") (sessionhopper config prompt)")
     return 0
 }

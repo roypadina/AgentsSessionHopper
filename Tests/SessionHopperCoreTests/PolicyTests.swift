@@ -36,6 +36,32 @@ final class PolicyTests: XCTestCase {
         XCTAssertEqual(l.percent(now: 9500), nil)
     }
 
+    func testNextRoomIsTheLatestResetOfAFullProfile() {
+        let p = policy(["a": ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: 2000),
+                                           sevenDay: LimitWindow(usedPercentage: 98, resetsAt: 5000), sampledAt: 0),
+                        "b": limits(99, resets: 3000), "c": limits(100, resets: 4000)])
+        XCTAssertEqual(p.nextRoom(order)?.profile.name, "b", "a frees only when its 7d window resets too")
+        XCTAssertEqual(p.nextRoom(order)?.at, 3000)
+        XCTAssertNil(policy(["a": limits(99)]).nextRoom([a]), "no reset time known")
+        XCTAssertEqual(policy(["a": limits(99, resets: 2000)]).nextRoom([a])?.at, 2000)
+    }
+
+    func testSpendLimitCountsAsAWindow() {
+        let l = ProfileLimits.fromStatusLine(json(#"{"rate_limits":{"spend_limit":{"used_percentage":98,"resets_at":5000}}}"#)!, now: 1000)
+        XCTAssertEqual(l?.percent(now: 1000), 98)
+        XCTAssertNil(policy(["a": l!, "b": limits(99), "c": limits(99)]).pick(order), "past the spend limit is paid usage")
+    }
+
+    func testLabelShowsResetAndStaleAge() {
+        let l = ProfileLimits(fiveHour: LimitWindow(usedPercentage: 86, resetsAt: 100_000), sevenDay: nil, sampledAt: 1000)
+        let reset = ProfileLimits.clock(100_000)
+        XCTAssertEqual(ProfileLimits.label(l, now: 1100), "5h 86% · resets \(reset)", "fresh: no age")
+        XCTAssertEqual(ProfileLimits.label(l, now: 1000 + 45 * 60), "5h 86% · resets \(reset) · sampled 45 min ago")
+        XCTAssertEqual(ProfileLimits.label(l, now: 1000 + 3 * 3600), "5h 86% · resets \(reset) · sampled 3 h ago")
+        XCTAssertEqual(ProfileLimits.label(l, now: 100_500), "reset since last seen · sampled 27 h ago")
+        XCTAssertEqual(ProfileLimits.label(nil, now: 0), "unknown")
+    }
+
     func testBelowSuggestDoesNothing() {
         XCTAssertEqual(policy(["a": limits(84)]).evaluate(current: a, order: order, held: false), .none)
     }
@@ -101,7 +127,8 @@ final class PolicyTests: XCTestCase {
         XCTAssertNil(l?.sevenDay)
         XCTAssertEqual(l?.session, "s1")
         XCTAssertNil(ProfileLimits.fromStatusLine(json(#"{"model":{"id":"x"}}"#)!, now: 5), "no rate_limits before the first response")
-        XCTAssertNil(ProfileLimits.fromStatusLine(json(#"{"rate_limits":{"spend_limit":{"used_percentage":50}}}"#)!, now: 5), "spend caps are not account windows")
+        XCTAssertEqual(ProfileLimits.fromStatusLine(json(#"{"rate_limits":{"spend_limit":{"used_percentage":50}}}"#)!, now: 5)?.percent(now: 5), 50,
+                       "a gateway spend limit counts: past it is paid usage")
     }
 
     func testPickerPagesAndPicks() {

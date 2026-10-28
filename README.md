@@ -48,7 +48,8 @@ brew install --cask roypadina/tap/agents-session-hopper
 - **Limit stops ask too.** If Claude Code stops on a usage limit, you are asked whether to continue on
   another profile, and the work picks up where it stopped.
 - **Park before paid usage** (on by default). Past 97% with nothing confirmed, the session ends at its
-  next turn end instead of running into paid extra usage, and tells you how to resume it.
+  next turn end instead of running into paid extra usage, then waits for the usage window to reset and
+  carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
 - **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings.
 - **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.

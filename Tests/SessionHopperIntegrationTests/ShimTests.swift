@@ -12,7 +12,7 @@ final class ShimTests: XCTestCase {
         XCTAssertEqual(r.stdout, "9.9.9 (stub)\n")
         XCTAssertEqual(h.launches, ["<unset> --version"], "no --settings: not a supervised session")
         try h.run(["shim", "auth", "status"])
-        XCTAssertEqual(h.launches.last, "<unset> auth status")
+        XCTAssertEqual(h.read("auths"), "<unset> auth status\n")
     }
 
     func testClaudeStartedInsideASessionIsNotSupervisedAgain() throws {

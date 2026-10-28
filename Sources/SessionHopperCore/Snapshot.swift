@@ -35,7 +35,7 @@ public struct HopperSnapshot: Codable, Equatable, Sendable {
 }
 
 public enum HopperInfo {
-    public static let version = "0.2.1"
+    public static let version = "1.0.0"
     /// Shown next to the version everywhere until real-world hand-offs are proven.
     public static let stage = "BETA"
     public static let betaNotice = "BETA: not fully tested; real account hand-offs are new. Expect rough edges and please report issues."

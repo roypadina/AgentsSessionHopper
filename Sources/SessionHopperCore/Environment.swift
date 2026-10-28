@@ -14,17 +14,21 @@ public struct HopperEnvironment: Sendable {
     public var killGrace: TimeInterval
     /// Supervisor tick. Control files and the turn state are checked once per tick.
     public var pollInterval: TimeInterval
+    /// A full window counts as full this long past its stated reset, so a waiting session resumes only
+    /// after the account itself reset.
+    public var resetSlack: TimeInterval
     /// The process environment the supervisor starts from.
     public var vars: [String: String]
 
     public init(home: URL, stateDir: URL, claudeBin: String = "claude", selfPath: String,
-                killGrace: TimeInterval = 10, pollInterval: TimeInterval = 0.25, vars: [String: String] = [:]) {
+                killGrace: TimeInterval = 10, pollInterval: TimeInterval = 0.25, resetSlack: TimeInterval = 60, vars: [String: String] = [:]) {
         self.home = home
         self.paths = StatePaths(root: stateDir)
         self.claudeBin = claudeBin
         self.selfPath = selfPath
         self.killGrace = killGrace
         self.pollInterval = pollInterval
+        self.resetSlack = resetSlack
         self.vars = vars
     }
 
@@ -41,6 +45,7 @@ public struct HopperEnvironment: Sendable {
             selfPath: selfPath ?? Bundle.main.executablePath ?? CommandLine.arguments[0],
             killGrace: vars["SESSIONHOPPER_KILL_GRACE"].flatMap(TimeInterval.init) ?? 10,
             pollInterval: vars["SESSIONHOPPER_POLL"].flatMap(TimeInterval.init) ?? 0.25,
+            resetSlack: vars["SESSIONHOPPER_RESET_SLACK"].flatMap(TimeInterval.init) ?? 60,
             vars: vars)
     }
 
@@ -113,8 +118,10 @@ public struct SessionFiles: Sendable {
     public var current: URL { f("current") }
     /// Scheduled tasks (`Stop.session_crons`) at the last Stop, one per line.
     public var crons: URL { f("crons") }
+    /// Every profile is full: the epoch time the supervisor waits until.
+    public var waiting: URL { f("waiting") }
 
     /// Turn state cleared on every (re)launch.
-    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited, loginFailed, crons] }
+    public var turnFiles: [URL] { [busy, jobs, pending, ctl, suggest, suggestShown, warned, killed, interrupted, limited, loginFailed, crons, waiting] }
     public var all: [URL] { turnFiles + [record, hold, current] }
 }

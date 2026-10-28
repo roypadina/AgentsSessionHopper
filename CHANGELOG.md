@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-28
+
+First stable release: out of BETA.
+
+### Added
+- **Wait for a reset instead of stopping.** When a park leaves no profile to run on without paid usage,
+  the session now waits for the first known usage-window reset (plus a minute, so it never lands before
+  the account itself reset) and then carries on by itself. Nothing runs while it waits, so nothing is
+  billed. Without "move without asking" it waits for its own profile; a move you confirm meanwhile
+  (`sessionhopper switch <profile> --session <id>`, or the app) is taken at once. Ctrl-C stops waiting.
+  No reset time known, or `sessionhopper config wait off`: it exits with code 2 as before. The app sends
+  one notification per park and shows waiting sessions.
+- **How old the usage numbers are, and when they reset**, on every surface: the park list, the "skipped"
+  line at start, `sessionhopper status` and the app's profile rows (e.g. `5h 98% · resets 18:00 ·
+  sampled 3 h ago`; the age shows once a sample is over 10 minutes old).
+- **The limit is named.** A usage-limit stop shows Claude Code's own words for it in the suggestion and
+  the notification, so a model's own limit (fixable with `/model`) is told apart from the account window.
+- **Login check before a move.** The target profile's login is checked with Claude Code's own
+  `claude auth status` (as `doctor` does); a profile that is not logged in is skipped instead of
+  landing the session on a login screen.
+- `doctor` warns when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` or `CLAUDE_CODE_OAUTH_TOKEN` is set
+  (sessions bill that key on every profile and report no usage limits, so hand-offs never trigger), and
+  when a profile has no usage sample yet (it counts as having room).
+
+### Changed
+- A gateway spend limit (`rate_limits.spend_limit`, behind a Claude apps gateway) now counts like a usage
+  window: past the park threshold of it is paid usage, so the session parks or moves instead.
+
 ## [0.2.1] - 2026-10-27
 
 Still **BETA**.

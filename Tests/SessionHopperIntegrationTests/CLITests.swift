@@ -128,6 +128,13 @@ final class CLITests: XCTestCase {
         XCTAssertTrue(try h.run(["log"]).stdout.contains("No hand-offs yet"))
     }
 
+    func testDoctorWarnsAboutAnExportedKeyAndMissingSamples() throws {
+        let d = try h.run(["doctor"], extraEnv: ["ANTHROPIC_API_KEY": "sk-test"])
+        XCTAssertTrue(d.stdout.contains("warn  ANTHROPIC_API_KEY set in this environment"), d.stdout)
+        XCTAssertTrue(d.stdout.contains("warn  default: no usage sample yet"), d.stdout)
+        XCTAssertFalse(try h.run(["doctor"]).stdout.contains("ANTHROPIC_API_KEY"))
+    }
+
     func testDoctorWarnsWhenHistoryIsNotShared() throws {
         try FileManager.default.removeItem(at: h.workDir.appendingPathComponent("projects"))
         try FileManager.default.createDirectory(at: h.workDir.appendingPathComponent("projects"), withIntermediateDirectories: true)
