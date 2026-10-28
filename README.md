@@ -1,10 +1,8 @@
 <div align="center">
 
-<img src="docs/brand/icon-beta.png" alt="AgentsSessionHopper app icon with a BETA ribbon" width="160">
+<img src="Assets/icons/AppIcon-1024.png" alt="AgentsSessionHopper app icon" width="160">
 
 # AgentsSessionHopper
-
-**⚠️ BETA — not fully tested; real account hand-offs are new. Expect rough edges; please [report issues](https://github.com/roypadina/AgentsSessionHopper/issues).**
 
 ### Profiles for Claude Code. One conversation, any of your accounts.
 
@@ -19,7 +17,6 @@ another with one click. Nothing lost, nothing re-explained, and nothing moves un
 [![CI](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml/badge.svg)](https://github.com/roypadina/AgentsSessionHopper/actions/workflows/ci.yml)
 [![Website](https://img.shields.io/badge/website-apps.roypadina-2F62E6)](https://apps.roypadina.synology.me/apps/agents-session-hopper/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?logo=opensourceinitiative&logoColor=white)](LICENSE)
-[![Status: beta](https://img.shields.io/badge/status-BETA-FFD60A)](docs/ROADMAP.md)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-support-F16061?logo=ko-fi&logoColor=white)](https://ko-fi.com/roypadina)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 

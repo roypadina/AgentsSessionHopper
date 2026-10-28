@@ -1,8 +1,6 @@
 # AgentsSessionHopper
 
-<img src="https://raw.githubusercontent.com/roypadina/AgentsSessionHopper/main/docs/brand/icon-beta.png" alt="AgentsSessionHopper icon with a BETA ribbon" width="128">
-
-**⚠️ BETA — not fully tested; real account hand-offs are new. Expect rough edges; please [report issues](https://github.com/roypadina/AgentsSessionHopper/issues).**
+<img src="https://raw.githubusercontent.com/roypadina/AgentsSessionHopper/main/Assets/icons/AppIcon-1024.png" alt="AgentsSessionHopper icon" width="128">
 
 **Profiles for Claude Code.** Keep your own Claude accounts side by side, one Claude Code profile each.
 When one runs low, continue the same conversation on another with one click. Nothing moves until you

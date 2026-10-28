@@ -10,9 +10,6 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("AgentsSessionHopper").font(.headline)
-                Text(HopperInfo.stage).font(.caption2.bold()).padding(.horizontal, 5).padding(.vertical, 1)
-                    .background(Capsule().fill(Color(red: 1, green: 0.84, blue: 0.04))).foregroundStyle(.black)
-                    .help(HopperInfo.betaNotice)
                 Spacer()
                 Button(action: openSettings) { Image(systemName: "gearshape") }
                     .buttonStyle(.borderless)
