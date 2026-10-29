@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-30
+
 ### Added
 - **A Welcome window on first launch** (and under Settings > About > Welcome Guide…): why the app exists, where
   the icon is, how to start Claude Code with it, and Open at Login. Set Up Profiles… opens the setup window,
