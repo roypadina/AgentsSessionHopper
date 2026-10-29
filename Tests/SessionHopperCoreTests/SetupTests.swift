@@ -154,6 +154,36 @@ final class TranscriptAndLogTests: XCTestCase {
         XCTAssertEqual(Transcripts.find("a", projects: projects).flatMap(Transcripts.cwd), "/work/app")
     }
 
+    func testSummaryNamesTheSession() {
+        let lines = [
+            #"{"type":"user","cwd":"/work/app","timestamp":"2026-10-14T14:14:29.302Z","message":{"content":"split billing into modules"}}"#,
+            #"{"type":"ai-title","aiTitle":"Split the billing service"}"#,
+            #"{"type":"user","message":{"content":"second   ask"}}"#,
+            #"{"type":"user","message":{"content":"/compact"}}"#,
+            #"{"type":"user","isMeta":true,"message":{"content":"meta"}}"#,
+            #"{"type":"user","message":{"content":[{"type":"tool_result","content":"out"}]}}"#,
+            #"{"type":"user","message":{"content":"[Request interrupted by user]"}}"#,
+            #"{"type":"user","message":{"content":[{"type":"text","text":"third ask"}]}}"#,
+            #"{"type":"assistant","timestamp":"2026-10-25T08:48:08Z","message":{"content":"done"}}"#,
+            #"{"type":"custom-title","customTitle":"billing-split"}"#,
+            #"{"type":"cost-state","totalCostUSD":1}"#,
+        ]
+        sb.write(lines.joined(separator: "\n"), "named.jsonl")
+        let named = Transcripts.summary(of: sb.root.appendingPathComponent("named.jsonl"))
+        XCTAssertEqual(named.name, "billing-split")
+        XCTAssertEqual(named.about, "Split the billing service", "the automatic title describes a renamed session")
+        XCTAssertEqual(named.started, ISO8601DateFormatter().date(from: "2026-10-14T14:14:29Z")?.addingTimeInterval(0.302))
+        XCTAssertEqual(named.recent, ["split billing into modules", "second ask", "third ask"], "typed prompts only, oldest first")
+        XCTAssertEqual(Transcripts.lastPrompts(of: sb.root.appendingPathComponent("named.jsonl"), count: 1), ["third ask"])
+        XCTAssertEqual(named.lastActive, ISO8601DateFormatter().date(from: "2026-10-25T08:48:08Z"), "the last timestamped record, not the mtime")
+
+        sb.write(lines[0] + "\n" + lines[1], "auto.jsonl")
+        let auto = Transcripts.summary(of: sb.root.appendingPathComponent("auto.jsonl"))
+        XCTAssertEqual(auto.name, "Split the billing service")
+        XCTAssertEqual(auto.about, "split billing into modules", "without /rename the first prompt describes it")
+        XCTAssertEqual(auto.recent, [], "a prompt already shown as about is not repeated")
+    }
+
     func testEventLogRoundTrip() {
         let paths = sb.env().paths
         EventLog.append(HopperEvent(type: "switch", session: "s", from: "a", to: "b", trigger: "confirm", source: "cli"), paths)

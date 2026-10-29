@@ -60,7 +60,13 @@ public enum Transcripts {
     /// Titles are re-written through the transcript, so the last 64 KB hold the current one.
     // shortcut: a title set once and never repeated in the last 64 KB is missed; read more if that shows up.
     static func title(of url: URL) -> String? {
-        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
+        let found = titles(of: url)
+        return found["customTitle"] ?? found["aiTitle"]
+    }
+
+    /// `customTitle` and `aiTitle`, each as last written in the transcript tail.
+    static func titles(of url: URL) -> [String: String] {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return [:] }
         defer { try? h.close() }
         let size = (try? h.seekToEnd()) ?? 0
         try? h.seek(toOffset: size > 65_536 ? size - 65_536 : 0)
@@ -71,7 +77,7 @@ public enum Transcripts {
                   let s = try? JSONSerialization.jsonObject(with: Data("\"\(text[v])\"".utf8), options: .fragmentsAllowed) as? String else { continue }
             found[String(text[k])] = s
         }
-        return found["customTitle"] ?? found["aiTitle"]
+        return found
     }
 
     public static func cwd(of url: URL) -> String? { scan(url).cwd }
@@ -115,26 +121,96 @@ public enum Transcripts {
         return (msg?["content"] as? [[String: Any]] ?? []).compactMap { $0["text"] as? String }.joined(separator: " ")
     }
 
-    /// First user prompt and cwd, from the first 256 KB.
-    static func scan(_ url: URL) -> (prompt: String?, cwd: String?, sidechain: Bool) {
-        guard let h = try? FileHandle(forReadingFrom: url) else { return (nil, nil, false) }
+    /// First user prompt, cwd and first timestamp, from the first 1 MB (attachments before the first prompt can pass 256 KB).
+    static func scan(_ url: URL) -> (prompt: String?, cwd: String?, sidechain: Bool, started: Date?) {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return (nil, nil, false, nil) }
         defer { try? h.close() }
-        let data = (try? h.read(upToCount: 256 * 1024)) ?? Data()
+        let data = (try? h.read(upToCount: 1024 * 1024)) ?? Data()
         var cwd: String?
+        var started: Date?
         for line in data.split(separator: UInt8(ascii: "\n")) {
             guard let rec = FileIO.jsonObject(Data(line)) else { continue }
-            if rec["isSidechain"] as? Bool == true { return (nil, cwd, true) }
+            if rec["isSidechain"] as? Bool == true { return (nil, cwd, true, started) }
             cwd = cwd ?? rec["cwd"] as? String
+            started = started ?? (rec["timestamp"] as? String).flatMap(isoDate)
             guard rec["type"] as? String == "user", let msg = rec["message"] as? [String: Any] else { continue }
             var text = msg["content"] as? String
             if text == nil, let blocks = msg["content"] as? [[String: Any]] {
                 text = blocks.compactMap { $0["text"] as? String }.joined(separator: " ")
             }
             if let t = text?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty, !t.hasPrefix("<") {
-                return (t.split(whereSeparator: \.isWhitespace).joined(separator: " "), cwd, false)
+                return (t.split(whereSeparator: \.isWhitespace).joined(separator: " "), cwd, false, started)
             }
         }
-        return (nil, cwd, false)
+        return (nil, cwd, false, started)
+    }
+
+    private static func isoDate(_ s: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.date(from: s) ?? ISO8601DateFormatter().date(from: s)
+    }
+
+    /// What a session is, for the block printed when it ends, so the id is not all the user gets.
+    public struct Summary: Equatable, Sendable {
+        /// `/rename`'s title, else the automatic one.
+        public var name: String?
+        /// The automatic title when `/rename` named the session, else the first prompt (cut to 100 characters).
+        public var about: String?
+        public var started: Date?
+        public var lastActive: Date?
+        /// The last few prompts, oldest first: what the session was last working on.
+        public var recent: [String] = []
+    }
+
+    public static func summary(of url: URL) -> Summary {
+        let head = scan(url)
+        let t = titles(of: url)
+        var about = t["customTitle"] == nil ? head.prompt : t["aiTitle"] ?? head.prompt
+        if let a = about, a.count > 100 { about = a.prefix(99) + "…" }
+        return Summary(name: t["customTitle"] ?? t["aiTitle"], about: about, started: head.started, lastActive: lastTimestamp(of: url),
+                       recent: lastPrompts(of: url, count: 3).filter { $0 != about })
+    }
+
+    /// The last `count` prompts the user typed, oldest first, each cut to 100 characters. Skips what
+    /// `turnFinished` skips (meta, slash commands, `<…>` injected text) plus interrupts and tool results.
+    /// Tool output can fill megabytes after the last prompt, so the window widens until `count` are found.
+    // shortcut: stops at the last 32 MB; read more if a longer tail without prompts shows up.
+    static func lastPrompts(of url: URL, count: Int) -> [String] {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return [] }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        var out: [String] = []
+        for window: UInt64 in [524_288, 4_194_304, 33_554_432] {
+            out = []
+            try? h.seek(toOffset: size > window ? size - window : 0)
+            collectPrompts(((try? h.readToEnd()) ?? Data()), count: count, into: &out)
+            if out.count == count || size <= window { break }
+        }
+        return out.reversed()
+    }
+
+    private static func collectPrompts(_ data: Data, count: Int, into out: inout [String]) {
+        for line in data.split(separator: UInt8(ascii: "\n")).reversed() where out.count < count {
+            guard let rec = FileIO.jsonObject(Data(line)), rec["type"] as? String == "user", rec["isSidechain"] as? Bool != true,
+                  !["isMeta", "isCompactSummary", "isVisibleInTranscriptOnly"].contains(where: { rec[$0] as? Bool == true }) else { continue }
+            let t = text(of: rec).split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            if t.isEmpty || t.hasPrefix("<") || t.hasPrefix("/") || t.hasPrefix("[Request interrupted by user") { continue }
+            out.append(t.count > 100 ? t.prefix(99) + "…" : t)
+        }
+    }
+
+    /// The newest `timestamp` in the last 256 KB. Not the file's mtime: records without a timestamp (cost, bridge
+    /// state) get appended while no one uses the session.
+    static func lastTimestamp(of url: URL) -> Date? {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        try? h.seek(toOffset: size > 262_144 ? size - 262_144 : 0)
+        for line in ((try? h.readToEnd()) ?? Data()).split(separator: UInt8(ascii: "\n")).reversed() {
+            if let ts = FileIO.jsonObject(Data(line))?["timestamp"] as? String, let d = isoDate(ts) { return d }
+        }
+        return nil
     }
 
     /// Conversations held open right now: ours, plus Claude Code's own `<config>/sessions/<pid>.json`

@@ -189,6 +189,12 @@ public final class Supervisor {
             switch watch(pid, profile: profile, order: order, files: files, sessionID: resumeID) {
             case .exited(let code):
                 child.set(0)
+                if !child.terminating {
+                    let finished = Transcripts.turnFinished(Transcripts.find(resumeID, projects: projects))
+                    printSummary(resumeID, status: (finished ? "ended, last turn finished" : "ended mid-turn, the last reply was cut off")
+                                 + (code == 0 ? "" : " (exit \(code))") + " · on \(profile.name)"
+                                 + (launches > 1 ? " · moved \(launches - 1)× this run" : ""))
+                }
                 return code
             case .handoff(let move):
                 child.set(0)
@@ -380,9 +386,34 @@ public final class Supervisor {
             }
             if child.terminating { return 128 + SIGTERM }
         }
+        printSummary(sessionID, status: "parked" + (from.map { " · last on \($0.name)" } ?? ""), resume: false)
         say("session kept. Continue later:  sessionhopper --resume \(sessionID)")
         say("or on a chosen profile now:     sessionhopper -P <profile> --resume \(sessionID)")
         return 2
+    }
+
+    /// Printed as the session ends, after Claude Code's own resume hint: what the session is, not just its id.
+    /// Nothing when there is no transcript (no prompt was sent, so there is nothing to resume).
+    private func printSummary(_ id: String, status: String, resume: Bool = true) {
+        guard let url = Transcripts.find(id, projects: Profiles.projectsDir(HopperConfig.load(env.paths), home: env.home)) else { return }
+        let s = Transcripts.summary(of: url)
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        var lines = ["session summary"]
+        func row(_ key: String, _ value: String?) {
+            if let value { lines.append("  " + key.padding(toLength: 10, withPad: " ", startingAt: 0) + value) }
+        }
+        row("name", s.name)
+        row("about", s.about)
+        for (i, prompt) in s.recent.enumerated() { row(i == 0 ? "recent" : "", "· " + prompt) }
+        row("status", status)
+        row("started", s.started.map(f.string))
+        row("last used", s.lastActive.map(f.string))
+        row("folder", env.tilde(FileManager.default.currentDirectoryPath))
+        row("id", id)
+        if resume { row("resume", "sessionhopper --resume \(id)") }
+        say(lines.joined(separator: "\n"))
     }
 
     private func installSignalHandlers() {

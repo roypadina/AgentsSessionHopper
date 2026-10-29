@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-29
+
+### Added
+- **A session summary when a session ends.** After Claude Code's own resume hint, `sessionhopper` prints
+  what the session is, not just its id: its name, what it is about, the last three prompts you typed,
+  how it ended (last turn finished or cut off, the profile, moves this run), when it started and was last
+  used, its folder, the id and the resume command. A parked session shows it too, above the resume lines.
+
+### Fixed
+- Sessions whose first prompt comes after large attachments (over 256 KB into the transcript) now show
+  in `sessionhopper sessions` and `--resume`'s picker; the first 1 MB is read.
+
 ## [1.0.1] - 2026-10-29
 
 ### Fixed

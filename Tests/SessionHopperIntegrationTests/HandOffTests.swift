@@ -26,6 +26,9 @@ final class HandOffTests: XCTestCase {
         XCTAssertEqual(LimitStore.read("default", h.env.paths)?.fiveHour?.usedPercentage, 10)
         XCTAssertTrue(Sessions.live(h.env.paths).isEmpty, "session record removed on exit")
         XCTAssertEqual(h.read("statusline-out"), "default · 5h 10%\n")
+        XCTAssertTrue(r.stderr.contains("session summary"), r.stderr)
+        XCTAssertTrue(r.stderr.contains("status    ended, last turn finished (exit 3) · on default"), r.stderr)
+        XCTAssertTrue(r.stderr.contains("resume    sessionhopper --resume \(h.sessionID(fromLaunch: first) ?? "?")"), r.stderr)
     }
 
     func testConfirmedMoveWaitsForTurnEnd() throws {

@@ -49,6 +49,8 @@ brew install --cask roypadina/tap/agents-session-hopper
   carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
 - **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings.
+- **A summary when a session ends:** its name, what it is about, your last three prompts, how it
+  ended, when it started and was last used, its folder and the resume command.
 - **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.
 
 <div align="center">
