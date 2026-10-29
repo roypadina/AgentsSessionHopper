@@ -13,6 +13,7 @@ struct PopoverView: View {
                 Spacer()
                 Button(action: openSettings) { Image(systemName: "gearshape") }
                     .buttonStyle(.borderless)
+                    .keyboardShortcut(",")
                     .help("Settings")
                     .accessibilityLabel("Settings")
             }

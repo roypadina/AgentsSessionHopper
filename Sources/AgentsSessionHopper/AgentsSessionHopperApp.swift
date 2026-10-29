@@ -11,10 +11,10 @@ struct AgentsSessionHopperApp: App {
             PopoverView(model: model, openSettings: Self.openSettings)
             Divider()
             HStack {
-                Button("About AgentsSessionHopper") { AboutWindow.show() }
+                Button("About") { AboutWindow.show() }
                 Button("Support on Ko-fi ☕") { NSWorkspace.shared.open(HopperInfo.koFi) }
                 Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+                Button("Quit AgentsSessionHopper") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 14)
@@ -55,6 +55,7 @@ struct MenuBarLabel: View {
     var body: some View {
         let s = model.snapshot
         let full = (s.worstLivePercent ?? 0) >= model.config.hardThreshold
+        let label = spoken(s, full: full)
         HStack(spacing: 3) {
             if !s.needsAttention.isEmpty {
                 Image(systemName: "arrow.triangle.2.circlepath.circle.fill")
@@ -65,7 +66,17 @@ struct MenuBarLabel: View {
             }
             if showPercent, let p = s.worstLivePercent { Text(percentText(p)).monospacedDigit() }
         }
-        .accessibilityLabel(s.needsAttention.isEmpty ? "AgentsSessionHopper" : "AgentsSessionHopper: a session needs you")
+        .accessibilityLabel(label)
+        .help(label)
+    }
+
+    /// One string for VoiceOver and the tooltip: the percent and the full state are not drawn text a label could inherit.
+    private func spoken(_ s: HopperSnapshot, full: Bool) -> String {
+        var text = "AgentsSessionHopper"
+        if let p = s.worstLivePercent { text += ", fullest profile \(Int(p.rounded())) percent" }
+        if !s.needsAttention.isEmpty { text += ", a session needs you" }
+        if full { text += ", a profile is full" }
+        return text
     }
 
     /// Bundled by Scripts/package_app.sh; `swift run` has no bundle resources, so it falls back to an SF Symbol.
