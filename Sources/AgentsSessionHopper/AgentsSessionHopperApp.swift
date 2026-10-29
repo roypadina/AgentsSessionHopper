@@ -23,6 +23,14 @@ struct AgentsSessionHopperApp: App {
             MenuBarLabel(model: model)
         }
         .menuBarExtraStyle(.window)
+        .commands {  // App menu while a window is open (policy .regular)
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") { Self.openSettings() }.keyboardShortcut(",")
+            }
+            CommandGroup(replacing: .appInfo) {
+                Button("About AgentsSessionHopper") { AboutWindow.show() }
+            }
+        }
     }
 
     @MainActor static func makeModel() -> AppModel {
@@ -94,5 +102,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         #endif
+    }
+
+    /// Opening AgentsSessionHopper again (Finder, Raycast) shows Settings: the way in when the icon is hidden (MBX-8).
+    @MainActor func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { SettingsWindow.show() }
+        return true
     }
 }

@@ -20,8 +20,7 @@ import SwiftUI
             w.center()
             window = w
         }
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        if let window { AccessoryWindows.shared.show(window) }
         toolbar?.applyPending()
     }
 }
