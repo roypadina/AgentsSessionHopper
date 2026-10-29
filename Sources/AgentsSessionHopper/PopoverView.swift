@@ -19,8 +19,8 @@ struct PopoverView: View {
 
             section("Profiles") {
                 if model.config.profiles.isEmpty {
-                    Text("No profiles yet. In Terminal: sessionhopper profiles import")
-                        .font(.callout).foregroundStyle(.secondary)
+                    Text("No profiles yet.").font(.callout).foregroundStyle(.secondary)
+                    Button("Set Up Profiles…") { OnboardingWindow.show(model: model) }
                 }
                 ForEach(model.config.profiles) { ProfileRow(model: model, profile: $0) }
             }
@@ -33,7 +33,12 @@ struct PopoverView: View {
 
             if !model.snapshot.sessions.isEmpty {
                 section("Sessions") {
-                    ForEach(model.snapshot.sessions) { SessionRow(model: model, session: $0) }
+                    // A bare ScrollView does not hug its content in this self-sizing panel, so only long lists get one.
+                    if model.snapshot.sessions.count > 8 {
+                        ScrollView { VStack(alignment: .leading, spacing: 6) { sessionRows } }.frame(height: 300)
+                    } else {
+                        sessionRows
+                    }
                 }
             }
 
@@ -52,10 +57,14 @@ struct PopoverView: View {
         .frame(width: 400)
     }
 
+    private var sessionRows: some View {
+        ForEach(model.snapshot.sessions) { SessionRow(model: model, session: $0) }
+    }
+
     @ViewBuilder
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             content()
         }
     }
@@ -71,20 +80,29 @@ struct ProfileRow: View {
         let five = l?.fiveHour.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
         let week = l?.sevenDay.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
         let count = s.sessions(on: profile.name).count
-        HStack(spacing: 8) {
-            Circle().fill(model.severity(profile.name).color).frame(width: 8, height: 8)
-                .accessibilityHidden(true)
-            Text(profile.name).frame(width: 80, alignment: .leading).lineLimit(1)
-            Text("5h \(percentText(five))").monospacedDigit().frame(width: 62, alignment: .leading)
-            Text("7d \(percentText(week))").monospacedDigit().frame(width: 62, alignment: .leading)
-            Text(note(l, now: s.now)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            Spacer()
-            if count > 0 {
-                Text("\(count) session\(count == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+        let severity = model.severity(profile.name)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Image(systemName: severity.symbol).foregroundStyle(severity.color).frame(width: 14)
+                    .accessibilityHidden(true)
+                Text(profile.name).frame(width: 80, alignment: .leading).lineLimit(1).help(profile.name)
+                Text("5h \(percentText(five))").monospacedDigit().frame(width: 62, alignment: .leading)
+                Text("7d \(percentText(week))").monospacedDigit().frame(width: 62, alignment: .leading)
+                Spacer()
+                if count > 0 {
+                    Text("\(count) session\(count == 1 ? "" : "s")").font(.caption).foregroundStyle(.secondary)
+                }
             }
+            // Own line under the name: the reset time is the key fact of wait-for-reset and must not be cut.
+            Text(note(l, now: s.now)).font(.caption).foregroundStyle(.secondary).padding(.leading, 22)
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(profile.name), 5-hour usage \(spoken(five)), weekly \(spoken(week)), \(severity.spoken)"
+            + (count > 0 ? ", \(count) session\(count == 1 ? "" : "s")" : ""))
+        .accessibilityValue(note(l, now: s.now))
     }
+
+    private func spoken(_ v: Double?) -> String { v.map { "\(Int($0.rounded())) percent" } ?? "unknown" }
 
     private func note(_ l: ProfileLimits?, now: Double) -> String { l?.note(now: now) ?? "no data yet" }
 }
@@ -130,16 +148,21 @@ struct SessionRow: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(model.tilde(session.record.cwd)).lineLimit(1).truncationMode(.head)
+                    .help(model.tilde(session.record.cwd))
                 Text(status).font(.caption).foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
             Spacer()
             Menu("Move…") {
                 ForEach(model.config.profiles.filter { $0.name != session.record.profile }) { p in
                     Button("\(p.name) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
                 }
+                Divider()
+                Button(session.held ? "Release Hold" : "Hold") { model.hold(session, on: !session.held) }
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .accessibilityLabel("Move \(model.tilde(session.record.cwd))")
         }
     }
 
@@ -160,7 +183,7 @@ struct EventRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(eventTime(event.ts)).monospacedDigit().foregroundStyle(.secondary).frame(width: 84, alignment: .leading)
-            Text(summary).lineLimit(1)
+            Text(summary).lineLimit(1).help(summary)
             Spacer()
         }
         .font(.callout)
@@ -169,7 +192,7 @@ struct EventRow: View {
     var summary: String {
         let dir = event.cwd.map { ($0 as NSString).lastPathComponent } ?? ""
         switch event.type {
-        case "switch": return "\(dir)  \(event.from ?? "?") → \(event.to ?? "?")  (\(event.trigger ?? ""))"
+        case "switch": return "\(dir)  \(event.from ?? "?") → \(event.to ?? "?")" + (event.trigger.map { "  (\($0))" } ?? "")
         case "park": return "\(dir)  parked on \(event.from ?? "?")" + (event.to.map { ", waits for \($0)" } ?? "")
         case "limit": return "\(dir)  \(event.from ?? "?") hit its limit"
         case "suggest": return "\(dir)  suggested \(event.from ?? "?") → \(event.to ?? "–")"
