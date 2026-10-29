@@ -39,7 +39,7 @@ struct AgentsSessionHopperApp: App {
         EventLog.prune(model.env.paths, days: 90)
         model.notifier = Notifier(model: model)
         DispatchQueue.main.async {
-            OnboardingWindow.showIfNeeded(model: model)
+            WelcomeWindow.showIfNeeded(model: model)
             model.checkLogins()
         }
         return model

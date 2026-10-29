@@ -1,28 +1,14 @@
-import ServiceManagement
 import SessionHopperCore
 import SwiftUI
 
-enum LoginItem {
-    static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
-
-    static func set(_ on: Bool) throws {
-        if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
-    }
-}
-
-/// First run: what the app does and never does, then profiles. Shown once; again from Settings → General.
+/// The setup: profiles, then history, shell line, plugin, checks. On demand from the welcome, the panel and Settings → General.
 @MainActor enum OnboardingWindow {
-    static let doneKey = "onboardingDone"
     private static var window: NSWindow?
-
-    static func showIfNeeded(model: AppModel) {
-        if !UserDefaults.standard.bool(forKey: doneKey) { show(model: model) }
-    }
 
     static func show(model: AppModel) {
         if window == nil {
             let w = NSWindow(contentViewController: NSHostingController(rootView: OnboardingView(model: model) { close() }))
-            w.title = "Set up AgentsSessionHopper"
+            w.title = "Setup"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             w.center()
@@ -31,10 +17,7 @@ enum LoginItem {
         if let window { AccessoryWindows.shared.show(window) }
     }
 
-    static func close() {
-        UserDefaults.standard.set(true, forKey: doneKey)
-        window?.close()
-    }
+    static func close() { window?.close() }
 }
 
 struct OnboardingView: View {

@@ -99,7 +99,7 @@ struct SettingsView: View {
         case .profiles: ProfilesSettings(model: model)
         case .commandLine: CommandLineSettings(model: model)
         case .log: LogSettings(model: model)
-        case .about: AboutSettings()
+        case .about: AboutSettings(model: model)
         }
     }
 }
@@ -278,15 +278,11 @@ private struct GeneralSettings: View {
     @ObservedObject var model: AppModel
     @AppStorage(Notifier.enabledKey) private var notifications = true
     @AppStorage(MenuBarLabel.showPercentKey) private var showPercent = true
-    @State private var launchAtLogin = LoginItem.isEnabled
 
     var body: some View {
         Form {
             Section {
-                Toggle("Launch at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, on in
-                        do { try LoginItem.set(on) } catch { model.lastError = "\(error.localizedDescription)"; launchAtLogin = LoginItem.isEnabled }
-                    }
+                LaunchAtLoginToggle()
                 Toggle("Notify me when a session should move", isOn: $notifications)
                 Toggle("Show usage % next to the menu-bar icon", isOn: $showPercent)
             }
@@ -370,12 +366,15 @@ private struct LogSettings: View {
 }
 
 private struct AboutSettings: View {
+    @ObservedObject var model: AppModel
+
     var body: some View {
         Form {
             Section {
                 LabeledContent("AgentsSessionHopper", value: "Version \(HopperInfo.version)")
                 HStack {
                     Button("About…") { AboutWindow.show() }
+                    Button("Welcome Guide…") { WelcomeWindow.show(model: model) }
                     Link("Support on Ko-fi ☕", destination: HopperInfo.koFi)
                 }
                 Text(HopperInfo.disclaimer).font(.caption).foregroundStyle(.secondary)
