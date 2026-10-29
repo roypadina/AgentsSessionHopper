@@ -159,7 +159,10 @@ struct SessionRow: View {
                     Button("\(p.name) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
                 }
                 Divider()
+                // "Hold every session" holds it too and only Settings turns that off, so releasing one here would do nothing.
                 Button(session.held ? "Release Hold" : "Hold") { model.hold(session, on: !session.held) }
+                    .disabled(session.held && model.holdAll)
+                    .help(session.held && model.holdAll ? "Hold every session is on. Turn it off in Settings > Hand-off." : "")
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
