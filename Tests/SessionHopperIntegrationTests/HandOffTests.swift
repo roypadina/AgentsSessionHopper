@@ -389,6 +389,17 @@ final class HandOffTests: XCTestCase {
         XCTAssertEqual(h.events().last?.detail, "skipped work: not logged in")
     }
 
+    func testMoveBeforeTheFirstPromptStartsTheSameSessionAgain() throws {
+        try h.write("", "no-transcript")
+        try h.scenario("""
+            if [ "$N" = 1 ]; then "$SESSIONHOPPER_BIN" switch work --now > /dev/null; sleep 5; else exit 0; fi
+            """)
+        XCTAssertEqual(try h.run([]).code, 0)
+        XCTAssertEqual(h.launches.count, 2)
+        let id = h.sessionID(fromLaunch: h.launches[0])!
+        XCTAssertTrue(h.launches[1].hasPrefix(h.workDir.path + " --session-id \(id) "), "nothing to --resume yet: \(h.launches[1])")
+    }
+
     func testHeldSessionIsNotCutInAtHard() throws {
         try h.config { $0.autoMove = true; $0.moveNowAtHard = true }
         try h.scenario("""

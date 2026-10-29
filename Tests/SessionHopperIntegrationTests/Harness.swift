@@ -50,6 +50,8 @@ final class Harness {
             SID=""; prev=""
             for a in "$@"; do { [ "$prev" = "--session-id" ] || [ "$prev" = "--resume" ]; } && SID="$a"; prev="$a"; done
             N=$(wc -l < "$T/launches" | tr -d ' ')
+            # Claude Code saves a conversation once it has a prompt; `no-transcript` plays one that has none yet.
+            [ -n "$SID" ] && [ ! -f "$T/no-transcript" ] && mkdir -p "$T/home/.claude/projects/-w" && touch "$T/home/.claude/projects/-w/$SID.jsonl"
             export SID N T
             emit() { printf '{"hook_event_name":"%s","session_id":"%s"%s}' "$1" "$SID" "$2" | "$SESSIONHOPPER_BIN" hook >> "$T/hook-out"; }
             usage() { printf '{"session_id":"%s","rate_limits":{"five_hour":{"used_percentage":%s,"resets_at":4102444800}}}' "$SID" "$1" | "$SESSIONHOPPER_BIN" statusline >> "$T/statusline-out"; }
