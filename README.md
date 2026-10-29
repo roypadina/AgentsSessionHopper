@@ -48,7 +48,10 @@ brew install --cask roypadina/tap/agents-session-hopper
   next turn end instead of running into paid extra usage, then waits for the usage window to reset and
   carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
-- **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings.
+- **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings → Log or
+  from the right-click menu (Show Hand-off Log).
+- **Hard to lose.** Open the app again from Applications or Raycast and Settings appears, even when a full
+  menu bar hides the icon. The icon's tooltip and VoiceOver label read the fullest profile's usage.
 - **A summary when a session ends:** its name, what it is about, your last three prompts, how it
   ended, when it started and was last used, its folder and the resume command.
 - **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.
@@ -82,8 +85,10 @@ xattr -dr com.apple.quarantine /Applications/AgentsSessionHopper.app
 
 ## Set up
 
-Open the app: its **setup window** walks through everything, one click per step, and shows what each
-step changes before it does it:
+Open the app. On first launch a **Welcome** window explains what it does, where its icon is and how to
+start Claude Code with it, and has an **Open at Login** switch (Settings → About → **Welcome Guide…** shows
+it again). Its **Set Up Profiles…** button opens the **setup window**, which walks through everything, one
+click per step, and shows what each step changes before it does it:
 
 1. **Profiles**: finds your Claude Code folders (`~/.claude`, `~/.claude-*`) or adds new ones, and logs
    each in with Claude Code's own login.

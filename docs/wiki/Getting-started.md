@@ -1,7 +1,9 @@
 # Getting started
 
-The quickest way: open the app and follow its **setup window** (Settings → General → **Run setup
-again** brings it back). It covers everything on this page plus three extras, each shown before it
+The quickest way: open the app. On first launch a **Welcome** window explains it (Settings → About →
+**Welcome Guide…** shows it again); its **Set Up Profiles…** button opens the **setup window**. The
+panel offers the same button while there are no profiles, and Settings → General → **Run setup again**
+brings the window back. It covers everything on this page plus three extras, each shown before it
 changes anything:
 
 - **Share history** for profiles you already had: `sessionhopper profiles share <name>`. Links
@@ -19,7 +21,7 @@ changes anything:
 A profile is a Claude Code configuration folder with its own login. Claude Code documents this as the
 way to use several accounts: one `CLAUDE_CONFIG_DIR` per account.
 
-- **Already have them?** `sessionhopper profiles import` (or **Use these** in the first-run guide)
+- **Already have them?** `sessionhopper profiles import` (or **Use these** in the setup window)
   picks up `~/.claude`, `~/.claude-*` and `~/.claudeN`. Nothing inside them is changed.
 - **New one:** `sessionhopper profiles add work` (or Settings → Profiles → **Add Profile…**). It creates
   `~/.claude-work`, links `projects/` (conversation history) to your first profile, optionally shares
@@ -65,4 +67,5 @@ continues on the other account.
 - **Move without asking** — off by default. When on, sessions move at turn end without a prompt.
 - **Park before paid usage** — on by default, at 97%. A session you did not move ends at its next turn
   end instead of running into paid extra usage.
-- **Hold** a session (or all) to keep it where it is: no park, no automatic move.
+- **Hold** a session (or all) to keep it where it is: no park, no automatic move. **Release Hold** in the
+  session's **Move…** menu undoes it; it is disabled while **Hold every session** (Settings → Hand-off) is on.

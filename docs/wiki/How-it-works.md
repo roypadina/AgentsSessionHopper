@@ -67,6 +67,36 @@ Resuming under another profile works because all profiles share one `projects/` 
 Code keeps conversation transcripts. This sharing is not a documented Claude Code interface;
 `sessionhopper doctor` checks it.
 
+## When a session ends
+
+After Claude Code's own "Resume this session with" hint, `sessionhopper` prints a summary, so you know
+which session that id is:
+
+```
+[sessionhopper] session summary
+  name      billing-split
+  about     Split the billing service into modules
+  recent    · move the invoice code into its own module
+            · run the tests again
+            · open a PR for this
+  status    ended, last turn finished · on personal
+  started   2026-10-14 17:14
+  last used 2026-10-29 15:27
+  folder    ~/Code/shop
+  id        6f1c2b9e-3d4a-4e8f-9b21-7c5d0a1e2f34
+  resume    sessionhopper --resume 6f1c2b9e-3d4a-4e8f-9b21-7c5d0a1e2f34
+```
+
+- **name**: the `/rename` title, else Claude Code's automatic title.
+- **about**: the automatic title when you renamed the session, else your first prompt.
+- **recent**: the last three prompts you typed (slash commands, interrupts and injected text skipped).
+- **status**: whether the last turn finished or was cut off, a non-zero exit code, the profile and the
+  moves this run.
+- **last used**: the newest timestamped entry in the transcript, not the file date.
+
+A parked session shows it above the resume lines. A session that never got a prompt has no transcript,
+so it shows none.
+
 ## Files
 
 Everything lives in `~/Library/Application Support/AgentsSessionHopper/`:

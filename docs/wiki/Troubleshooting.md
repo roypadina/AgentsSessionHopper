@@ -9,6 +9,7 @@ sessionhopper doctor
 | Symptom | Fix |
 |---|---|
 | "cannot be opened" / the CLI is killed on first run | `xattr -dr com.apple.quarantine /Applications/AgentsSessionHopper.app` |
+| The menu-bar icon is missing | A full menu bar can hide it. Open AgentsSessionHopper again from Applications or Raycast: Settings appears. |
 | `claude not found` | Install Claude Code; the app also looks in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`. |
 | A profile asks to log in again after import | For `~/.claude`, leave `CLAUDE_CONFIG_DIR` unset (`sessionhopper profiles export-config-dir default off`), or turn it on if you always launched it with the variable set. |
 | "projects/ not shared by: X" | Sessions cannot move to or from X. Move X's `projects/` contents into the shared folder `doctor` names, then replace X's folder with a link to it. Close sessions first. |
