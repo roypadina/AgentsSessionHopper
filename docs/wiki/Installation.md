@@ -19,8 +19,9 @@ and click **Open Anyway**, or clear quarantine once (this also unblocks the CLI)
 xattr -dr com.apple.quarantine /Applications/AgentsSessionHopper.app
 ```
 
-On first launch a short guide explains what the app does and never does, and lists the Claude Code
-profiles it found. Turn on **Launch at login** in Settings → General if you want it always running.
+On first launch a **Welcome** window explains what the app does and never does, where its icon is and how
+to start Claude Code with it. It has an **Open at Login** switch (also in Settings → General) and a
+**Set Up Profiles…** button that opens the setup window.
 
 ## Uninstall
 

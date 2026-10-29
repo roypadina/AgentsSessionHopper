@@ -31,8 +31,8 @@ import SessionHopperCore
             m.addItem(i)
         }
         item("Open", #selector(open))
-        item("Settings…", #selector(settings))
-        item("Switch log…", #selector(switchLog))
+        item("Settings…", #selector(settings), key: ",")
+        item("Show Hand-off Log", #selector(switchLog))
         m.addItem(.separator())
         item("Request a feature", #selector(feature))
         item("Contribute", #selector(contribute))

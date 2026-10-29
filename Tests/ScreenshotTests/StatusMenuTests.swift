@@ -8,7 +8,7 @@ final class StatusMenuTests: XCTestCase {
     func testMenuLayout() {
         let m = StatusMenu.shared.menu()
         XCTAssertEqual(m.items.map { $0.isSeparatorItem ? "-" : $0.title }, [
-            "Open", "Settings…", "Switch log…", "-", "Request a feature", "Contribute",
+            "Open", "Settings…", "Show Hand-off Log", "-", "Request a feature", "Contribute",
             "About AgentsSessionHopper", "Support on Ko-fi ☕", "-", "Quit AgentsSessionHopper"])
         XCTAssertEqual(m.items.last?.keyEquivalent, "q")
         XCTAssertTrue(m.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.action != nil && $0.target != nil })
@@ -20,7 +20,7 @@ final class StatusMenuTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         SettingsWindow.model = AppModel(env: HopperEnvironment(home: root, stateDir: root, selfPath: "/usr/bin/true"), autoRefresh: false)
         _ = NSApplication.shared  // xctest has no NSApp until something asks for it
-        let item = try XCTUnwrap(StatusMenu.shared.menu().items.first { $0.title == "Switch log…" })
+        let item = try XCTUnwrap(StatusMenu.shared.menu().items.first { $0.title == "Show Hand-off Log" })
         NSApp.sendAction(try XCTUnwrap(item.action), to: item.target, from: item)
         let w = try XCTUnwrap(NSApp.windows.first { $0.title == "Log" })
         XCTAssertTrue(w.isVisible)

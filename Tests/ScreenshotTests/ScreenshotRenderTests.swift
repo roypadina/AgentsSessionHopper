@@ -70,6 +70,7 @@ final class ScreenshotRenderTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: root) }
         AboutView.iconOverride = NSImage(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appendingPathComponent("../../Assets/icons/AppIcon-1024.png").standardizedFileURL)
+        try render(WelcomeView(onSetUp: {}, onDone: {}).background(Color(nsColor: .windowBackgroundColor)), name: "welcome.png", dir: dir)
         try render(OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "onboarding.png", dir: dir)
         try render(PopoverView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "popover.png", dir: dir)
         for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.profiles, "settings-profiles.png"),

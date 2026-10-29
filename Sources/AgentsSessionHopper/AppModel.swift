@@ -40,7 +40,7 @@ final class AppModel: ObservableObject {
 
     func notNow(_ s: LiveSession) { Control.dismiss(session: s.record.session, env: env); refresh() }
 
-    func hold(_ s: LiveSession) { act { try Control.setHold(session: s.record.session, on: true, env: env) } }
+    func hold(_ s: LiveSession, on: Bool = true) { act { try Control.setHold(session: s.record.session, on: on, env: env) } }
 
     func setHoldAll(_ on: Bool) { act { try Control.setHold(session: nil, on: on, env: env) } }
     var holdAll: Bool { FileManager.default.fileExists(atPath: env.paths.holdAll.path) }
@@ -205,6 +205,25 @@ final class AppModel: ObservableObject {
 }
 
 extension AppModel.Severity {
+    /// Shape plus color, so the state never rests on color alone (CLR-4).
+    var symbol: String {
+        switch self {
+        case .unknown: "circle.dashed"
+        case .ok: "checkmark.circle.fill"
+        case .near: "exclamationmark.triangle.fill"
+        case .full: "xmark.octagon.fill"
+        }
+    }
+
+    var spoken: String {
+        switch self {
+        case .unknown: "no usage data yet"
+        case .ok: "within its limits"
+        case .near: "near its limit"
+        case .full: "at its limit"
+        }
+    }
+
     var color: Color {
         switch self {
         case .unknown: .secondary

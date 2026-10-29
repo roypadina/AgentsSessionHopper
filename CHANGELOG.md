@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-30
+
+### Added
+- **A Welcome window on first launch** (and under Settings > About > Welcome Guide…): why the app exists, where
+  the icon is, how to start Claude Code with it, and Open at Login. Set Up Profiles… opens the setup window,
+  which no longer opens by itself or on every launch.
+- Opening AgentsSessionHopper again from Applications or Raycast shows Settings, so a hidden menu-bar icon is
+  never a dead end.
+- Release Hold in a session's Move… menu (and Hold), the missing undo for the Hold button.
+- A real app menu while Settings, About or the setup window is open (Dock icon, Cmd-Tab, Settings… Cmd-,).
+- The panel's Settings gear answers to Cmd-, and Settings… in the right-click menu shows it.
+- No profiles yet: the panel offers Set Up Profiles… instead of a Terminal command.
+
+### Changed
+- Each profile row in the panel has two lines: usage on top, the reset time and sample age below, full width
+  instead of cut off. A profile's state is a symbol (ok, near, full, no data), not a color alone.
+- With more than 8 live sessions the Sessions list scrolls, so About and Quit stay on screen.
+- Open at Login handles the "Allow in Login Items" and "move to Applications" states and follows a change made in
+  System Settings.
+- The right-click item "Switch log…" is now "Show Hand-off Log"; the panel's Quit reads "Quit AgentsSessionHopper"
+  (Cmd-Q), and its About button is just "About". Section titles are no longer in capitals.
+- VoiceOver: the menu-bar icon reads the fullest profile's percent and whether a profile is full or a session needs
+  you; profile and session rows read as one item each, and a session's menu names its folder.
+
+### Fixed
+- A hand-off with no trigger no longer ends in an empty "()" in the recent list.
+
 ## [1.1.0] - 2026-10-29
 
 ### Added

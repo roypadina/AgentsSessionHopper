@@ -30,6 +30,8 @@ sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are su
 
 Exit codes: a session returns Claude Code's own exit code; `2` means the session was parked and no
 reset time was known to wait for (the message shows how to resume it).
+When a session ends, a session summary (name, about, recent prompts, status, dates, folder, resume
+command) follows Claude Code's own resume hint: see [How it works](How-it-works#when-a-session-ends).
 
 ## Notes
 
