@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A session moved (or resumed after a wait) before its first prompt no longer dies.** Claude Code saves a
+  conversation only once it has a prompt, so `--resume` failed with "No conversation found". The session now
+  starts again under the same id on the new profile.
+
 ## [1.0.0] - 2026-10-28
 
 First stable release: out of BETA.

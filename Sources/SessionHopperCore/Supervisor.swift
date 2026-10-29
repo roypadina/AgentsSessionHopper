@@ -141,13 +141,16 @@ public final class Supervisor {
                 say("starting on \(profile.name) (\(pct))" + (skipped.isEmpty ? "" : ", skipped " + skipped.joined(separator: ", ")))
             }
 
+            // Moved or parked before its first prompt: Claude Code saved no conversation to resume, so start it
+            // again under the same id (`--resume` would fail with "No conversation found").
+            if launches > 0, Transcripts.find(resumeID, projects: projects) == nil { firstRun = true }
             var args: [String]
             let settings = LaunchPlan.settingsJSON(
                 selfPath: env.selfPath,
                 userStatusLine: StatusLineBridge.effectiveUserStatusLine(cwd: fm.currentDirectoryPath, profile: profile, paths: env.paths),
                 caller: callerSettings)
             if firstRun {
-                args = ["--session-id", sessionID, "--settings", settings] + claudeArgs
+                args = ["--session-id", resumeID, "--settings", settings] + (launches == 0 ? claudeArgs : LaunchPlan.relaunchArgs(claudeArgs))
             } else {
                 args = ["--resume", resumeID, "--settings", settings]
                 args += launches == 0 ? claudeArgs : LaunchPlan.relaunchArgs(claudeArgs)
