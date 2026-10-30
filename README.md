@@ -24,6 +24,8 @@ another with one click. Nothing lost, nothing re-explained, and nothing moves un
 brew install --cask roypadina/tap/agents-session-hopper
 ```
 
+<img src="docs/demo.gif" alt="AgentsSessionHopper in action: the menu bar shows the fullest profile's usage, the panel opens with each profile's usage and live sessions, and when Work nears its limit it asks to continue the conversation on Personal and moves it at turn end." width="720">
+
 <img src="docs/screenshots/popover.png" alt="The menu-bar window: three profiles with their 5-hour and weekly usage, a prompt to move a session from work to personal, live sessions and recent hand-offs" width="400">
 
 </div>
