@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-03
+
+### Added
+- Several Claude accounts on a server: a profile can hold its own `claude setup-token` (`sessionhopper profiles key <name> < file`; Keychain on macOS, systemd credential or private file on Linux). A `CLAUDE_CODE_OAUTH_TOKEN` in the caller's environment is kept for the first Claude profile only, never given to the others or to an OpenRouter profile. `doctor` says which login each profile uses.
+- `sessionhopper config on-switch "<command>"`: a command run on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `_FROM`, `_TO`, `_REASON`, `_DETAIL` and `_SESSION` set.
+
+### Fixed
+- On Linux, a `claude` started by `sessionhopper run` ends when `sessionhopper` is killed (a caller's timeout), instead of running on.
+- No colour codes on stderr when it is not a terminal or `NO_COLOR` is set.
+- The Linux tarball carries no macOS metadata (GNU tar printed "Ignoring unknown extended header keyword").
+
 ## [1.3.0] - 2026-11-03
 
 ### Added

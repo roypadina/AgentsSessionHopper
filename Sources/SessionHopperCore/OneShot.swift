@@ -259,6 +259,14 @@ public enum OneShot {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: claude)
         proc.arguments = args
+        #if os(Linux)
+        // A caller that SIGKILLs us (a timeout) cannot have it forwarded: the kernel ends claude with us instead,
+        // so no orphaned turn keeps the conversation busy. setpriv is util-linux, on every common distribution.
+        if FileManager.default.isExecutableFile(atPath: "/usr/bin/setpriv") {
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/setpriv")
+            proc.arguments = ["--pdeathsig", "TERM", "--", claude] + args
+        }
+        #endif
         proc.environment = env
         let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
         proc.standardInput = inPipe

@@ -62,10 +62,13 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     /// `order` by their place in the list like any profile, `manual` only when asked for (`-P`, `switch`).
     public var gatewayUse: String = "last"
     public static let gatewayUses = ["last", "order", "manual"]
+    /// A shell command run (not waited for) on every move, limit stop and park, with `SESSIONHOPPER_EVENT`,
+    /// `_FROM`, `_TO`, `_REASON`, `_DETAIL` and `_SESSION` set. nil = none.
+    public var onSwitch: String?
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -80,6 +83,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         waitForReset = try c.decodeIfPresent(Bool.self, forKey: .waitForReset) ?? d.waitForReset
         continuePrompt = try c.decodeIfPresent(String.self, forKey: .continuePrompt)
         gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
+        onSwitch = try c.decodeIfPresent(String.self, forKey: .onSwitch)
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {

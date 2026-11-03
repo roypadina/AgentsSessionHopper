@@ -4,7 +4,9 @@ import SessionHopperCore
 let env = HopperEnvironment.current()
 var args = Array(CommandLine.arguments.dropFirst())
 
-func say(_ s: String) { FileHandle.standardError.write(Data("\u{1B}[2m[sessionhopper]\u{1B}[0m \(s)\n".utf8)) }
+/// Dimmed tag only on a terminal (and never with NO_COLOR): callers' logs get plain text.
+let colorErr = isatty(2) == 1 && (ProcessInfo.processInfo.environment["NO_COLOR"] ?? "").isEmpty
+func say(_ s: String) { FileHandle.standardError.write(Data("\(colorErr ? "\u{1B}[2m[sessionhopper]\u{1B}[0m" : "[sessionhopper]") \(s)\n".utf8)) }
 func die(_ s: String) -> Never { say(s); exit(1) }
 func out(_ s: String) { print(s) }
 
@@ -51,13 +53,15 @@ let usage = """
       sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
       sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
                                               pay-per-use fallback: the same claude, billed to your OpenRouter key
-      sessionhopper profiles key <name> < keyfile  store that profile's API key (Keychain on macOS, private file on Linux)
+      sessionhopper profiles key <name> < file    store that profile's secret: an OpenRouter API key, or for a Claude
+                                              profile on a server a `claude setup-token` (Keychain on macOS, private file on Linux)
       sessionhopper login <profile>             run `claude auth login` for that profile
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
       sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
-                            |gateway last|order|manual]  (gateway: when OpenRouter profiles are used; default last)
+                            |gateway last|order|manual|on-switch "<command>"|off]  (gateway: when OpenRouter profiles are
+                            used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
@@ -67,8 +71,8 @@ let usage = """
       sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are supervised, the rest
                                               go straight to claude (or link the binary as *-shim)
 
-    Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login or tokens,
-    and makes no network requests. An OpenRouter profile's key is yours; it is handed only to that `claude`.
+    Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login, and makes
+    no network requests. A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
     """
 
 // MARK: - Subcommands
@@ -274,7 +278,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         save()
         out("Order: " + config.profiles.map(\.name).joined(separator: ", "))
     case "key":
-        guard let name = a.first, let p = config.profile(named: name), p.isGateway else { die("usage: sessionhopper profiles key <openrouter profile> < keyfile") }
+        guard let name = a.first, let p = config.profile(named: name) else { die("usage: sessionhopper profiles key <profile> < file   (OpenRouter key, or a Claude setup-token)") }
         if isatty(0) == 1 { say("paste the key, then Ctrl-D") }
         do { out("\(name): key stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: p, env: env))") } catch { die("\(error)") }
     case "export-config-dir":
@@ -352,11 +356,12 @@ func configCommand(_ a: [String]) -> Int32 {
         case "move-now": c.moveNowAtHard = v == "on"
         case "wait": c.waitForReset = v == "on"
         case "gateway": c.gatewayUse = v
+        case "on-switch": c.onSwitch = v == "off" ? nil : v
         default: die("unknown setting \(a[0])")
         }
         do { try c.save(env.paths) } catch { die("\(error)") }
     } else if !a.isEmpty {
-        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off|gateway last|order|manual]")
+        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off|gateway last|order|manual|on-switch <cmd>|off]")
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
@@ -365,6 +370,7 @@ func configCommand(_ a: [String]) -> Int32 {
     out("all full, wait for a reset: \(c.waitForReset ? "on" : "off")")
     out("pay-per-use profiles: \(c.gatewayUse) (\(["last": "only after every Claude subscription is full", "order": "by list order", "manual": "only when asked for"][c.gatewayUse] ?? ""))")
     out("continue prompt:     \(c.continuePrompt == nil ? "built-in" : "your own") (sessionhopper config prompt)")
+    out("on switch:           \(c.onSwitch ?? "off")")
     return 0
 }
 

@@ -16,5 +16,6 @@ docker run --rm --platform linux/amd64 -v "$ROOT_DIR":/src -w /src "$SWIFT_IMAGE
 rm -rf "$OUT" && mkdir -p "$OUT"
 mv "$ROOT_DIR/dist/sessionhopper.linux" "$OUT/sessionhopper"
 cp "$ROOT_DIR/LICENSE" "$OUT/"
-tar -C "$ROOT_DIR/dist" -czf "$OUT.tar.gz" "$(basename "$OUT")"
+# No macOS metadata: GNU tar warns about every LIBARCHIVE.xattr header it does not know.
+COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata -C "$ROOT_DIR/dist" -czf "$OUT.tar.gz" "$(basename "$OUT")"
 (cd "$ROOT_DIR/dist" && shasum -a 256 "$(basename "$OUT").tar.gz" | tee "$(basename "$OUT").tar.gz.sha256")

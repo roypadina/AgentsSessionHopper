@@ -15,14 +15,16 @@ sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-logi
 sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
                                           [--resets daily|weekly|monthly]  pay-per-use fallback on your OpenRouter key
-sessionhopper profiles key <name> < keyfile  store that profile's API key (Keychain on macOS, private file on Linux)
+sessionhopper profiles key <name> < file  store that profile's secret: an OpenRouter API key, or for a Claude profile on a
+                                          server a `claude setup-token` (Keychain on macOS, private file on Linux)
 sessionhopper login <profile>             run `claude auth login` for that profile
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
 sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
 sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
-                      |gateway last|order|manual]  when OpenRouter profiles are used (default: last)
+                      |gateway last|order|manual|on-switch "<command>"|off]  when OpenRouter profiles are used
+                      (default: last); a command run on every move, limit stop and park
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log
