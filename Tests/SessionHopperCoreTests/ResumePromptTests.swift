@@ -79,6 +79,16 @@ final class ResumePromptTests: XCTestCase {
         XCTAssertFalse(FileIO.exists(f.crons))
     }
 
+    func testDoctorSeesSymlinkedFoldersAsShared() throws {
+        let fm = FileManager.default
+        let base = sb.home.appendingPathComponent(".claude"), p = sb.home.appendingPathComponent(".claude2")
+        for d in ["todos", "file-history"] { try fm.createDirectory(at: base.appendingPathComponent(d), withIntermediateDirectories: true) }
+        try fm.createDirectory(at: p.appendingPathComponent("file-history"), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: p.appendingPathComponent("todos"), withDestinationURL: base.appendingPathComponent("todos"))
+        // todos is a link to the base (real folder URL ends in "/", the link's does not); file-history is its own folder
+        XCTAssertEqual(Doctor.notShared(["todos", "file-history"], dir: p.path, base: base.path), ["file-history"])
+    }
+
     func testClaudeVersionGate() {
         XCTAssertEqual(Doctor.atLeast("2.1.300 (Claude Code)", Doctor.minClaude), true)
         XCTAssertEqual(Doctor.atLeast("2.1.145", Doctor.minClaude), true)

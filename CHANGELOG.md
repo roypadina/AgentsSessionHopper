@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-03
+
+### Fixed
+- `sessionhopper doctor` no longer reports `todos` and `file-history` as "not shared" on profiles where they are correctly linked to the first profile.
+
+### Changed
+- README: a short demo of a hand-off at the top, and the app is no longer called beta.
+
 ## [1.2.0] - 2026-10-30
 
 ### Added
