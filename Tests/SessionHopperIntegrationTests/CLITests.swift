@@ -133,6 +133,10 @@ final class CLITests: XCTestCase {
         XCTAssertTrue(d.stdout.contains("warn  ANTHROPIC_API_KEY set in this environment"), d.stdout)
         XCTAssertTrue(d.stdout.contains("warn  default: no usage sample yet"), d.stdout)
         XCTAssertFalse(try h.run(["doctor"]).stdout.contains("ANTHROPIC_API_KEY"))
+        // A setup-token in the environment is routed to the first Claude profile, not a reason to warn.
+        let t = try h.run(["doctor"], extraEnv: ["CLAUDE_CODE_OAUTH_TOKEN": "tok"])
+        XCTAssertFalse(t.stdout.contains("set in this environment: sessions use it"), t.stdout)
+        XCTAssertTrue(t.stdout.contains("CLAUDE_CODE_OAUTH_TOKEN is set: it is used for default only"), t.stdout)
     }
 
     func testDoctorWarnsWhenHistoryIsNotShared() throws {
