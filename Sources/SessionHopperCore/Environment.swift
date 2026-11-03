@@ -50,8 +50,15 @@ public struct HopperEnvironment: Sendable {
     }
 
     public static func defaultStateDir() -> URL {
+        #if os(macOS)
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/AgentsSessionHopper", isDirectory: true)
+        #else
+        // XDG base directories: ${XDG_STATE_HOME:-~/.local/state}/agents-session-hopper.
+        (ProcessInfo.processInfo.environment["XDG_STATE_HOME"].flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/state"))
+            .appendingPathComponent("agents-session-hopper", isDirectory: true)
+        #endif
     }
 
     /// The session this process runs inside, when started by `sessionhopper`.

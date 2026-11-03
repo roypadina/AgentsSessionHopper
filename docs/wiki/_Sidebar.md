@@ -6,6 +6,7 @@
 - [How it works](How-it-works)
 - [CLI reference](CLI-reference)
 - [Using with cmux and IDEs](Using-with-cmux-and-IDEs)
+- [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter)
 - [Privacy and terms](Privacy-and-terms)
 - [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)

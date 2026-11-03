@@ -4,6 +4,8 @@
 sessionhopper [claude args...]            start a session on the first profile with room
 sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
 sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run (bots, services): the
+                                          prompt on stdin; a limit failure retries the turn on the next profile
 sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
@@ -11,12 +13,16 @@ sessionhopper status [--json]             profiles, last-known usage, live sessi
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
+                                          [--resets daily|weekly|monthly]  pay-per-use fallback on your OpenRouter key
+sessionhopper profiles key <name> < keyfile  store that profile's API key (Keychain on macOS, private file on Linux)
 sessionhopper login <profile>             run `claude auth login` for that profile
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
 sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
-sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
+sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
+                      |gateway last|order|manual]  when OpenRouter profiles are used (default: last)
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log
@@ -29,7 +35,8 @@ sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are su
 ```
 
 Exit codes: a session returns Claude Code's own exit code; `2` means the session was parked and no
-reset time was known to wait for (the message shows how to resume it).
+reset time was known to wait for (the message shows how to resume it). `run` returns `75` when no
+profile can take the turn (see [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter)).
 When a session ends, a session summary (name, about, recent prompts, status, dates, folder, resume
 command) follows Claude Code's own resume hint: see [How it works](How-it-works#when-a-session-ends).
 

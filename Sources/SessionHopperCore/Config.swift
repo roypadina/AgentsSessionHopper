@@ -11,13 +11,31 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     /// default path, makes Claude Code look for a differently named login and asks you to log in again.
     /// Turn it on if you always launch that profile with the variable set.
     public var exportConfigDir: Bool
+    /// nil or "claude": a Claude login. "openrouter": the same `claude`, billed to an OpenRouter key (see `Gateway`).
+    public var kind: String?
+    /// Gateway profiles: where the API key is read from, instead of the platform default (see `Gateway.key`).
+    public var keyFile: String?
+    /// Gateway profiles: Claude Code model alias (opus, sonnet, haiku, fable) → the gateway's model name.
+    public var models: [String: String]?
+    /// Gateway profiles: Anthropic-compatible endpoint. Default `Gateway.openRouterURL`.
+    public var baseURL: String?
+    /// Gateway profiles: when a spent key has credit again: daily | weekly | monthly (UTC). Default daily.
+    public var resets: String?
 
     public var id: String { name }
+    /// Billed per use (an API key), not a subscription: used only when no subscription profile has room.
+    public var isGateway: Bool { kind == Gateway.openRouter }
 
-    public init(name: String, dir: String, exportConfigDir: Bool) {
+    public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
+                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil) {
         self.name = name
         self.dir = dir
         self.exportConfigDir = exportConfigDir
+        self.kind = kind
+        self.keyFile = keyFile
+        self.models = models
+        self.baseURL = baseURL
+        self.resets = resets
     }
 }
 
@@ -40,10 +58,14 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public var waitForReset: Bool = true
     /// The user's own continue prompt (placeholders: see `LaunchPlan.defaultContinuePrompt`). nil = built-in.
     public var continuePrompt: String?
+    /// When pay-per-use (gateway) profiles are used: `last` only once every subscription profile is full,
+    /// `order` by their place in the list like any profile, `manual` only when asked for (`-P`, `switch`).
+    public var gatewayUse: String = "last"
+    public static let gatewayUses = ["last", "order", "manual"]
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -57,6 +79,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         moveNowAtHard = try c.decodeIfPresent(Bool.self, forKey: .moveNowAtHard) ?? d.moveNowAtHard
         waitForReset = try c.decodeIfPresent(Bool.self, forKey: .waitForReset) ?? d.waitForReset
         continuePrompt = try c.decodeIfPresent(String.self, forKey: .continuePrompt)
+        gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {
@@ -67,6 +90,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         guard suggestThreshold > 0, suggestThreshold < hardThreshold, hardThreshold <= 100 else {
             throw HopperError("thresholds must satisfy 0 < suggest (\(Int(suggestThreshold))) < hard (\(Int(hardThreshold))) <= 100")
         }
+        guard Self.gatewayUses.contains(gatewayUse) else { throw HopperError("gateway use is one of: \(Self.gatewayUses.joined(separator: ", "))") }
         try FileIO.encode(self, to: paths.config)
     }
 

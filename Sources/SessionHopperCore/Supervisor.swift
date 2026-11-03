@@ -122,8 +122,9 @@ public final class Supervisor {
                 continue
             }
             // A move lands only where Claude Code's own `claude auth status` says the login works (as `doctor` checks).
-            if let from = current, from.name != profile.name, Claude.isLoggedIn(profile, env: env) == false {
-                say("\(profile.name): not logged in (sessionhopper login \(profile.name)), skipping it")
+            if profile.isGateway || current.map({ $0.name != profile.name }) == true, Claude.isLoggedIn(profile, env: env) == false {
+                say(profile.isGateway ? "\(profile.name): no API key (\(Gateway.keySource(profile, env: env))), skipping it"
+                    : "\(profile.name): not logged in (sessionhopper login \(profile.name)), skipping it")
                 loggedOut.insert(profile.name)
                 request = PendingMove(to: PendingMove.anywhere, trigger: request?.trigger ?? "auto", source: request?.source ?? "engine")
                 continue
@@ -453,12 +454,17 @@ enum Spawn {
     /// posix_spawnp with default dispositions for the signals we ignore, so the child behaves as if the
     /// shell had started it. Same process group: the child keeps the terminal.
     static func run(_ exe: String, args: [String], env: [String: String]) throws -> pid_t {
+        #if os(macOS)
         var attr: posix_spawnattr_t?
+        #else
+        var attr = posix_spawnattr_t()
+        #endif
         posix_spawnattr_init(&attr)
         defer { posix_spawnattr_destroy(&attr) }
-        var defaults: sigset_t = 0
-        for s in [SIGINT, SIGQUIT, SIGTERM, SIGHUP, SIGPIPE] { defaults |= sigset_t(1) << sigset_t(s - 1) }
-        var empty: sigset_t = 0
+        var defaults = sigset_t(), empty = sigset_t()
+        sigemptyset(&defaults)
+        sigemptyset(&empty)
+        for s in [SIGINT, SIGQUIT, SIGTERM, SIGHUP, SIGPIPE] { sigaddset(&defaults, s) }
         posix_spawnattr_setsigdefault(&attr, &defaults)
         posix_spawnattr_setsigmask(&attr, &empty)
         posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK))

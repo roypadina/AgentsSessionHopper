@@ -12,7 +12,9 @@ accounts.
 ## What it never does
 
 - It never reads, copies, stores or sends your Claude login, OAuth tokens, `.credentials.json` or
-  Keychain items. There is no Keychain code in it.
+  Claude Code's Keychain items. The one secret it handles is an OpenRouter API key you give it for an
+  OpenRouter profile: kept in its own Keychain item (macOS) or a private file (Linux), and handed only
+  to the `claude` it launches for that profile.
 - It makes no network requests: no usage endpoint, no telemetry, no update check. The optional skill
   install runs Claude Code's own `claude plugin install`, which downloads the plugin from GitHub.
 - It edits your shell's startup file only when you click **Add the line** (or run `sessionhopper shell

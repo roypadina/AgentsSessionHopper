@@ -69,6 +69,9 @@ macOS 14 Sonoma or later · Apple Silicon and Intel (universal binary) ·
 account (usage numbers come only for those). Any terminal and any shell: nothing depends on cmux or a
 particular shell setup.
 
+**Linux (x86_64):** the `sessionhopper` CLI only, no menu-bar app. Built for servers that run
+`claude -p`; see [Servers, bots and Linux](#servers-bots-and-linux).
+
 ## Install
 
 ```bash
@@ -137,6 +140,69 @@ pane was first opened with, so restart those panes once too. The alias covers in
 scripts and cron jobs still run plain `claude`.
 Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
 
+## OpenRouter as a last fallback
+
+An OpenRouter profile runs the same unmodified `claude` against [OpenRouter](https://openrouter.ai)
+with your own OpenRouter API key, through Claude Code's documented
+[gateway settings](https://code.claude.com/docs/en/llm-gateway). It is pay per use, so it is used only
+when no Claude profile has room, and a session on it is offered the way back as soon as one has.
+
+```bash
+sessionhopper profiles add openrouter --openrouter \
+  --model opus=anthropic/claude-opus-5 --model sonnet=anthropic/claude-sonnet-5
+sessionhopper profiles key openrouter < ~/Downloads/openrouter-key.txt
+sessionhopper doctor
+```
+
+- **The key** never goes on a command line or into `config.json`. On macOS it is a Keychain item
+  (service `agents-session-hopper`, account = the profile name). On Linux it is the systemd credential
+  `$CREDENTIALS_DIRECTORY/<profile>` when the service has one (`LoadCredential=`), else
+  `~/.config/agents-session-hopper/<profile>.key`, which must be private (mode 600).
+  `--key-file <path>` sets your own file instead. The key is handed only to the `claude` it launches.
+- **`--model alias=name`** maps Claude Code's aliases to OpenRouter model names (sets
+  `ANTHROPIC_DEFAULT_<ALIAS>_MODEL`, and `--model opus` becomes the mapped name).
+- **When the key runs out of credit** (HTTP 402), the profile counts as full until the next daily reset
+  (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
+- **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
+  Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
+  for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
+  without `--only` still starts on a Claude profile with room.
+- A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
+  the caller's environment shortens that.
+
+## Servers, bots and Linux
+
+`sessionhopper run` is for callers that run one non-interactive turn at a time (`claude -p`), such as a
+chat bot under systemd. It picks the profile, runs the turn, and when the turn fails on a usage limit it
+runs the same turn again on the next profile: Claude profiles in order, OpenRouter last.
+
+```bash
+# instead of: claude -p --session-id <uuid> --model opus < prompt.txt
+sessionhopper run -- -p --session-id <uuid> --model opus --permission-mode bypassPermissions < prompt.txt
+sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPermissions < prompt.txt
+```
+
+- Everything after `--` goes to `claude` unchanged. Output is what `claude` would print for your
+  `--output-format` (text, json or stream-json); the exit code is `claude`'s.
+- Usage comes from `claude`'s own `rate_limit_event` output (it runs with `--output-format
+  stream-json` and translates back), so `status` shows real numbers without a status line.
+- A retry of a `--session-id` turn continues the same conversation with `--resume`. Every profile must
+  share one `projects/` folder (`profiles add` does this; `doctor` checks).
+- **Exit 75** means no profile can take the turn right now; stderr names the first reset.
+
+**Linux install** (x86_64, any glibc distribution; the Swift runtime is built in):
+
+```bash
+curl -LO https://github.com/roypadina/AgentsSessionHopper/releases/latest/download/sessionhopper-linux-x86_64.tar.gz
+tar -xzf sessionhopper-linux-x86_64.tar.gz
+install -Dm755 sessionhopper-linux-x86_64/sessionhopper ~/.local/bin/sessionhopper
+sessionhopper profiles import && sessionhopper doctor
+```
+
+State lives in `${XDG_STATE_HOME:-~/.local/state}/agents-session-hopper/`. A systemd service needs no
+change other than calling `sessionhopper run --` where it called `claude`; give it the OpenRouter key
+with `LoadCredential=openrouter:/path/to/key` (the credential name is the profile name).
+
 ## How it works (and what it never does)
 
 - `sessionhopper` starts the **official, unmodified `claude`** with the profile's configuration folder
@@ -150,8 +216,9 @@ Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
   session comes back silently; one that was cut off gets a short continue prompt, which you can replace
   with your own (`sessionhopper config prompt`). Moving needs every profile to share one `projects/` folder, where Claude Code
   keeps conversations. Profiles added by the app do; `doctor` checks.
-- **It never reads, copies, stores or sends** your Claude login, tokens or Keychain items. Login always
-  happens in Claude Code's own flow.
+- **It never reads, copies, stores or sends** your Claude login, tokens or Claude Code's Keychain items.
+  Login always happens in Claude Code's own flow. The one secret it handles is an OpenRouter key you
+  give it for an OpenRouter profile.
 - **It makes no network requests** at all: no usage endpoint, no telemetry, no update check. (The
   optional skill install runs Claude Code's own `claude plugin install`, which downloads it from GitHub.)
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
@@ -159,11 +226,12 @@ Details in the [wiki](https://github.com/roypadina/AgentsSessionHopper/wiki).
 
 **Your part:** use it only with accounts that are yours, never shared with anyone. Each account is
 subject to Anthropic's Consumer Terms, Usage Policy and Claude Code usage rules, which Anthropic may
-change at any time.
+change at any time. If you run it for a bot or service, check Anthropic's terms for your use case.
 
 ## Privacy
 
 No network access, no analytics. State lives in `~/Library/Application Support/AgentsSessionHopper/`
+(Linux: `~/.local/state/agents-session-hopper/`)
 (profile list, last-known usage percentages, the switch log). Preferences are in the defaults domain
 `com.padina.agents-session-hopper`. Optional `install-hooks` edits a profile's `settings.json` only when
 you run it, keeps a backup, and `uninstall-hooks` restores it.
@@ -177,6 +245,19 @@ git clone https://github.com/roypadina/AgentsSessionHopper.git
 cd AgentsSessionHopper
 swift test                        # unit + integration tests (fake `claude`, no real sessions)
 Scripts/package_app.sh            # dist/AgentsSessionHopper.app, CLI in Contents/Helpers/
+Scripts/package_linux.sh          # dist/sessionhopper-linux-x86_64.tar.gz, built in Docker (swift:6.4)
+```
+
+On Linux itself: `swift test` and `swift build -c release --static-swift-stdlib --product sessionhopper`.
+
+Live tests with the real `claude` (a few cents of usage; temp state, your own config untouched). Usage is
+mocked with `SESSIONHOPPER_MOCK_LIMITS=<dir>` (`<dir>/<profile>.limits.json` overrides what sessions
+report), so every hand-off can be forced:
+
+```bash
+swift build
+Scripts/live/run-swaps.sh ~/.claude ~/.claude-work [--openrouter-key-file F]          # `run`, headless
+Scripts/live/interactive-swaps.py ~/.claude ~/.claude-work [--openrouter-key-file F]  # a real TUI session
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

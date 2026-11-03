@@ -40,6 +40,8 @@ let usage = """
       sessionhopper [claude args...]            start a session on the first profile with room
       sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
       sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+      sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run (bots, services): the
+                                              prompt on stdin; a limit failure retries the turn on the next profile
       sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
       sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
       sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
@@ -47,11 +49,15 @@ let usage = """
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+      sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
+                                              pay-per-use fallback: the same claude, billed to your OpenRouter key
+      sessionhopper profiles key <name> < keyfile  store that profile's API key (Keychain on macOS, private file on Linux)
       sessionhopper login <profile>             run `claude auth login` for that profile
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
-      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
+      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
+                            |gateway last|order|manual]  (gateway: when OpenRouter profiles are used; default last)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
@@ -61,8 +67,8 @@ let usage = """
       sessionhopper shim [claude args...]       for cmux/IDEs: interactive runs are supervised, the rest
                                               go straight to claude (or link the binary as *-shim)
 
-    Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your login or tokens,
-    and makes no network requests.
+    Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login or tokens,
+    and makes no network requests. An OpenRouter profile's key is yours; it is handed only to that `claude`.
     """
 
 // MARK: - Subcommands
@@ -99,7 +105,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let p = s.percent(p.name), p >= s.config.suggestThreshold { note += ", near limit" }
         let n = s.sessions(on: p.name).count
-        out("  \(i + 1). \(pad(p.name, 10)) \(pad(env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")")
+        out("  \(i + 1). \(pad(p.name, 10)) \(pad(p.isGateway ? "openrouter" : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")")
     }
     let c = s.config
     out("Hand-off: suggest at \(Int(c.suggestThreshold))%, park at \(Int(c.hardThreshold))% (\(c.parkBeforePaid ? "on" : "off")), move without asking: \(c.autoMove ? "on" : "off")")
@@ -219,7 +225,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
             found.forEach { out("  \(pad($0.name, 10)) \(env.tilde($0.dir))") }
         }
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.name, 10)) \(pad(env.tilde(p.dir), 22)) \(p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")")
+            out("  \(i + 1). \(pad(p.name, 10)) \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))
@@ -232,6 +238,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         guard let name = a.first, !name.hasPrefix("-") else { die("usage: sessionhopper profiles add <name> [--dir D] [--no-share] [--no-login]") }
         a.removeFirst()
         guard config.profile(named: name) == nil else { die("profile '\(name)' exists") }
+        if has("--openrouter", in: &a) { return addGateway(name, &a, &config) }
         let dir = take("--dir", from: &a).map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
             ?? env.home.appendingPathComponent(".claude-\(name)")
         let share = !has("--no-share", in: &a)
@@ -266,6 +273,10 @@ func profilesCommand(_ a: [String]) -> Int32 {
         do { config.profiles = try config.order(prefer: list.split(separator: ",").map(String.init), only: false) } catch { die("\(error)") }
         save()
         out("Order: " + config.profiles.map(\.name).joined(separator: ", "))
+    case "key":
+        guard let name = a.first, let p = config.profile(named: name), p.isGateway else { die("usage: sessionhopper profiles key <openrouter profile> < keyfile") }
+        if isatty(0) == 1 { say("paste the key, then Ctrl-D") }
+        do { out("\(name): key stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: p, env: env))") } catch { die("\(error)") }
     case "export-config-dir":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), ["on", "off"].contains(a[1]) else {
             die("usage: sessionhopper profiles export-config-dir <name> on|off")
@@ -277,6 +288,38 @@ func profilesCommand(_ a: [String]) -> Int32 {
         die("unknown: profiles \(sub)")
     }
     return 0
+}
+
+/// `profiles add <name> --openrouter`: no new folder; it runs in the first profile's folder, so history is shared.
+func addGateway(_ name: String, _ a: inout [String], _ config: inout HopperConfig) -> Int32 {
+    guard Profiles.isValidName(name), let base = config.profiles.first(where: { !$0.isGateway }) else {
+        die("add your Claude profiles first (sessionhopper profiles import); the OpenRouter profile goes last")
+    }
+    var models: [String: String] = [:]
+    while let m = take("--model", from: &a) {
+        let kv = m.split(separator: "=", maxSplits: 1).map(String.init)
+        guard kv.count == 2 else { die("--model takes alias=name, e.g. opus=anthropic/claude-opus-5") }
+        models[kv[0]] = kv[1]
+    }
+    let resets = take("--resets", from: &a)
+    if let r = resets, !["daily", "weekly", "monthly"].contains(r) { die("--resets is daily, weekly or monthly") }
+    let p = Profile(name: name, dir: base.dir, exportConfigDir: base.exportConfigDir, kind: Gateway.openRouter,
+                    keyFile: take("--key-file", from: &a), models: models.isEmpty ? nil : models, resets: resets)
+    config.profiles.append(p)
+    do { try config.save(env.paths) } catch { die("\(error)") }
+    out("Added \(name): OpenRouter, pay per use, used only when no Claude profile has room. Runs in \(env.tilde(base.dir)).")
+    if (try? Gateway.key(p, env: env)) == nil { out("Store its key: sessionhopper profiles key \(name) < keyfile   (key goes to \(Gateway.keySource(p, env: env)))") }
+    return 0
+}
+
+/// `run [-P a,b] [--only] -- <claude args>`.
+func runCommand(_ a: [String]) -> Int32 {
+    var a = a
+    let only = has("--only", in: &a)
+    let prefer = (take("-P", from: &a) ?? take("--profile", from: &a)).map { $0.split(separator: ",").map(String.init) } ?? []
+    if a.first == "--" { a.removeFirst() }
+    let input = isatty(0) == 1 ? Data() : readStdin()
+    return OneShot.run(env: env, prefer: prefer, only: only, args: a, stdin: input, say: say)
 }
 
 /// The unmodified `claude auth login`, in the foreground: login completes in Anthropic's own flow.
@@ -308,17 +351,19 @@ func configCommand(_ a: [String]) -> Int32 {
         case "auto-move": c.autoMove = v == "on"
         case "move-now": c.moveNowAtHard = v == "on"
         case "wait": c.waitForReset = v == "on"
+        case "gateway": c.gatewayUse = v
         default: die("unknown setting \(a[0])")
         }
         do { try c.save(env.paths) } catch { die("\(error)") }
     } else if !a.isEmpty {
-        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]")
+        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off|gateway last|order|manual]")
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
     out("move without asking: \(c.autoMove ? "on" : "off")")
     out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
     out("all full, wait for a reset: \(c.waitForReset ? "on" : "off")")
+    out("pay-per-use profiles: \(c.gatewayUse) (\(["last": "only after every Claude subscription is full", "order": "by list order", "manual": "only when asked for"][c.gatewayUse] ?? ""))")
     out("continue prompt:     \(c.continuePrompt == nil ? "built-in" : "your own") (sessionhopper config prompt)")
     return 0
 }
@@ -494,7 +539,7 @@ func pluginCommand(_ a: [String]) -> Int32 {
 func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version)"); return 0 }
 
 let commands: [String: ([String]) -> Int32] = [
-    "shim": shimCommand,
+    "shim": shimCommand, "run": runCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "sessions": sessionsCommand,
     "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,

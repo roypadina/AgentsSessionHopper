@@ -8,6 +8,8 @@ confirm.
 
 - A **menu-bar app**: usage per profile, a prompt when a session should move, the switch log, settings.
 - A **CLI**, `sessionhopper`: starts and supervises sessions, and does everything the app does.
+- On **Linux** (x86_64): the CLI alone, for servers and bots that run `claude -p`, with an optional
+  pay-per-use OpenRouter profile as the last fallback. See [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter).
 
 Start here: [Installation](Installation) → [Getting started](Getting-started).
 
@@ -15,7 +17,7 @@ Start here: [Installation](Installation) → [Getting started](Getting-started).
 > endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.
 >
 > It starts the official, unmodified `claude`, never reads, stores or sends your Claude login or tokens,
-> and makes no network requests. Use it only with accounts that are yours, never shared with anyone.
+> and makes no network requests. (An OpenRouter profile's key is yours and goes only to the `claude` it starts.) Use it only with accounts that are yours, never shared with anyone.
 > See [Privacy and terms](Privacy-and-terms).
 
 ## Support
