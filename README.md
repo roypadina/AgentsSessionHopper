@@ -175,6 +175,21 @@ sessionhopper doctor
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 
+## The VS Code extension
+
+Set the official Claude Code extension's **Claude Process Wrapper** to `sessionhopper` (VS Code settings
+→ `claudeCode.claudeProcessWrapper`, e.g. `/opt/homebrew/bin/sessionhopper`; Linux: the full path of the
+binary). Every side-panel conversation then runs as a supervised session:
+
+- It starts on the profile the rules pick (priorities, thresholds, OpenRouter last) and shows in
+  `sessionhopper status`, the menu-bar app and the log, with live usage.
+- When a turn hits a usage limit, the conversation moves to the next profile and the same message runs
+  again there; the panel just shows the answer.
+- At a turn end (or while idle) it moves like a terminal session: "move without asking", a better
+  priority freeing up, or `sessionhopper switch` / the app's Move. `sessionhopper hold` works too.
+- A move restarts Claude Code behind the panel: background tasks still running in that conversation
+  stop with it.
+
 ## Servers, bots and Linux
 
 `sessionhopper run` is for callers that run one non-interactive turn at a time (`claude -p`), such as a
