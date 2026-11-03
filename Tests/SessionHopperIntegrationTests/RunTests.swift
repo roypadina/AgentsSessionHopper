@@ -115,6 +115,18 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(h.read("tokens")?.split(separator: "\n").last, "work work-token")
     }
 
+    func testRunStaysOnTheProfileThatServedTheLastTurnAmongEqualPriorities() throws {
+        try h.write("limit", "behave-default")
+        XCTAssertEqual(try h.run(["run", "--", "-p"]).stdout, "answer from work\n")
+        // default has reset: same priority, so the run stays on work until work is full.
+        FileIO.remove(h.env.paths.limits("default"))
+        try h.write("ok", "behave-default")
+        XCTAssertEqual(try h.run(["run", "--", "-p"]).stdout, "answer from work\n")
+        // A better priority wins at once.
+        XCTAssertEqual(try h.run(["profiles", "priority", "work", "2"]).code, 0)
+        XCTAssertEqual(try h.run(["run", "--", "-p"]).stdout, "answer from default\n")
+    }
+
     func testGatewayWithoutKeyIsSkipped() throws {
         XCTAssertEqual(try h.run(["profiles", "add", "gw", "--openrouter", "--key-file", h.t.appendingPathComponent("missing.key").path]).code, 0)
         try h.write("limit", "behave-default")

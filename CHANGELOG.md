@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Profile priorities: `sessionhopper profiles priority <name> <n>` (lower is preferred; Claude 1, OpenRouter 10 by default). A better priority with room always wins and a session on a worse one moves back up as soon as one frees up; equal priorities never trade places before the current profile reaches its limit (also for `sessionhopper run`, which keeps the profile that served the last turn).
+
 ## [1.4.2] - 2026-11-03
 
 ### Fixed

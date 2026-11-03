@@ -13,6 +13,8 @@ sessionhopper status [--json]             profiles, last-known usage, live sessi
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10); equal priorities
+                                          don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
                                           [--resets daily|weekly|monthly]  pay-per-use fallback on your OpenRouter key
 sessionhopper profiles key <name> < file  store that profile's secret: an OpenRouter API key, or for a Claude profile on a

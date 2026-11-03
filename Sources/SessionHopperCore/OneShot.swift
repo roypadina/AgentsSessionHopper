@@ -196,13 +196,14 @@ public enum OneShot {
         let session = sessionID(callerArgs)
         let stop = Terminator()
         var skipped: Set<String> = []
+        let current = EventLog.lastServed(session: session, env.paths)
         var last: Attempt?
         var lastProfile: Profile?
 
         while !stop.requested {
             let now = FileIO.now()
             let policy = Policy(config: config, limits: LimitStore.all(config, env.paths), now: now)
-            guard let p = policy.pick(order.filter { !skipped.contains($0.name) }) else { break }
+            guard let p = policy.pick(order.filter { !skipped.contains($0.name) }, current: current) else { break }
             if p.isGateway, Claude.isLoggedIn(p, env: env) != true {
                 say("\(p.name): no API key (\(Gateway.keySource(p, env: env))), skipping it")
                 skipped.insert(p.name)

@@ -23,6 +23,11 @@ sessionhopper doctor
   `ANTHROPIC_DEFAULT_<ALIAS>_MODEL`, and `--model opus` becomes the mapped name).
 - **When the key runs out of credit** (HTTP 402), the profile counts as full until the next daily reset
   (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
+- **Priorities.** Each profile has a priority, lower = preferred (Claude 1, OpenRouter 10 by default):
+  `sessionhopper profiles priority <name> <n>`. A better priority with room always wins, and a session on a
+  worse one moves back up as soon as a better one is free (with "move without asking" on; else you are
+  asked). Profiles of equal priority never trade places before the current one reaches its limit. Example:
+  `claude1` and `claude2` at 1, `claude3` at 2, OpenRouter at 10.
 - **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
   Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
   for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
