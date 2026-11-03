@@ -567,6 +567,8 @@ let commands: [String: ([String]) -> Int32] = [
 
 // Invoked through a link named `*-shim` (e.g. ~/bin/sessionhopper-shim): shim mode, for tools that take one path.
 if (CommandLine.arguments[0] as NSString).lastPathComponent.hasSuffix("-shim") { exit(shimCommand(args)) }
+// VS Code extension, `claudeCode.claudeProcessWrapper`: called as `sessionhopper <bundled claude> <flags>`.
+if PanelWrapper.isWrapperCall(args) { exit(PanelWrapper.run(env: env, args: args, say: say)) }
 if let first = args.first, let run = commands[first] {
     exit(run(Array(args.dropFirst())))
 }
