@@ -110,6 +110,8 @@ public enum Claude {
     /// `claude auth status` exits 0 when logged in (https://code.claude.com/docs/en/cli-reference).
     /// Claude Code checks its own login; we only read the exit code. nil = claude not found.
     public static func isLoggedIn(_ profile: Profile, env: HopperEnvironment) -> Bool? {
+        // A gateway profile needs no Claude login, only its API key.
+        if profile.isGateway { return (try? Gateway.key(profile, env: env)) != nil }
         guard let claude = locate(env) else { return nil }
         return Shell.run(claude, ["auth", "status"], timeout: 15, env: Profiles.environment(for: profile, base: env.vars)).status == 0
     }

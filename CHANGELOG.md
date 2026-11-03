@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- OpenRouter profiles: `sessionhopper profiles add <name> --openrouter [--model alias=name]` runs the same unmodified `claude` against OpenRouter with your own API key. Pay per use, so it is used only when no Claude profile has room; a session on it is offered the way back once one has. Out of credit (402) = full until the next daily (or `--resets weekly|monthly`) reset.
+- `sessionhopper profiles key <name>` stores that key: macOS Keychain, or on Linux a private file (or the systemd credential `$CREDENTIALS_DIRECTORY/<name>`). Never on a command line or in `config.json`.
+- `sessionhopper run -- <claude -p args>`: one non-interactive turn for bots and services. Picks the profile, records usage from `claude`'s own `rate_limit_event` output, and on a limit failure runs the same turn again on the next profile. Exit 75 when no profile can take it.
+- Linux x86_64 build of the `sessionhopper` CLI (no menu-bar app): `Scripts/package_linux.sh`, state in `~/.local/state/agents-session-hopper/`. CI builds and tests on Linux too.
+
 ## [1.2.1] - 2026-11-03
 
 ### Fixed

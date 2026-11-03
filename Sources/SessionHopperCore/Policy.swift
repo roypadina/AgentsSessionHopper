@@ -35,17 +35,25 @@ public struct Policy: Sendable {
 
     /// Where to (re)start: order beats headroom, so the preferred profile is used up first. A profile under
     /// the suggest threshold wins over one between the thresholds, which would only queue the next move.
+    /// Gateway (pay-per-use) profiles come last, whatever their place in `order`.
     public func pick(_ order: [Profile], excluding: String? = nil) -> Profile? {
-        first(in: order, under: config.suggestThreshold, excluding: excluding)
-            ?? first(in: order, under: config.hardThreshold, excluding: excluding)
+        let subs = order.filter { !$0.isGateway }
+        return first(in: subs, under: config.suggestThreshold, excluding: excluding)
+            ?? first(in: subs, under: config.hardThreshold, excluding: excluding)
+            ?? first(in: order.filter(\.isGateway), under: config.hardThreshold, excluding: excluding)
     }
 
     /// `held`: the user pinned this session to its profile; it is never parked or moved automatically.
     public func evaluate(current: Profile, order: [Profile], held: Bool) -> Decision {
+        let subs = order.filter { !$0.isGateway }
+        let roomy = first(in: subs, under: config.suggestThreshold, excluding: current.name)
+        // On a pay-per-use profile while a subscription has room again: offer the way back.
+        if current.isGateway, (percent(current.name) ?? 0) < config.hardThreshold, let to = roomy {
+            return config.autoMove && !held ? .autoMove(to: to.name, percent: percent(current.name) ?? 0) : .suggest(to: to.name, percent: percent(current.name) ?? 0)
+        }
         guard let pct = percent(current.name) else { return .none }
-        let roomy = first(in: order, under: config.suggestThreshold, excluding: current.name)
         if !held, pct >= config.hardThreshold {
-            if config.autoMove, let to = roomy ?? first(in: order, under: config.hardThreshold, excluding: current.name) {
+            if config.autoMove, let to = pick(order, excluding: current.name) {
                 return .autoMove(to: to.name, percent: pct)
             }
             if config.parkBeforePaid { return .park(percent: pct) }

@@ -19,7 +19,12 @@ final class Harness {
     var env: HopperEnvironment { HopperEnvironment(home: home, stateDir: state, selfPath: Harness.binary.path) }
 
     static let binary: URL = {
+        #if os(macOS)
         let products = Bundle.allBundles.first { $0.bundlePath.hasSuffix(".xctest") }!.bundleURL.deletingLastPathComponent()
+        #else
+        // Linux: the tests are one executable in the products folder.
+        let products = Bundle.main.executableURL!.deletingLastPathComponent()
+        #endif
         return products.appendingPathComponent("sessionhopper")
     }()
 

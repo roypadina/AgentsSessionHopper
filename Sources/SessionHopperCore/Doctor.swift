@@ -52,7 +52,10 @@ public enum Doctor {
         for p in config.profiles {
             let tag = "\(p.name) (\(env.tilde(p.dir)))"
             guard FileManager.default.fileExists(atPath: p.dir) else { add(.fail, "\(tag): directory missing"); continue }
-            if let claudePath {
+            if p.isGateway {
+                do { _ = try Gateway.key(p, env: env); add(.ok, "\(tag): \(p.kind ?? "") key found (\(Gateway.keySource(p, env: env)))") }
+                catch { add(.fail, "\(tag): \(error)") }
+            } else if let claudePath {
                 let status = Shell.run(claudePath, ["auth", "status"], timeout: 15, env: Profiles.environment(for: p, base: env.vars)).status
                 add(status == 0 ? .ok : .warn, status == 0 ? "\(tag): logged in" : "\(tag): not logged in. Run: \(Profiles.loginCommand(for: p, tilde: env.tilde))")
             }

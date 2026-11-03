@@ -71,6 +71,8 @@ public enum LaunchPlan {
                                         env: HopperEnvironment, userStatusCommand: String?) -> [String: String] {
         var e = Profiles.environment(for: profile, base: base)
         for k in scrubbed { e[k] = nil }
+        // The supervisor checks the key before it launches a gateway profile (`Claude.isLoggedIn`).
+        if profile.isGateway, let key = try? Gateway.key(profile, env: env) { e.merge(Gateway.environment(profile, key: key)) { _, new in new } }
         e["SESSIONHOPPER_SESSION_ID"] = sessionID
         e["SESSIONHOPPER_PROFILE"] = profile.name
         e["SESSIONHOPPER_STATE_DIR"] = env.paths.root.path
