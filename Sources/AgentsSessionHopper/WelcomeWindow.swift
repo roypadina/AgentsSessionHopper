@@ -50,7 +50,7 @@ struct WelcomeView: View {
             row("arrow.triangle.swap", "Start Claude Code with sessionhopper.",
                 "Run sessionhopper instead of claude, or let Setup add a shell alias. Near a limit you are asked whether to continue on another profile. Nothing moves until you confirm.")
             row("lock.shield", "Your logins stay yours.",
-                "It never reads your Claude login or tokens and makes no network requests. Use it only with accounts that are yours.")
+                "It never reads your Claude login and makes no network requests. Use it only with accounts that are yours.")
             row("questionmark.circle", "Icon missing?",
                 "Open AgentsSessionHopper again from Applications to get Settings. A full menu bar can hide the icon.")
             LaunchAtLoginToggle()
