@@ -88,9 +88,7 @@ public enum Doctor {
         // Not required for a move, but without them the todo list and /rewind checkpoints stay behind.
         let base = config.profiles[0]
         for p in config.profiles.dropFirst() {
-            let apart = ["todos", "file-history"].filter {
-                URL(fileURLWithPath: p.dir).appendingPathComponent($0).resolvingSymlinksInPath() != URL(fileURLWithPath: base.dir).appendingPathComponent($0).resolvingSymlinksInPath()
-            }
+            let apart = notShared(["todos", "file-history"], dir: p.dir, base: base.dir)
             if !apart.isEmpty { add(.info, "\(p.name): \(apart.joined(separator: ", ")) not shared with \(base.name), so todo lists and /rewind stay behind on a move. Share: sessionhopper profiles share \(p.name)") }
         }
         let shell = Setup.shellKind(env.vars)
@@ -99,6 +97,15 @@ public enum Doctor {
             : "\(shell.rawValue): no AgentsSessionHopper alias, so plain `claude` is supervised only if your own setup routes it. Start sessions with `sessionhopper`, or run: sessionhopper shell install")
         if config.suggestThreshold >= config.hardThreshold { add(.fail, "suggest threshold must be below the park threshold") }
         return out
+    }
+
+    /// Items of `dir` that do not resolve to the same folder as in `base`. Compares paths, not URLs:
+    /// a real folder's URL ends in "/" and one reached through a symlink does not, so URLs never match.
+    static func notShared(_ items: [String], dir: String, base: String) -> [String] {
+        items.filter {
+            URL(fileURLWithPath: dir).appendingPathComponent($0).resolvingSymlinksInPath().path
+                != URL(fileURLWithPath: base).appendingPathComponent($0).resolvingSymlinksInPath().path
+        }
     }
 
     /// `Stop.background_tasks` / `session_crons`, which keep a move from cutting work off.
