@@ -57,6 +57,30 @@ public enum EventLog {
         enc.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         guard let data = try? enc.encode(event), let line = String(data: data, encoding: .utf8) else { return }
         FileIO.appendLine(line, to: paths.events)
+        notify(event, paths)
+    }
+
+    /// Events worth telling someone about: a move, a limit stop, a park, a `run` served after a retry.
+    public static func isSwitch(_ e: HopperEvent) -> Bool {
+        ["switch", "limit", "park"].contains(e.type) || (e.type == "run" && e.from != nil)
+    }
+
+    /// Runs the user's `onSwitch` command for `e`, detached: its output goes nowhere and it is never waited for,
+    /// so a slow or failing command cannot hold up a session or a caller reading our output.
+    static func notify(_ e: HopperEvent, _ paths: StatePaths) {
+        guard isSwitch(e), let cmd = HopperConfig.load(paths).onSwitch, !cmd.isEmpty else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", cmd]
+        var vars = ProcessInfo.processInfo.environment
+        for (k, v) in [("EVENT", e.type), ("FROM", e.from), ("TO", e.to), ("REASON", e.trigger), ("DETAIL", e.detail), ("SESSION", e.session)] {
+            vars["SESSIONHOPPER_\(k)"] = v ?? ""
+        }
+        p.environment = vars
+        p.standardInput = FileHandle.nullDevice
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
     }
 
     /// Newest last.

@@ -16,8 +16,8 @@ Start here: [Installation](Installation) → [Getting started](Getting-started).
 > AgentsSessionHopper is an independent open-source tool. It is not made by, affiliated with, or
 > endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC.
 >
-> It starts the official, unmodified `claude`, never reads, stores or sends your Claude login or tokens,
-> and makes no network requests. (An OpenRouter profile's key is yours and goes only to the `claude` it starts.) Use it only with accounts that are yours, never shared with anyone.
+> It starts the official, unmodified `claude`, never reads, copies or sends your Claude login or Claude Code's Keychain items,
+> and makes no network requests. (A key or setup-token you store for a profile goes only to that profile's `claude`.) Use it only with accounts that are yours, never shared with anyone.
 > See [Privacy and terms](Privacy-and-terms).
 
 ## Support

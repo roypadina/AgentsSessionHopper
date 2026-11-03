@@ -49,6 +49,10 @@ public enum Doctor {
 
         let now = FileIO.now()
         let claudePath = Claude.locate(env)
+        let subs = config.profiles.filter { !$0.isGateway }
+        if env.vars["CLAUDE_CODE_OAUTH_TOKEN"].map({ !$0.isEmpty }) == true, subs.count > 1 {
+            add(.info, "CLAUDE_CODE_OAUTH_TOKEN is set: it is used for \(subs[0].name) only. The other Claude profiles use their own stored token (sessionhopper profiles key <name>) or their own login.")
+        }
         for p in config.profiles {
             let tag = "\(p.name) (\(env.tilde(p.dir)))"
             guard FileManager.default.fileExists(atPath: p.dir) else { add(.fail, "\(tag): directory missing"); continue }
@@ -56,8 +60,14 @@ public enum Doctor {
                 do { _ = try Gateway.key(p, env: env); add(.ok, "\(tag): \(p.kind ?? "") key found (\(Gateway.keySource(p, env: env)))") }
                 catch { add(.fail, "\(tag): \(error)") }
             } else if let claudePath {
-                let status = Shell.run(claudePath, ["auth", "status"], timeout: 15, env: Profiles.environment(for: p, base: env.vars)).status
-                add(status == 0 ? .ok : .warn, status == 0 ? "\(tag): logged in" : "\(tag): not logged in. Run: \(Profiles.loginCommand(for: p, tilde: env.tilde))")
+                let authEnv = Claude.authEnvironment(p, env: env)
+                let status = Shell.run(claudePath, ["auth", "status"], timeout: 15, env: authEnv).status
+                let via = (try? Gateway.key(p, env: env)) != nil ? " (its stored token)"
+                    : authEnv["CLAUDE_CODE_OAUTH_TOKEN"] != nil ? " (CLAUDE_CODE_OAUTH_TOKEN of this environment)" : ""
+                let why = !via.isEmpty ? "not logged in: \(via.dropFirst(2).dropLast()) was rejected (expired or revoked?)"
+                    : "not logged in here (no login in its folder, no stored token\(Gateway.ownsEnvToken(p, env: env) ? ", CLAUDE_CODE_OAUTH_TOKEN not set in this environment" : ""))"
+                add(status == 0 ? .ok : .warn, status == 0 ? "\(tag): logged in\(via)"
+                    : "\(tag): \(why). Run: \(Profiles.loginCommand(for: p, tilde: env.tilde)), or store a setup-token: sessionhopper profiles key \(p.name) < tokenfile")
             }
             if let l = LimitStore.read(p.name, env.paths) {
                 let age = Int((now - l.sampledAt) / 60)

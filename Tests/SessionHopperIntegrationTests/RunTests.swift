@@ -12,6 +12,7 @@ final class RunTests: XCTestCase {
         try h.scenario(#"""
             who=default; [ -n "$CLAUDE_CONFIG_DIR" ] && who=work; [ -n "$ANTHROPIC_BASE_URL" ] && who=gw
             echo "$who $ANTHROPIC_BASE_URL $ANTHROPIC_AUTH_TOKEN $ENABLE_TOOL_SEARCH" >> "$T/run-env"
+            echo "$who ${CLAUDE_CODE_OAUTH_TOKEN:-none}" >> "$T/tokens"
             case "$(cat "$T/behave-$who" 2>/dev/null || echo ok)" in
               ok) echo '{"type":"system","subtype":"init"}'
                   echo '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","unifiedWindows":{"five_hour":{"utilization":0.5,"resetsAt":4102444800}}}}'
@@ -86,6 +87,32 @@ final class RunTests: XCTestCase {
         let none = try h.run(["run", "--", "-p"], extraEnv: ["SESSIONHOPPER_MOCK_LIMITS": mock.path])
         XCTAssertEqual(none.code, OneShot.allFullExit, "manual: the gateway is not used on its own")
         XCTAssertEqual(try h.run(["run", "--only", "-P", "gw", "--", "-p"], extraEnv: ["SESSIONHOPPER_MOCK_LIMITS": mock.path]).stdout, "answer from gw\n")
+    }
+
+    func testCallerTokenStaysWithTheFirstProfileAndOnSwitchFires() throws {
+        try addGateway()
+        let hook = h.t.appendingPathComponent("hook.log").path
+        XCTAssertEqual(try h.run(["config", "on-switch", "echo \"$SESSIONHOPPER_EVENT $SESSIONHOPPER_FROM>$SESSIONHOPPER_TO $SESSIONHOPPER_REASON\" >> '\(hook)'"]).code, 0)
+        try h.write("limit", "behave-default")
+        try h.write("limit", "behave-work")
+        let r = try h.run(["run", "--", "-p"], extraEnv: ["CLAUDE_CODE_OAUTH_TOKEN": "caller-token"])
+        XCTAssertEqual(r.stdout, "answer from gw\n", r.stderr)
+        XCTAssertFalse(r.stderr.contains("\u{1B}["), "no colour codes when stderr is not a terminal")
+        XCTAssertEqual(h.read("tokens"), "default caller-token\nwork none\ngw none\n",
+                       "the caller's token is account 1's: never given to another Claude profile or to the gateway")
+        let deadline = Date().addingTimeInterval(5)
+        while (h.read("hook.log") ?? "").split(separator: "\n").count < 3 && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        XCTAssertEqual(Set((h.read("hook.log") ?? "").split(separator: "\n").map(String.init)),
+                       ["limit default> limit", "limit work> limit", "run work>gw ok"])
+
+        // A Claude profile's own stored token wins over the caller's.
+        let tok = h.t.appendingPathComponent("work.token").path
+        try h.config { c in c.profiles[1].keyFile = tok }
+        try Gateway.writePrivate(Data("work-token\n".utf8), to: URL(fileURLWithPath: tok))
+        try h.write("ok", "behave-work")
+        FileIO.remove(h.env.paths.limits("work"))
+        _ = try h.run(["run", "--", "-p"], extraEnv: ["CLAUDE_CODE_OAUTH_TOKEN": "caller-token"])
+        XCTAssertEqual(h.read("tokens")?.split(separator: "\n").last, "work work-token")
     }
 
     func testGatewayWithoutKeyIsSkipped() throws {

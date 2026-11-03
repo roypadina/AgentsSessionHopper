@@ -36,7 +36,7 @@ public enum Gateway {
         #if os(macOS)
         let r = Shell.run("/usr/bin/security", ["find-generic-password", "-s", keychainService, "-a", p.name, "-w"], timeout: 10)
         let k = r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard r.status == 0, !k.isEmpty else { throw HopperError("\(p.name): no API key in the Keychain. Add it: sessionhopper profiles key \(p.name) < keyfile") }
+        guard r.status == 0, !k.isEmpty else { throw HopperError("\(p.name): no key in the Keychain. Add it: sessionhopper profiles key \(p.name) < keyfile") }
         return k
         #else
         if let dir = credentialsDir(env), FileManager.default.fileExists(atPath: "\(dir)/\(p.name)") {
@@ -51,7 +51,7 @@ public enum Gateway {
     public static func storeKey(_ key: String, for p: Profile, env: HopperEnvironment) throws -> String {
         let k = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !k.isEmpty, k.count <= 512, k.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.".contains($0)) }) else {
-            throw HopperError("that does not look like an API key (letters, digits, - _ . only)")
+            throw HopperError("that does not look like an API key or token (letters, digits, - _ . only)")
         }
         #if os(macOS)
         if p.keyFile == nil {
@@ -113,6 +113,22 @@ public enum Gateway {
                                             sampledAt: now), profile: p.name, paths)
     }
 
+    /// Claude profiles on a server. Claude Code ranks `CLAUDE_CODE_OAUTH_TOKEN` above the login in a profile's
+    /// own folder (https://code.claude.com/docs/en/authentication), so a token in the caller's environment would
+    /// run every profile on one account. A profile's own stored token (`profiles key`, a `claude setup-token`)
+    /// wins; else the caller's token is kept only for the first Claude profile and removed for the others, which
+    /// then use their own login. Never passed to a gateway profile.
+    public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment) {
+        if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; return }
+        if let t = try? key(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = t; return }
+        if !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+    }
+
+    /// The caller's `CLAUDE_CODE_OAUTH_TOKEN` belongs to the first Claude (non-gateway) profile.
+    public static func ownsEnvToken(_ p: Profile, env: HopperEnvironment) -> Bool {
+        HopperConfig.load(env.paths).profiles.first { !$0.isGateway }?.name == p.name
+    }
+
     static func credentialsDir(_ env: HopperEnvironment) -> String? {
         env.vars["CREDENTIALS_DIRECTORY"].flatMap { $0.isEmpty ? nil : $0 }
     }
@@ -121,7 +137,7 @@ public enum Gateway {
 
     static func readKeyFile(_ path: String) throws -> String {
         var st = stat()
-        guard stat(path, &st) == 0 else { throw HopperError("no API key file at \(path)") }
+        guard stat(path, &st) == 0 else { throw HopperError("no key file at \(path)") }
         guard st.st_uid == getuid(), st.st_mode & 0o077 == 0 else {
             throw HopperError("\(path) must be owned by you and private (chmod 600 \(path))")
         }

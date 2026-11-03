@@ -189,6 +189,15 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 - A retry of a `--session-id` turn continues the same conversation with `--resume`. Every profile must
   share one `projects/` folder (`profiles add` does this; `doctor` checks).
 - **Exit 75** means no profile can take the turn right now; stderr names the first reset.
+- **Several Claude accounts on a server.** Claude Code ranks `CLAUDE_CODE_OAUTH_TOKEN` above the login in
+  a profile's folder, so a token in the service's environment would run every profile on one account.
+  `sessionhopper` keeps that token for the first Claude profile only and never gives it to OpenRouter.
+  Give each other profile its own `claude setup-token` with `sessionhopper profiles key <name> < file`
+  (or log it in inside its folder); `doctor` shows which one each profile uses.
+- **Notify on a switch:** `sessionhopper config on-switch "<command>"` runs the command, not waited for,
+  on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `SESSIONHOPPER_FROM`, `SESSIONHOPPER_TO`,
+  `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.
+- On Linux a killed `sessionhopper` (a caller's timeout) takes the running `claude` with it.
 
 **Linux install** (x86_64, any glibc distribution; the Swift runtime is built in):
 
@@ -216,9 +225,10 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   session comes back silently; one that was cut off gets a short continue prompt, which you can replace
   with your own (`sessionhopper config prompt`). Moving needs every profile to share one `projects/` folder, where Claude Code
   keeps conversations. Profiles added by the app do; `doctor` checks.
-- **It never reads, copies, stores or sends** your Claude login, tokens or Claude Code's Keychain items.
-  Login always happens in Claude Code's own flow. The one secret it handles is an OpenRouter key you
-  give it for an OpenRouter profile.
+- **It never reads, copies or sends** your Claude login or Claude Code's Keychain items. Login always
+  happens in Claude Code's own flow. The only secrets it handles are ones you give it with `sessionhopper
+  profiles key`: an OpenRouter key, or on a server a `claude setup-token` for a profile. Each is kept in
+  its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
 - **It makes no network requests** at all: no usage endpoint, no telemetry, no update check. (The
   optional skill install runs Claude Code's own `claude plugin install`, which downloads it from GitHub.)
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide

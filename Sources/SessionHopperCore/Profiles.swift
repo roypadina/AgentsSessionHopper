@@ -113,7 +113,14 @@ public enum Claude {
         // A gateway profile needs no Claude login, only its API key.
         if profile.isGateway { return (try? Gateway.key(profile, env: env)) != nil }
         guard let claude = locate(env) else { return nil }
-        return Shell.run(claude, ["auth", "status"], timeout: 15, env: Profiles.environment(for: profile, base: env.vars)).status == 0
+        return Shell.run(claude, ["auth", "status"], timeout: 15, env: authEnvironment(profile, env: env)).status == 0
+    }
+
+    /// What `claude` sees for `profile`'s login: its folder plus the token rules of `Gateway.applyClaudeToken`.
+    public static func authEnvironment(_ profile: Profile, env: HopperEnvironment) -> [String: String] {
+        var e = Profiles.environment(for: profile, base: env.vars)
+        Gateway.applyClaudeToken(&e, profile, env: env)
+        return e
     }
 
     /// A double-clickable script that runs the unmodified `claude auth login` for `profile` in Terminal.

@@ -49,6 +49,15 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 - A retry of a `--session-id` turn continues the same conversation with `--resume`. Every profile must
   share one `projects/` folder (`profiles add` does this; `doctor` checks).
 - **Exit 75** means no profile can take the turn right now; stderr names the first reset.
+- **Several Claude accounts on a server.** Claude Code ranks `CLAUDE_CODE_OAUTH_TOKEN` above the login in
+  a profile's folder, so a token in the service's environment would run every profile on one account.
+  `sessionhopper` keeps that token for the first Claude profile only and never gives it to OpenRouter.
+  Give each other profile its own `claude setup-token` with `sessionhopper profiles key <name> < file`
+  (or log it in inside its folder); `doctor` shows which one each profile uses.
+- **Notify on a switch:** `sessionhopper config on-switch "<command>"` runs the command, not waited for,
+  on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `SESSIONHOPPER_FROM`, `SESSIONHOPPER_TO`,
+  `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.
+- On Linux a killed `sessionhopper` (a caller's timeout) takes the running `claude` with it.
 
 **Linux install** (x86_64, any glibc distribution; the Swift runtime is built in):
 
