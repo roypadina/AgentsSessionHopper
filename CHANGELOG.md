@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-03
+
 ### Added
+- VS Code side panel: set the Claude Code extension's `claudeCode.claudeProcessWrapper` to `sessionhopper` and every panel conversation runs as a supervised session: picked by the same rules, shown in `status` and the app with live usage, and moved like a terminal session. A turn that hits a usage limit runs again on the next profile without the panel noticing; `switch`, `hold`, "move without asking" and priorities apply, also while the conversation is idle.
 - Profile priorities: `sessionhopper profiles priority <name> <n>` (lower is preferred; Claude 1, OpenRouter 10 by default). A better priority with room always wins and a session on a worse one moves back up as soon as one frees up; equal priorities never trade places before the current profile reaches its limit (also for `sessionhopper run`, which keeps the profile that served the last turn).
 
 ## [1.4.2] - 2026-11-03

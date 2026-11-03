@@ -37,8 +37,11 @@ it was first opened with. Panes opened before you set the shim keep their old co
 sessions are not supervised (`sessionhopper doctor` lists them). Restart each once: `/exit`, then
 `sessionhopper -c`.
 
-**VS Code side panel**: not supported. The extension drives Claude Code directly over its own channel,
-and a restart under another profile would break the panel. Use `claude` in VS Code's terminal instead
-(with the alias). **JetBrains**: set Settings → Tools → Claude Code → Claude command to the shim; it runs
+**VS Code side panel**: set the extension's `claudeCode.claudeProcessWrapper` setting to the full path of
+`sessionhopper` (not the shim). Panel conversations then run as supervised sessions: they start on the
+profile the rules pick, show in `status` and the app, and move on a usage limit (the same message runs
+again on the next profile), at a turn end or while idle (`switch`, "move without asking", a better
+priority freeing up). A move restarts Claude Code behind the panel, so background tasks still running in
+that conversation stop. **JetBrains**: set Settings → Tools → Claude Code → Claude command to the shim; it runs
 in the IDE terminal, so it should be supervised like any terminal (not yet tested; reports welcome). The shim finds the real `claude` on your
 PATH (and in `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin`). Do not name the link `claude`.

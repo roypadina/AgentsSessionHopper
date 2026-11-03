@@ -119,7 +119,7 @@ struct SetupSteps: View {
             }
 
             step("4. cmux and JetBrains (optional)",
-                 "Tools that ask for a Claude binary path get a link that behaves like `claude` but is supervised. Panes a terminal restores re-run their original command: restart them once. The VS Code side panel is not supported; use its terminal.")
+                 "Tools that ask for a Claude binary path get a link that behaves like `claude` but is supervised. Panes a terminal restores re-run their original command: restart them once. For the VS Code side panel, set the extension's Claude Process Wrapper to the sessionhopper command.")
             HStack {
                 Text(model.tilde(Setup.shimLink(home: model.env.home).path)).font(.system(.callout, design: .monospaced)).textSelection(.enabled)
                 Spacer()
