@@ -21,13 +21,15 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var baseURL: String?
     /// Gateway profiles: when a spent key has credit again: daily | weekly | monthly (UTC). Default daily.
     public var resets: String?
+    /// Lower is preferred (see `Policy.priority` for the default). Equal priorities don't trade places before a limit.
+    public var priority: Int?
 
     public var id: String { name }
     /// Billed per use (an API key), not a subscription: used only when no subscription profile has room.
     public var isGateway: Bool { kind == Gateway.openRouter }
 
     public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
-                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil) {
+                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil) {
         self.name = name
         self.dir = dir
         self.exportConfigDir = exportConfigDir
@@ -36,6 +38,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
         self.models = models
         self.baseURL = baseURL
         self.resets = resets
+        self.priority = priority
     }
 }
 

@@ -60,6 +60,13 @@ public enum EventLog {
         notify(event, paths)
     }
 
+    /// The profile that served the last `run` turn of `session` (else the last `run` turn at all): the "current"
+    /// profile for one-shot callers, which `Policy.pick` keeps while it has room.
+    public static func lastServed(session: String?, _ paths: StatePaths) -> String? {
+        let runs = read(paths, last: 500).filter { $0.type == "run" && $0.trigger != "error" && $0.to != nil }
+        return (session.flatMap { s in runs.last { $0.session == s } } ?? runs.last)?.to
+    }
+
     /// Events worth telling someone about: a move, a limit stop, a park, a `run` served after a retry.
     public static func isSwitch(_ e: HopperEvent) -> Bool {
         ["switch", "limit", "park"].contains(e.type) || (e.type == "run" && e.from != nil)

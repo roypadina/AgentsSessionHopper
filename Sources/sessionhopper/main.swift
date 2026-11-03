@@ -51,6 +51,8 @@ let usage = """
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+      sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10): equal priorities
+                                              don't trade places before a limit; a freed-up better one is moved back to
       sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
                                               pay-per-use fallback: the same claude, billed to your OpenRouter key
       sessionhopper profiles key <name> < file    store that profile's secret: an OpenRouter API key, or for a Claude
@@ -228,8 +230,9 @@ func profilesCommand(_ a: [String]) -> Int32 {
             out(found.isEmpty ? "No profiles configured or found." : "No profiles configured. Found on disk (add them with `sessionhopper profiles import`):")
             found.forEach { out("  \(pad($0.name, 10)) \(env.tilde($0.dir))") }
         }
+        let policy = Policy(config: config, limits: [:], now: 0)
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.name, 10)) \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")")
+            out("  \(i + 1). \(pad(p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))
@@ -281,6 +284,14 @@ func profilesCommand(_ a: [String]) -> Int32 {
         guard let name = a.first, let p = config.profile(named: name) else { die("usage: sessionhopper profiles key <profile> < file   (OpenRouter key, or a Claude setup-token)") }
         if isatty(0) == 1 { say("paste the key, then Ctrl-D") }
         do { out("\(name): key stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: p, env: env))") } catch { die("\(error)") }
+    case "priority":
+        guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), let n = Int(a[1]) ?? (a[1] == "default" ? 0 : nil) else {
+            die("usage: sessionhopper profiles priority <name> <n>|default   (lower is preferred; Claude 1, OpenRouter 10 by default)")
+        }
+        config.profiles[i].priority = a[1] == "default" ? nil : n
+        save()
+        let policy = Policy(config: config, limits: [:], now: 0)
+        out("Priorities: " + config.profiles.map { "\($0.name) \(policy.priority($0))" }.joined(separator: ", "))
     case "export-config-dir":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), ["on", "off"].contains(a[1]) else {
             die("usage: sessionhopper profiles export-config-dir <name> on|off")

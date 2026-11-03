@@ -33,35 +33,43 @@ public struct Policy: Sendable {
         order.first { $0.name != excluding && hasRoom($0.name, under: limit) }
     }
 
-    /// Where to (re)start: order beats headroom, so the preferred profile is used up first. A profile under
-    /// the suggest threshold wins over one between the thresholds, which would only queue the next move.
-    /// Gateway (pay-per-use) profiles follow `config.gatewayUse`: by default last, whatever their place in `order`.
-    public func pick(_ order: [Profile], excluding: String? = nil) -> Profile? {
-        let (subs, paid) = split(order)
-        return first(in: subs, under: config.suggestThreshold, excluding: excluding)
-            ?? first(in: subs, under: config.hardThreshold, excluding: excluding)
-            ?? first(in: paid, under: config.hardThreshold, excluding: excluding)
+    /// Lower is preferred. Unset: Claude profiles 1, gateway (pay-per-use) profiles 10, or 1 with `gateway order`.
+    public func priority(_ p: Profile) -> Int { p.priority ?? (p.isGateway && config.gatewayUse != "order" ? 10 : 1) }
+
+    /// What the policy may choose by itself: with `gateway manual`, gateways only when `order` holds nothing else.
+    func automatic(_ order: [Profile]) -> [Profile] {
+        guard config.gatewayUse == "manual", order.contains(where: { !$0.isGateway }) else { return order }
+        return order.filter { !$0.isGateway }
     }
 
-    /// (Profiles picked by headroom, pay-per-use fallbacks.) `order` mode: one list. `manual`: a gateway only when
-    /// `order` holds nothing else (`--only` it), else never automatically.
-    func split(_ order: [Profile]) -> (main: [Profile], paid: [Profile]) {
-        let subs = order.filter { !$0.isGateway }
-        switch config.gatewayUse {
-        case "order": return (order, [])
-        case "manual": return subs.isEmpty ? (order, []) : (subs, [])
-        default: return (subs, order.filter(\.isGateway))
+    /// Priority levels, best first; `order` kept inside each.
+    func levels(_ order: [Profile]) -> [[Profile]] {
+        Dictionary(grouping: automatic(order), by: priority).sorted { $0.key < $1.key }.map(\.value)
+    }
+
+    /// Where to (re)start. The best priority level with room wins. Inside a level, `current` (the profile already in
+    /// use) stays until it reaches the hard threshold, so profiles of equal priority never trade places early;
+    /// otherwise order beats headroom, and a profile under the suggest threshold wins over one between the thresholds.
+    public func pick(_ order: [Profile], excluding: String? = nil, current: String? = nil) -> Profile? {
+        for level in levels(order) {
+            if let cur = current, cur != excluding, let p = level.first(where: { $0.name == cur }),
+               hasRoom(cur, under: config.hardThreshold) { return p }
+            if let p = first(in: level, under: config.suggestThreshold, excluding: excluding)
+                ?? first(in: level, under: config.hardThreshold, excluding: excluding) { return p }
         }
+        return nil
     }
 
     /// `held`: the user pinned this session to its profile; it is never parked or moved automatically.
     public func evaluate(current: Profile, order: [Profile], held: Bool) -> Decision {
-        let subs = split(order).main.filter { !$0.isGateway || config.gatewayUse == "order" }
-        let roomy = first(in: subs, under: config.suggestThreshold, excluding: current.name)
-        // On a pay-per-use profile while a subscription has room again: offer the way back.
-        if current.isGateway, config.gatewayUse != "order", (percent(current.name) ?? 0) < config.hardThreshold, let to = roomy {
-            return config.autoMove && !held ? .autoMove(to: to.name, percent: percent(current.name) ?? 0) : .suggest(to: to.name, percent: percent(current.name) ?? 0)
+        // A profile of better priority has room again: go back up (pay-per-use to Claude, a fallback account to the main ones).
+        if let up = levels(order).joined().first(where: { priority($0) < priority(current) && hasRoom($0.name, under: config.suggestThreshold) }) {
+            let pct = percent(current.name) ?? 0
+            return config.autoMove && !held ? .autoMove(to: up.name, percent: pct) : .suggest(to: up.name, percent: pct)
         }
+        // Near the limit: another profile of the same priority. Lower levels only past the hard threshold (`pick`).
+        let peers = automatic(order).filter { priority($0) == priority(current) }
+        let roomy = first(in: peers, under: config.suggestThreshold, excluding: current.name)
         guard let pct = percent(current.name) else { return .none }
         if !held, pct >= config.hardThreshold {
             if config.autoMove, let to = pick(order, excluding: current.name) {
