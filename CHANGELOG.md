@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-03
+
+### Added
+- Settings → Profiles: add an OpenRouter profile (name, key stored in your Keychain, model names, credit reset), set each profile's priority, and remove a profile from the list (right-click).
+
+### Changed
+- Settings → Profiles shows what each row is (folder, or OpenRouter · pay per use), whether its login or key is there, and explains priorities.
+
 ## [1.5.0] - 2026-11-03
 
 ### Added

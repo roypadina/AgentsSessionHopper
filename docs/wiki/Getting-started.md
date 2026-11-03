@@ -28,7 +28,7 @@ way to use several accounts: one `CLAUDE_CONFIG_DIR` per account.
   CLAUDE.md, agents, commands and skills, copies settings.json, then runs Claude Code's own
   `claude auth login` for it.
 
-The order in the list is the fallback order: new sessions start on the first profile with room.
+The order in the list is the fallback order: new sessions start on the first profile with room. Each profile also has a priority (Settings → Profiles, or `sessionhopper profiles priority <name> <n>`): lower is preferred, so a fallback account at 2 or an OpenRouter key (10 by default) is used only when every better one is full.
 
 Check everything with:
 

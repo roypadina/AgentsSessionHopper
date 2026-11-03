@@ -40,7 +40,8 @@ final class ScreenshotRenderTests: XCTestCase {
         var c = HopperConfig()
         c.profiles = [Profile(name: "personal", dir: "/Users/me/.claude", exportConfigDir: false),
                       Profile(name: "work", dir: "/Users/me/.claude-work", exportConfigDir: true),
-                      Profile(name: "spare", dir: "/Users/me/.claude-spare", exportConfigDir: true)]
+                      Profile(name: "spare", dir: "/Users/me/.claude-spare", exportConfigDir: true, priority: 2),
+                      Profile(name: "openrouter", dir: "/Users/me/.claude", exportConfigDir: false, kind: Gateway.openRouter)]
         try c.save(p)
         let now = Date().timeIntervalSince1970
         try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 42, resetsAt: now + 7200),
@@ -77,6 +78,8 @@ final class ScreenshotRenderTests: XCTestCase {
                           (.commandLine, "settings-command-line.png"), (.log, "settings-log.png")] {
             try render(SettingsView(model: model, nav: { let n = SettingsNav(); n.tab = tab; return n }()).background(Color(nsColor: .windowBackgroundColor)).frame(width: 600, height: 480), name: name, dir: dir)
         }
+        try render(AddProfileSheet(model: model, isPresented: .constant(true), kind: .openRouter).background(Color(nsColor: .windowBackgroundColor)), name: "add-openrouter.png", dir: dir)
+        try render(AddProfileSheet(model: model, isPresented: .constant(true)).background(Color(nsColor: .windowBackgroundColor)), name: "add-claude.png", dir: dir)
         try render(AboutView().background(Color(nsColor: .windowBackgroundColor)), name: "about.png", dir: dir)
     }
 
@@ -92,7 +95,7 @@ final class ScreenshotRenderTests: XCTestCase {
         XCTAssertEqual(size.width, 400)
         XCTAssertGreaterThan(size.height, 200)
         model.moveProfile("spare", by: -1)
-        XCTAssertEqual(model.config.profiles.map(\.name), ["personal", "spare", "work"])
+        XCTAssertEqual(model.config.profiles.map(\.name), ["personal", "spare", "work", "openrouter"])
         model.confirmMove(model.snapshot.needsAttention[0])
         XCTAssertEqual(model.snapshot.sessions.first { $0.record.profile == "work" }?.pending?.to, "personal")
         XCTAssertTrue(model.snapshot.needsAttention.isEmpty)

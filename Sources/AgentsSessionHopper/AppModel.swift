@@ -90,6 +90,36 @@ final class AppModel: ObservableObject {
         return p
     }
 
+    /// An OpenRouter profile in the first Claude profile's folder (history shared); the key goes to the Keychain.
+    @discardableResult
+    func addGateway(name: String, key: String, models: [String: String], resets: String) -> Bool {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard Profiles.isValidName(name) else { lastError = "profile names use letters, digits, - and _"; return false }
+        guard config.profile(named: name) == nil else { lastError = "profile '\(name)' exists"; return false }
+        guard let base = config.profiles.first(where: { !$0.isGateway }) else { lastError = "add a Claude profile first"; return false }
+        let p = Profile(name: name, dir: base.dir, exportConfigDir: base.exportConfigDir, kind: Gateway.openRouter,
+                        models: models.isEmpty ? nil : models, resets: resets == "daily" ? nil : resets)
+        do { try Gateway.storeKey(key, for: p, env: env) } catch { lastError = "\(error)"; return false }
+        lastError = nil
+        update { $0.profiles.append(p) }
+        guard lastError == nil else { return false }
+        checkLogins()
+        return true
+    }
+
+    /// Off the list only: the folder, its login and any stored key stay.
+    func removeProfile(_ name: String) { update { $0.profiles.removeAll { $0.name == name } } }
+
+    /// nil = the default for its kind (Claude 1, OpenRouter 10).
+    func setPriority(_ name: String, _ value: Int?) {
+        update { c in
+            guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
+            c.profiles[i].priority = value
+        }
+    }
+
+    func priority(_ p: Profile) -> Int { Policy(config: config, limits: [:], now: 0).priority(p) }
+
     func checkLogins() {
         guard !checkingLogins else { return }
         checkingLogins = true
