@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `sessionhopper doctor` no longer warns "no usage sample yet" for an OpenRouter profile, which never reports usage windows; it says when the profile counts as full instead.
+
 ## [1.4.1] - 2026-11-03
 
 ### Fixed
