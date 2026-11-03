@@ -80,7 +80,8 @@ public enum Doctor {
         }
 
         // An exported key overrides every profile's login: usage bills the key and the status line carries no `rate_limits`.
-        let keys = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"].filter { !(env.vars[$0] ?? "").isEmpty }
+        // (CLAUDE_CODE_OAUTH_TOKEN is not one: it goes to the first Claude profile only, see `Gateway.applyClaudeToken`.)
+        let keys = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"].filter { !(env.vars[$0] ?? "").isEmpty }
         if !keys.isEmpty {
             add(.warn, "\(keys.joined(separator: ", ")) set in this environment: sessions use it on every profile instead of the profile's login, report no usage limits, and hand-offs never trigger. Unset it to use your Claude logins")
         }

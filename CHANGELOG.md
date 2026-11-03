@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-11-03
+
+### Fixed
+- `sessionhopper doctor` no longer warns that `CLAUDE_CODE_OAUTH_TOKEN` is used on every profile: since 1.4.0 it goes to the first Claude profile only.
+
 ## [1.4.0] - 2026-11-03
 
 ### Added
