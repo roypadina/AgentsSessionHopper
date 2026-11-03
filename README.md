@@ -147,6 +147,8 @@ with your own OpenRouter API key, through Claude Code's documented
 [gateway settings](https://code.claude.com/docs/en/llm-gateway). It is pay per use, so it is used only
 when no Claude profile has room, and a session on it is offered the way back as soon as one has.
 
+In the app: **Settings → Profiles → Add Profile… → OpenRouter key**. From the terminal:
+
 ```bash
 sessionhopper profiles add openrouter --openrouter \
   --model opus=anthropic/claude-opus-5 --model sonnet=anthropic/claude-sonnet-5

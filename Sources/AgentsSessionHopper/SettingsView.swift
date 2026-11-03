@@ -167,30 +167,44 @@ private struct ContinuePromptSection: View {
 private struct ProfilesSettings: View {
     @ObservedObject var model: AppModel
     @State private var adding = false
+    @State private var removing: Profile?
 
     var body: some View {
         Form {
             Section {
                 ForEach(Array(model.config.profiles.enumerated()), id: \.element.id) { i, p in
                     HStack {
-                        Text("\(i + 1).").monospacedDigit().foregroundStyle(.secondary)
                         VStack(alignment: .leading) {
                             Text(p.name)
-                            Text(model.tilde(p.dir)).font(.caption).foregroundStyle(.secondary)
+                            Text(p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir)).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
                         LoginBadge(model: model, profile: p)
+                        Picker("Priority", selection: Binding(get: { p.priority ?? 0 }, set: { model.setPriority(p.name, $0 == 0 ? nil : $0) })) {
+                            Text("Default (\(p.isGateway ? 10 : 1))").tag(0)
+                            Divider()
+                            ForEach(1...10, id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .labelsHidden().fixedSize()
+                        .help("Priority \(model.priority(p)): lower is preferred")
+                        .accessibilityLabel("Priority of \(p.name)")
                         Button { model.moveProfile(p.name, by: -1) } label: { Image(systemName: "chevron.up") }
                             .disabled(i == 0).accessibilityLabel("Move \(p.name) up")
                         Button { model.moveProfile(p.name, by: 1) } label: { Image(systemName: "chevron.down") }
                             .disabled(i == model.config.profiles.count - 1).accessibilityLabel("Move \(p.name) down")
                     }
                     .buttonStyle(.borderless)
+                    .contextMenu {
+                        Button("Move Up") { model.moveProfile(p.name, by: -1) }.disabled(i == 0)
+                        Button("Move Down") { model.moveProfile(p.name, by: 1) }.disabled(i == model.config.profiles.count - 1)
+                        Divider()
+                        Button("Remove from List…", role: .destructive) { removing = p }
+                    }
                 }
             } header: {
-                Text("Fallback order")
+                Text("Profiles")
             } footer: {
-                Text("New sessions start on the first profile with room. Moving a session needs every profile to share one projects/ folder; profiles added here do.")
+                Text("Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -209,6 +223,12 @@ private struct ProfilesSettings: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $adding) { AddProfileSheet(model: model, isPresented: $adding) }
+        .confirmationDialog("Remove \(removing?.name ?? "") from the list?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            presenting: removing) { p in
+            Button("Remove", role: .destructive) { model.removeProfile(p.name) }
+        } message: { p in
+            Text(p.isGateway ? "Its key stays in the Keychain." : "Its folder and login stay on disk; add it again with Import.")
+        }
     }
 }
 
@@ -219,7 +239,11 @@ struct LoginBadge: View {
     var body: some View {
         switch model.loggedIn[profile.name] {
         case true?:
-            Label("Logged in", systemImage: "checkmark.circle.fill").labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
+            Label(profile.isGateway ? "Key found" : "Logged in", systemImage: "checkmark.circle.fill")
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
+        case false? where profile.isGateway:
+            Label("No key", systemImage: "exclamationmark.triangle.fill").labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.orange)
+                .help("Remove it and add it again with its key, or run: sessionhopper profiles key \(profile.name)")
         case false?:
             Menu("Log in…") {
                 Button("Open in Terminal") { model.openLoginInTerminal(profile) }
@@ -232,18 +256,43 @@ struct LoginBadge: View {
     }
 }
 
-/// New profile: a folder next to ~/.claude with history shared; login runs in Claude Code's own flow.
+/// New profile: a Claude account (a folder next to ~/.claude with history shared; login runs in Claude Code's own
+/// flow) or an OpenRouter key (pay per use, key in the Keychain).
 struct AddProfileSheet: View {
+    enum Kind: Hashable { case claude, openRouter }
     @ObservedObject var model: AppModel
     @Binding var isPresented: Bool
-    @State private var name = ""
+    @State private var kind: Kind
+    @State private var name: String
     @State private var share = true
     @State private var created: Profile?
+    @State private var key = ""
+    @State private var opus = "anthropic/claude-opus-5"
+    @State private var sonnet = "anthropic/claude-sonnet-5"
+    @State private var haiku = "anthropic/claude-haiku-4.5"
+    @State private var resets = "daily"
+
+    init(model: AppModel, isPresented: Binding<Bool>, kind: Kind = .claude) {
+        self.model = model
+        _isPresented = isPresented
+        _kind = State(initialValue: kind)
+        _name = State(initialValue: kind == .openRouter ? "openrouter" : "")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Add a profile").font(.headline)
-            if let p = created {
+            if created == nil {
+                Picker("Kind", selection: $kind) {
+                    Text("Claude account").tag(Kind.claude)
+                    Text("OpenRouter key (pay per use)").tag(Kind.openRouter)
+                }
+                .pickerStyle(.radioGroup).labelsHidden()
+                .onChange(of: kind) { _, k in if k == .openRouter, name.isEmpty { name = "openrouter" } }
+            }
+            if kind == .openRouter, created == nil {
+                openRouterForm
+            } else if let p = created {
                 Text("Created \(model.tilde(p.dir)). Now log it in with the Claude account you want here. Login happens in Claude Code's own flow; this app never sees it.")
                     .fixedSize(horizontal: false, vertical: true)
                 Text(model.loginCommand(p)).font(.system(.body, design: .monospaced)).textSelection(.enabled)
@@ -270,7 +319,37 @@ struct AddProfileSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 440)
+        .frame(width: 460)
+    }
+
+    @ViewBuilder private var openRouterForm: some View {
+        Form {
+            TextField("Name", text: $name)
+            SecureField("API key", text: $key, prompt: Text("sk-or-v1-…"))
+            Picker("Credit resets", selection: $resets) {
+                Text("Daily").tag("daily"); Text("Weekly").tag("weekly"); Text("Monthly").tag("monthly")
+            }
+            Section {
+                TextField("Opus", text: $opus)
+                TextField("Sonnet", text: $sonnet)
+                TextField("Haiku", text: $haiku)
+            } header: { Text("Model names on OpenRouter") }
+        }
+        .formStyle(.grouped).frame(height: 300)
+        Text("Used only when no Claude profile has room (priority 10). The key is stored in your Keychain and handed only to Claude Code runs on this profile.")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        if let err = model.lastError { Text(err).font(.caption).foregroundStyle(.red) }
+        HStack {
+            Link("Get a key", destination: URL(string: "https://openrouter.ai/keys")!)
+            Spacer()
+            Button("Cancel") { isPresented = false }.keyboardShortcut(.cancelAction)
+            Button("Add") {
+                let models = ["opus": opus, "sonnet": sonnet, "haiku": haiku].filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
+                if model.addGateway(name: name, key: key, models: models, resets: resets) { isPresented = false }
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(!Profiles.isValidName(name) || key.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
     }
 }
 
