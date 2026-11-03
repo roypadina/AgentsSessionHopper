@@ -23,6 +23,11 @@ sessionhopper doctor
   `ANTHROPIC_DEFAULT_<ALIAS>_MODEL`, and `--model opus` becomes the mapped name).
 - **When the key runs out of credit** (HTTP 402), the profile counts as full until the next daily reset
   (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
+- **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
+  Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
+  for it: `-P openrouter --only`, `switch openrouter`).
+- A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
+  the caller's environment shortens that.
 
 ## Servers, bots and Linux
 

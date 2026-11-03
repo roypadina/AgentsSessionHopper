@@ -58,10 +58,14 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public var waitForReset: Bool = true
     /// The user's own continue prompt (placeholders: see `LaunchPlan.defaultContinuePrompt`). nil = built-in.
     public var continuePrompt: String?
+    /// When pay-per-use (gateway) profiles are used: `last` only once every subscription profile is full,
+    /// `order` by their place in the list like any profile, `manual` only when asked for (`-P`, `switch`).
+    public var gatewayUse: String = "last"
+    public static let gatewayUses = ["last", "order", "manual"]
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -75,6 +79,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         moveNowAtHard = try c.decodeIfPresent(Bool.self, forKey: .moveNowAtHard) ?? d.moveNowAtHard
         waitForReset = try c.decodeIfPresent(Bool.self, forKey: .waitForReset) ?? d.waitForReset
         continuePrompt = try c.decodeIfPresent(String.self, forKey: .continuePrompt)
+        gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {
@@ -85,6 +90,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         guard suggestThreshold > 0, suggestThreshold < hardThreshold, hardThreshold <= 100 else {
             throw HopperError("thresholds must satisfy 0 < suggest (\(Int(suggestThreshold))) < hard (\(Int(hardThreshold))) <= 100")
         }
+        guard Self.gatewayUses.contains(gatewayUse) else { throw HopperError("gateway use is one of: \(Self.gatewayUses.joined(separator: ", "))") }
         try FileIO.encode(self, to: paths.config)
     }
 

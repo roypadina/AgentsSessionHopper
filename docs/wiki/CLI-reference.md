@@ -21,7 +21,8 @@ sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--forc
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
 sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
-sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
+sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
+                      |gateway last|order|manual]  when OpenRouter profiles are used (default: last)
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log

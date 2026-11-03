@@ -43,6 +43,7 @@ final class OneShotTests: XCTestCase {
         XCTAssertEqual(failing("Claude AI usage limit reached|1793715000"), .limit(until: 1_793_715_000, weekly: false))
         XCTAssertEqual(failing("API Error: 402 This request requires more credits, or fewer max_tokens"), .credits)
         XCTAssertEqual(failing("OAuth access token is invalid"), .login)
+        XCTAssertEqual(failing("Not logged in · Please run /login"), .login)
         XCTAssertEqual(failing("Error: tool crashed"), .other)
         var ok = OneShot.Attempt()
         ok.read(line: #"{"type":"result","is_error":false,"result":"the docs say usage limit is 5"}"#, now: now)

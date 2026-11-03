@@ -49,7 +49,8 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(h.launches.count, 2)
         XCTAssertTrue(h.launches[1].contains("--resume \(sid)"), "the retry continues the conversation the first attempt saved")
         XCTAssertEqual(LimitStore.read("default", h.env.paths)?.fiveHour?.usedPercentage, 100)
-        XCTAssertEqual(h.events().last?.type, "limit")
+        XCTAssertEqual(h.events().map(\.type).suffix(2), ["limit", "run"])
+        XCTAssertEqual(h.events().last?.to, "work")
         // Next run skips the full profile straight away.
         _ = try h.run(["run", "--", "-p", "--resume", sid])
         XCTAssertEqual(h.launches.count, 3)
@@ -74,6 +75,19 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(LimitStore.read("gw", h.env.paths)?.spendLimit?.usedPercentage, 100)
     }
 
+    func testManualGatewayIsNeverPickedAndMockUsageForcesAMove() throws {
+        try addGateway()
+        XCTAssertEqual(try h.run(["config", "gateway", "manual"]).code, 0)
+        let mock = h.t.appendingPathComponent("mock")
+        try FileIO.encode(limits(99), to: mock.appendingPathComponent("default.limits.json"))
+        let r = try h.run(["run", "--", "-p"], extraEnv: ["SESSIONHOPPER_MOCK_LIMITS": mock.path])
+        XCTAssertEqual(r.stdout, "answer from work\n", "mocked 99% on default moves the run to work")
+        try FileIO.encode(limits(99), to: mock.appendingPathComponent("work.limits.json"))
+        let none = try h.run(["run", "--", "-p"], extraEnv: ["SESSIONHOPPER_MOCK_LIMITS": mock.path])
+        XCTAssertEqual(none.code, OneShot.allFullExit, "manual: the gateway is not used on its own")
+        XCTAssertEqual(try h.run(["run", "--only", "-P", "gw", "--", "-p"], extraEnv: ["SESSIONHOPPER_MOCK_LIMITS": mock.path]).stdout, "answer from gw\n")
+    }
+
     func testGatewayWithoutKeyIsSkipped() throws {
         XCTAssertEqual(try h.run(["profiles", "add", "gw", "--openrouter", "--key-file", h.t.appendingPathComponent("missing.key").path]).code, 0)
         try h.write("limit", "behave-default")
@@ -83,4 +97,8 @@ final class RunTests: XCTestCase {
         XCTAssertTrue(r.stderr.contains("gw: no API key"), r.stderr)
         XCTAssertEqual(h.launches.count, 2, "never launched without its key (it would fall back to a Claude login)")
     }
+}
+
+private func limits(_ five: Double) -> ProfileLimits {
+    ProfileLimits(fiveHour: LimitWindow(usedPercentage: five, resetsAt: 4_102_444_800), sevenDay: nil, sampledAt: Date().timeIntervalSince1970)
 }

@@ -116,7 +116,13 @@ public struct ProfileLimits: Codable, Equatable, Sendable {
 
 public enum LimitStore {
     public static func read(_ profile: String, _ paths: StatePaths) -> ProfileLimits? {
-        FileIO.decode(ProfileLimits.self, from: paths.limits(profile))
+        // Testing: `SESSIONHOPPER_MOCK_LIMITS=<dir>` with `<dir>/<profile>.limits.json` (same format) overrides
+        // what sessions report, so hand-offs can be forced with the real `claude` (Scripts/live/).
+        if let dir = ProcessInfo.processInfo.environment["SESSIONHOPPER_MOCK_LIMITS"], !dir.isEmpty,
+           let mock = FileIO.decode(ProfileLimits.self, from: URL(fileURLWithPath: dir).appendingPathComponent("\(profile).limits.json")) {
+            return mock
+        }
+        return FileIO.decode(ProfileLimits.self, from: paths.limits(profile))
     }
 
     public static func write(_ limits: ProfileLimits, profile: String, _ paths: StatePaths) throws {

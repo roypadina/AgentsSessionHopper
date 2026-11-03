@@ -56,7 +56,8 @@ let usage = """
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
-      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]
+      sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
+                            |gateway last|order|manual]  (gateway: when OpenRouter profiles are used; default last)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
@@ -348,17 +349,19 @@ func configCommand(_ a: [String]) -> Int32 {
         case "auto-move": c.autoMove = v == "on"
         case "move-now": c.moveNowAtHard = v == "on"
         case "wait": c.waitForReset = v == "on"
+        case "gateway": c.gatewayUse = v
         default: die("unknown setting \(a[0])")
         }
         do { try c.save(env.paths) } catch { die("\(error)") }
     } else if !a.isEmpty {
-        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off]")
+        die("usage: sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off|gateway last|order|manual]")
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
     out("move without asking: \(c.autoMove ? "on" : "off")")
     out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
     out("all full, wait for a reset: \(c.waitForReset ? "on" : "off")")
+    out("pay-per-use profiles: \(c.gatewayUse) (\(["last": "only after every Claude subscription is full", "order": "by list order", "manual": "only when asked for"][c.gatewayUse] ?? ""))")
     out("continue prompt:     \(c.continuePrompt == nil ? "built-in" : "your own") (sessionhopper config prompt)")
     return 0
 }

@@ -112,7 +112,7 @@ public enum OneShot {
 
     static let limitPhrases = ["usage limit", "session limit", "weekly limit", "rate limit", "limit reached", "hit your limit"]
     static let creditPhrases = ["402", "requires more credits", "insufficient credits"]
-    static let loginPhrases = ["oauth access token is invalid", "failed to authenticate", "authentication_error",
+    static let loginPhrases = ["not logged in", "please run /login", "oauth access token is invalid", "failed to authenticate", "authentication_error",
                                "invalid bearer token", "invalid api key", "401"]
 
     public static func classify(_ a: Attempt, now: Double) -> Failure {
@@ -215,6 +215,9 @@ public enum OneShot {
             let failure = classify(a, now: FileIO.now())
             switch failure {
             case .none, .other:
+                EventLog.append(HopperEvent(type: "run", session: session, cwd: FileManager.default.currentDirectoryPath, from: lastProfile?.name,
+                                            to: p.name, trigger: failure == .none ? "ok" : "error", source: "run",
+                                            detail: failure == .none ? nil : (a.resultText ?? a.stderr).prefix(200).description), env.paths)
                 emit(a, format)
                 return a.exit
             case .limit, .credits, .login:

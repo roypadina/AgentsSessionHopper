@@ -72,6 +72,36 @@ final class GatewayTests: XCTestCase {
         XCTAssertEqual(Gateway.nextReset(gateway(resets: "monthly"), now: now), 1_796_083_200) // 12-01
     }
 
+    func testGatewayUseRule() {
+        let a = profile("a"), or = gateway()
+        var c = HopperConfig()
+        c.profiles = [or, a]
+        let full = ["a": limits(99)]
+        XCTAssertEqual(Policy(config: c, limits: [:], now: 0).pick(c.profiles)?.name, "a", "last (default): subscriptions first")
+        c.gatewayUse = "order"
+        XCTAssertEqual(Policy(config: c, limits: [:], now: 0).pick(c.profiles)?.name, "or", "order: the list decides")
+        XCTAssertEqual(Policy(config: c, limits: [:], now: 0).evaluate(current: or, order: c.profiles, held: false), .none, "order: no way back offered")
+        c.gatewayUse = "manual"
+        XCTAssertNil(Policy(config: c, limits: full, now: 0).pick(c.profiles), "manual: never picked automatically")
+        XCTAssertEqual(Policy(config: c, limits: full, now: 0).pick([or])?.name, "or", "manual: --only it still works")
+        c.gatewayUse = "sometimes"
+        XCTAssertThrowsError(try c.save(StatePaths(root: Sandbox().state)))
+    }
+
+    func testMockLimitsOverrideReportedUsage() throws {
+        let box = Sandbox()
+        let paths = StatePaths(root: box.state)
+        try LimitStore.write(limits(10), profile: "a", paths)
+        let mock = box.root.appendingPathComponent("mock")
+        try FileIO.encode(limits(99), to: mock.appendingPathComponent("a.limits.json"))
+        setenv("SESSIONHOPPER_MOCK_LIMITS", mock.path, 1)
+        defer { unsetenv("SESSIONHOPPER_MOCK_LIMITS") }
+        XCTAssertEqual(LimitStore.read("a", paths)?.fiveHour?.usedPercentage, 99)
+        XCTAssertEqual(LimitStore.read("b", paths), nil)
+        unsetenv("SESSIONHOPPER_MOCK_LIMITS")
+        XCTAssertEqual(LimitStore.read("a", paths)?.fiveHour?.usedPercentage, 10)
+    }
+
     func testGatewayIsLastResortAndOffersTheWayBack() {
         let a = profile("a"), b = profile("b"), or = gateway()
         var c = HopperConfig()

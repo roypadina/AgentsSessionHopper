@@ -163,6 +163,11 @@ sessionhopper doctor
   `ANTHROPIC_DEFAULT_<ALIAS>_MODEL`, and `--model opus` becomes the mapped name).
 - **When the key runs out of credit** (HTTP 402), the profile counts as full until the next daily reset
   (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
+- **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
+  Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
+  for it: `-P openrouter --only`, `switch openrouter`).
+- A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
+  the caller's environment shortens that.
 
 ## Servers, bots and Linux
 
@@ -243,6 +248,16 @@ Scripts/package_linux.sh          # dist/sessionhopper-linux-x86_64.tar.gz, buil
 ```
 
 On Linux itself: `swift test` and `swift build -c release --static-swift-stdlib --product sessionhopper`.
+
+Live tests with the real `claude` (a few cents of usage; temp state, your own config untouched). Usage is
+mocked with `SESSIONHOPPER_MOCK_LIMITS=<dir>` (`<dir>/<profile>.limits.json` overrides what sessions
+report), so every hand-off can be forced:
+
+```bash
+swift build
+Scripts/live/run-swaps.sh ~/.claude ~/.claude-work [--openrouter-key-file F]          # `run`, headless
+Scripts/live/interactive-swaps.py ~/.claude ~/.claude-work [--openrouter-key-file F]  # a real TUI session
+```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
