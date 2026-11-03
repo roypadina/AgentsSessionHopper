@@ -73,6 +73,8 @@ public enum Doctor {
                 let age = Int((now - l.sampledAt) / 60)
                 let pct = l.percent(now: now).map { "\(Int($0.rounded()))%" } ?? "reset since"
                 add(.info, "\(p.name): last usage sample \(age) min ago, \(pct)")
+            } else if p.isGateway {
+                add(.info, "\(p.name): pay per use, no usage windows; it counts as full only after a 402 (out of credit), until its next \(p.resets ?? "daily") reset")
             } else {
                 add(.warn, "\(p.name): no usage sample yet, so it counts as having room until a session on it reports (comes with the first status-line update)")
             }
