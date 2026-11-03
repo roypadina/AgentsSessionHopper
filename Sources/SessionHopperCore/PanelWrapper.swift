@@ -170,9 +170,7 @@ final class PanelSession: @unchecked Sendable {
         if !held.isEmpty, type != "result" { held.append(line); return false }
         guard type == "result" else { emit(line); return false }
 
-        // A turn ended.
-        lock.sync { busy = false }
-        if let f = files { FileIO.remove(f.busy) }
+        // A turn ended (busy stays set until the limit decision, so the idle watcher cannot move in between).
         var a = OneShot.Attempt()
         held.forEach { a.read(line: $0, now: FileIO.now()) }
         a.read(line: line, now: FileIO.now())
@@ -189,6 +187,8 @@ final class PanelSession: @unchecked Sendable {
             say("\(p.name) cannot go on (\(why)) and no profile has room")
         default: break
         }
+        lock.sync { busy = false }
+        if let f = files { FileIO.remove(f.busy) }
         held.forEach(emit)
         held = []
         emit(line)
