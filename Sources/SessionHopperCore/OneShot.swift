@@ -41,6 +41,7 @@ public enum OneShot {
     public static func sessionID(_ args: [String]) -> String? {
         for flag in ["--session-id", "--resume", "-r"] {
             if let i = args.firstIndex(of: flag), i + 1 < args.count { return args[i + 1] }
+            if let v = args.first(where: { $0.hasPrefix(flag + "=") }) { return String(v.dropFirst(flag.count + 1)) }
         }
         return nil
     }
@@ -48,9 +49,12 @@ public enum OneShot {
     /// On a retry, `--session-id X` becomes `--resume X` once the failed attempt wrote X's transcript
     /// (Claude Code refuses a `--session-id` that already exists).
     public static func retryArgs(_ args: [String], projects: URL) -> [String] {
-        guard let i = args.firstIndex(of: "--session-id"), i + 1 < args.count,
-              Transcripts.find(args[i + 1], projects: projects) != nil else { return args }
         var out = args
+        if let i = args.firstIndex(where: { $0.hasPrefix("--session-id=") }) {
+            out[i...i] = ["--session-id", String(args[i].dropFirst("--session-id=".count))]
+        }
+        guard let i = out.firstIndex(of: "--session-id"), i + 1 < out.count,
+              Transcripts.find(out[i + 1], projects: projects) != nil else { return args }
         out[i] = "--resume"
         return out
     }

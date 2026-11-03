@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SWIFT_IMAGE="${SWIFT_IMAGE:-swift:6.4}"
 OUT="$ROOT_DIR/dist/sessionhopper-linux-x86_64"
 
+mkdir -p "$ROOT_DIR/dist"
 # .build-linux keeps the macOS .build untouched.
 docker run --rm --platform linux/amd64 -v "$ROOT_DIR":/src -w /src "$SWIFT_IMAGE" bash -c \
   "swift build -c release --static-swift-stdlib --product sessionhopper --scratch-path /src/.build-linux \

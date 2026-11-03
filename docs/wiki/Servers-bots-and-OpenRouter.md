@@ -25,7 +25,8 @@ sessionhopper doctor
   (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
 - **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
   Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
-  for it: `-P openrouter --only`, `switch openrouter`).
+  for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
+  without `--only` still starts on a Claude profile with room.
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 

@@ -17,7 +17,7 @@ x86_64, any glibc distribution (the Swift runtime is built in). The CLI only, no
 ```bash
 curl -LO https://github.com/roypadina/AgentsSessionHopper/releases/latest/download/sessionhopper-linux-x86_64.tar.gz
 tar -xzf sessionhopper-linux-x86_64.tar.gz
-install -m 755 sessionhopper-linux-x86_64/sessionhopper ~/.local/bin/
+install -Dm755 sessionhopper-linux-x86_64/sessionhopper ~/.local/bin/sessionhopper
 sessionhopper profiles import && sessionhopper doctor
 ```
 

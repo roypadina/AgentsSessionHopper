@@ -19,7 +19,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var models: [String: String]?
     /// Gateway profiles: Anthropic-compatible endpoint. Default `Gateway.openRouterURL`.
     public var baseURL: String?
-    /// Gateway profiles: when a spent key has credit again: daily | weekly | monthly (UTC) | never. Default daily.
+    /// Gateway profiles: when a spent key has credit again: daily | weekly | monthly (UTC). Default daily.
     public var resets: String?
 
     public var id: String { name }

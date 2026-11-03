@@ -49,7 +49,7 @@ let usage = """
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
-      sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
+      sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
                                               pay-per-use fallback: the same claude, billed to your OpenRouter key
       sessionhopper profiles key <name> < keyfile  store that profile's API key (Keychain on macOS, private file on Linux)
       sessionhopper login <profile>             run `claude auth login` for that profile
@@ -301,8 +301,10 @@ func addGateway(_ name: String, _ a: inout [String], _ config: inout HopperConfi
         guard kv.count == 2 else { die("--model takes alias=name, e.g. opus=anthropic/claude-opus-5") }
         models[kv[0]] = kv[1]
     }
+    let resets = take("--resets", from: &a)
+    if let r = resets, !["daily", "weekly", "monthly"].contains(r) { die("--resets is daily, weekly or monthly") }
     let p = Profile(name: name, dir: base.dir, exportConfigDir: base.exportConfigDir, kind: Gateway.openRouter,
-                    keyFile: take("--key-file", from: &a), models: models.isEmpty ? nil : models, resets: take("--resets", from: &a))
+                    keyFile: take("--key-file", from: &a), models: models.isEmpty ? nil : models, resets: resets)
     config.profiles.append(p)
     do { try config.save(env.paths) } catch { die("\(error)") }
     out("Added \(name): OpenRouter, pay per use, used only when no Claude profile has room. Runs in \(env.tilde(base.dir)).")

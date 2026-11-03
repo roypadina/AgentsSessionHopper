@@ -165,7 +165,8 @@ sessionhopper doctor
   (00:00 UTC). `--resets weekly|monthly` if your key's limit resets less often.
 - **When OpenRouter is used** is a setting: `sessionhopper config gateway last` (default: only after every
   Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
-  for it: `-P openrouter --only`, `switch openrouter`).
+  for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
+  without `--only` still starts on a Claude profile with room.
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 
@@ -194,7 +195,7 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 ```bash
 curl -LO https://github.com/roypadina/AgentsSessionHopper/releases/latest/download/sessionhopper-linux-x86_64.tar.gz
 tar -xzf sessionhopper-linux-x86_64.tar.gz
-install -m 755 sessionhopper-linux-x86_64/sessionhopper ~/.local/bin/
+install -Dm755 sessionhopper-linux-x86_64/sessionhopper ~/.local/bin/sessionhopper
 sessionhopper profiles import && sessionhopper doctor
 ```
 

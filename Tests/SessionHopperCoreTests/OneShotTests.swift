@@ -65,5 +65,7 @@ final class OneShotTests: XCTestCase {
         XCTAssertEqual(OneShot.retryArgs(args, projects: projects), args)
         box.write("{}", "projects/-w/8a1f1d3c-0000-4000-8000-000000000001.jsonl")
         XCTAssertEqual(OneShot.retryArgs(args, projects: projects), ["-p", "--resume", "8a1f1d3c-0000-4000-8000-000000000001"])
+        XCTAssertEqual(OneShot.retryArgs(["-p", "--session-id=8a1f1d3c-0000-4000-8000-000000000001"], projects: projects),
+                       ["-p", "--resume", "8a1f1d3c-0000-4000-8000-000000000001"])
     }
 }
