@@ -109,10 +109,13 @@ final class PanelSession: @unchecked Sendable {
         self.say = say
     }
 
-    private var files: SessionFiles? { session.map { env.paths.session($0) } }
+    private var files: SessionFiles? { lock.sync { session }.map { env.paths.session($0) } }
+    /// The profile now in use (the idle watcher may change it).
+    private var current: Profile { lock.sync { profile } }
 
     func run() -> Int32 {
         guard spawn(args) else { return 127 }
+        if session != nil { publish() }
         log(type: "run", from: nil, to: profile.name, trigger: session == nil ? "start" : "resume")
         Thread.detachNewThread { [self] in pumpStdin() }
         Thread.detachNewThread { [self] in watchIdle() }
@@ -154,13 +157,14 @@ final class PanelSession: @unchecked Sendable {
         if type == "control_response", let r = obj?["response"] as? [String: Any], let id = r["request_id"] as? String,
            lock.sync({ swallowIDs.remove(id) != nil }) { return false }
         if type == "system", obj?["subtype"] as? String == "init" {
-            if session == nil, let s = obj?["session_id"] as? String { session = s; publish() }
+            if let s = obj?["session_id"] as? String, lock.sync({ session == nil ? { session = s; return true }() : false }) { publish() }
             if lock.sync({ let s = swallowInit; swallowInit = false; return s }) { return false }
         }
         if type == "user", lock.sync({ let s = swallowEcho; swallowEcho = false; return s }) { return false }
 
         if type == "rate_limit_event", let info = obj?["rate_limit_info"] as? [String: Any] {
-            if !profile.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: profile.name, env.paths) }
+            let p = current
+            if !p.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: p.name, env.paths) }
             if info["status"] as? String == "rejected" { held.append(line); return false }
         }
         if !held.isEmpty, type != "result" { held.append(line); return false }
@@ -175,14 +179,14 @@ final class PanelSession: @unchecked Sendable {
         let failure = OneShot.classify(a, now: FileIO.now())
         switch failure {
         case .limit, .credits, .login:
-            OneShot.markFull(profile, failure, attempt: a, paths: env.paths, now: FileIO.now())
+            let p = current
+            OneShot.markFull(p, failure, attempt: a, paths: env.paths, now: FileIO.now())
             let why = failure == .login ? "login" : failure == .credits ? "credits" : "limit"
-            if let next = nextProfile(excluding: [profile.name]) {
+            if let next = nextProfile(excluding: [p.name]), moveLock.sync({ move(to: next, trigger: why, replayTurn: true) }) {
                 held = []
-                move(to: next, trigger: why, replayTurn: true)
                 return true
             }
-            say("\(profile.name) cannot go on (\(why)) and no profile has room")
+            say("\(p.name) cannot go on (\(why)) and no profile has room")
         default: break
         }
         held.forEach(emit)
@@ -209,22 +213,26 @@ final class PanelSession: @unchecked Sendable {
     private func turnEnd() -> Bool {
         guard let f = files else { return false }
         let config = HopperConfig.load(env.paths)
+        let cur = current
         if let req = FileIO.decode(PendingMove.self, from: f.ctl) ?? FileIO.decode(PendingMove.self, from: f.pending) {
+            let to = req.to == PendingMove.anywhere ? nextProfile(excluding: [cur.name]) : config.profile(named: req.to)
+            guard let to, to.name != cur.name else { FileIO.remove(f.ctl); FileIO.remove(f.pending); return false }
+            // Kept until it happens: a message that arrived meanwhile defers it to the next turn end or idle check.
+            guard move(to: to, trigger: req.trigger, replayTurn: false) else { return false }
             FileIO.remove(f.ctl)
             FileIO.remove(f.pending)
-            let to = req.to == PendingMove.anywhere ? nextProfile(excluding: [profile.name]) : config.profile(named: req.to)
-            if let to, to.name != profile.name { move(to: to, trigger: req.trigger, replayTurn: false); return true }
+            return true
         }
         let held = FileIO.exists(f.hold) || FileIO.exists(env.paths.holdAll)
         let order = PanelWrapper.usable(config, env: env)
         let policy = Policy(config: config, limits: LimitStore.all(config, env.paths), now: FileIO.now())
-        switch policy.evaluate(current: profile, order: order, held: held) {
+        switch policy.evaluate(current: cur, order: order, held: held) {
         case .autoMove(let to, _):
-            if let p = config.profile(named: to) { move(to: p, trigger: "auto", replayTurn: false); return true }
+            if let p = config.profile(named: to) { return move(to: p, trigger: "auto", replayTurn: false) }
         case .suggest(let to, let pct):
             let old = FileIO.decode(Suggestion.self, from: f.suggest)
             if old?.to != to || old?.dismissed != true {
-                try? FileIO.encode(Suggestion(from: profile.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
+                try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
             }
         case .park, .none: break
         }
@@ -240,10 +248,14 @@ final class PanelSession: @unchecked Sendable {
     // MARK: moving
 
     /// Ends this `claude` and resumes the conversation on `to`, replaying the extension's startup requests.
-    private func move(to: Profile, trigger: String, replayTurn: Bool) {
-        guard let s = session else { return }
-        let from = profile
+    /// False when it cannot move now: no session id yet, or (outside a re-run) a message is being handled, which
+    /// would be lost with the old `claude`.
+    // shortcut: waits for the old claude to exit without draining its stdout; fine unless it prints >64 KB after SIGTERM.
+    @discardableResult
+    private func move(to: Profile, trigger: String, replayTurn: Bool) -> Bool {
         lock.lock()
+        guard let s = session, replayTurn || !busy else { lock.unlock(); return false }
+        let from = profile
         if let old = child, old.isRunning {
             try? childIn?.close()
             kill(old.processIdentifier, SIGTERM)
@@ -259,7 +271,7 @@ final class PanelSession: @unchecked Sendable {
                 try? childIn?.write(contentsOf: Data((line + "\n").utf8))
             }
             if replayTurn, let u = lastUserLine {
-                swallowEcho = true
+                swallowEcho = args.contains("--replay-user-messages")
                 try? childIn?.write(contentsOf: Data((u + "\n").utf8))
             }
             if stdinClosed { try? childIn?.close() }
@@ -269,6 +281,7 @@ final class PanelSession: @unchecked Sendable {
         publish()
         log(type: "switch", from: from.name, to: to.name, trigger: trigger)
         say("moved this conversation from \(from.name) to \(to.name) (\(trigger))")
+        return ok
     }
 
     @discardableResult
