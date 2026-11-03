@@ -181,7 +181,7 @@ private struct ProfilesSettings: View {
                         Spacer()
                         LoginBadge(model: model, profile: p)
                         Picker("Priority", selection: Binding(get: { p.priority ?? 0 }, set: { model.setPriority(p.name, $0 == 0 ? nil : $0) })) {
-                            Text("Default (\(p.isGateway ? 10 : 1))").tag(0)
+                            Text("Default (\(model.priority({ var d = p; d.priority = nil; return d }())))").tag(0)
                             Divider()
                             ForEach(1...10, id: \.self) { Text("\($0)").tag($0) }
                         }
@@ -320,6 +320,7 @@ struct AddProfileSheet: View {
         }
         .padding(20)
         .frame(width: 460)
+        .onAppear { model.lastError = nil }
     }
 
     @ViewBuilder private var openRouterForm: some View {

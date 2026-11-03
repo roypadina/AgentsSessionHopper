@@ -94,13 +94,15 @@ final class AppModel: ObservableObject {
     @discardableResult
     func addGateway(name: String, key: String, models: [String: String], resets: String) -> Bool {
         let name = name.trimmingCharacters(in: .whitespaces)
-        guard Profiles.isValidName(name), config.profile(named: name) == nil else { lastError = "pick another name"; return false }
+        guard Profiles.isValidName(name) else { lastError = "profile names use letters, digits, - and _"; return false }
+        guard config.profile(named: name) == nil else { lastError = "profile '\(name)' exists"; return false }
         guard let base = config.profiles.first(where: { !$0.isGateway }) else { lastError = "add a Claude profile first"; return false }
         let p = Profile(name: name, dir: base.dir, exportConfigDir: base.exportConfigDir, kind: Gateway.openRouter,
                         models: models.isEmpty ? nil : models, resets: resets == "daily" ? nil : resets)
         do { try Gateway.storeKey(key, for: p, env: env) } catch { lastError = "\(error)"; return false }
-        update { $0.profiles.append(p) }
         lastError = nil
+        update { $0.profiles.append(p) }
+        guard lastError == nil else { return false }
         checkLogins()
         return true
     }
