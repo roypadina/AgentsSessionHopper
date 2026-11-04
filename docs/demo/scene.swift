@@ -64,25 +64,11 @@ private func snapshot(_ stage: Stage) -> HopperSnapshot {
     return HopperSnapshot(config: config, limits: limits, sessions: [app, site], events: events, now: now)
 }
 
-// MARK: - the panel: AgentsSessionHopperApp.swift:10-22, the MenuBarExtra(.window) content
+// MARK: - the panel: AgentsSessionHopperApp.swift:10, the MenuBarExtra(.window) content (PopoverView alone since 1.7.0)
 
 private struct PanelContent: View {
     @ObservedObject var model: AppModel
-    var body: some View {
-        VStack {
-            PopoverView(model: model, openSettings: {})
-            Divider()
-            HStack {
-                Button("About") {}                                       // AgentsSessionHopperApp.swift:14
-                Button("Support on Ko-fi ☕") {}                          // :15
-                Spacer()
-                Button("Quit AgentsSessionHopper") {}.keyboardShortcut("q")  // :17
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
-        }
-    }
+    var body: some View { PopoverView(model: model, openSettings: {}) }
 }
 
 /// Same look as the kit's renderView (transparent, dark, 2x), but drawn by a real NSHostingView in a window that is never shown (the way
@@ -200,7 +186,7 @@ private let W = Demo.size.width, H = Demo.size.height
 
     // 2. click opens the panel at once: profiles with 5 h / 7 d usage, live sessions; late in the scene Work crosses 85 %
     let path2 = CursorPath(start: CGPoint(x: W * 0.62, y: H * 0.46), moves: [.init(t0: 0.10, t1: 0.75, to: barCenter)], clicks: [0.85])
-    let s2 = Scene(name: "panel", duration: 3.2, caption: "See each profile's usage and its live sessions") { t in
+    let s2 = Scene(name: "panel", duration: 3.2, caption: "See each profile's usage and when it switches") { t in
         let c = Canvas()
         let open = t >= 0.85, nears = t >= 2.7
         let st = nears ? asks : calm

@@ -26,7 +26,7 @@ brew install --cask roypadina/tap/agents-session-hopper
 
 <img src="docs/demo.gif" alt="AgentsSessionHopper in action: the menu bar shows the fullest profile's usage, the panel opens with each profile's usage and live sessions, and when Work nears its limit it asks to continue the conversation on Personal and moves it at turn end." width="720">
 
-<img src="docs/screenshots/popover.png" alt="The menu-bar window: three profiles with their 5-hour and weekly usage, a prompt to move a session from work to personal, live sessions and recent hand-offs" width="400">
+<img src="docs/screenshots/popover.png" alt="The menu-bar window: a prompt to move a session from work to personal, then one row per profile with its usage bar, when it switches at the current pace, and a menu of its sessions" width="360">
 
 </div>
 
@@ -40,7 +40,9 @@ brew install --cask roypadina/tap/agents-session-hopper
   Existing `~/.claude` and `~/.claude-*` folders are picked up; new ones are created with your
   setup and history shared, and logged in through Claude Code's own `claude auth login`.
 - **Live usage per account**, from what Claude Code reports to its own status line (5-hour and weekly
-  windows). Your own status line keeps working.
+  windows). Your own status line keeps working. The menu-bar window shows one row per profile with a
+  usage bar and what comes next: when it switches at the current pace, when a full profile is free
+  again, or that it is ready. Each row's sessions sit in a menu with their moves and Hold.
 - **You confirm every move.** At 85% (adjustable), when another profile has room, a notification and
   the menu bar ask: *"work is near its usage limit (88%). Continue this conversation on personal?"*
   Confirm, and the session moves when the current turn ends, resuming the same conversation.
@@ -51,9 +53,10 @@ brew install --cask roypadina/tap/agents-session-hopper
   carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
 - **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings → Log or
-  from the right-click menu (Show Hand-off Log).
+  from the right-click and ⋯ menus (Show Hand-off Log).
 - **Hard to lose.** Open the app again from Applications or Raycast and Settings appears, even when a full
-  menu bar hides the icon. The icon's tooltip and VoiceOver label read the fullest profile's usage.
+  menu bar hides the icon. Record a global keyboard shortcut in Settings → General to open the window
+  from any app. The icon's tooltip and VoiceOver label read the fullest profile's usage.
 - **A summary when a session ends:** its name, what it is about, your last three prompts, how it
   ended, when it started and was last used, its folder and the resume command.
 - **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.

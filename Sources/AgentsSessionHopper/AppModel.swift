@@ -30,7 +30,6 @@ final class AppModel: ObservableObject {
     }
 
     var config: HopperConfig { snapshot.config }
-    var recent: [HopperEvent] { Array(snapshot.events.suffix(5).reversed()) }
 
     // MARK: Actions (same file protocol as the CLI)
 

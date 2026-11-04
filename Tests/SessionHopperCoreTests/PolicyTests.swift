@@ -5,6 +5,22 @@ final class PolicyTests: XCTestCase {
     let a = profile("a"), b = profile("b"), c = profile("c")
     var order: [Profile] { [a, b, c] }
 
+    func test_reachesAtAveragePace() {
+        let s: Double = 1_000_000
+        // 5h window opened 2 h before the sample at 40% (20%/h): 85% comes 2 h 15 min after it, before the reset.
+        let five = ProfileLimits(fiveHour: LimitWindow(usedPercentage: 40, resetsAt: s + 3 * 3600),
+                                 sevenDay: LimitWindow(usedPercentage: 10, resetsAt: s + 86400), sampledAt: s)
+        XCTAssertEqual(five.reaches(85, now: s), s + 2.25 * 3600)
+        // 4 h in at 40% (10%/h), resets in 1 h: no window gets to 85% first.
+        let slow = ProfileLimits(fiveHour: LimitWindow(usedPercentage: 40, resetsAt: s + 3600), sevenDay: nil, sampledAt: s)
+        XCTAssertNil(slow.reaches(85, now: s))
+        // Opened 5 min ago: too early to tell a pace.
+        let fresh = ProfileLimits(fiveHour: LimitWindow(usedPercentage: 30, resetsAt: s + 5 * 3600 - 300), sevenDay: nil, sampledAt: s)
+        XCTAssertNil(fresh.reaches(85, now: s))
+        // Already past it: the sample time.
+        XCTAssertEqual(five.reaches(30, now: s), s)
+    }
+
     func policy(_ l: [String: ProfileLimits], auto: Bool = false, park: Bool = true, now: Double = 1000) -> Policy {
         var cfg = HopperConfig()
         cfg.profiles = order

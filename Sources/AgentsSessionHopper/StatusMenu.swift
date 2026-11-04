@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import SessionHopperCore
 
 /// Right-click / control-click menu on the menu-bar icon. SwiftUI's MenuBarExtra has no hook for it,
@@ -6,7 +7,6 @@ import SessionHopperCore
 @MainActor final class StatusMenu: NSObject {
     static let shared = StatusMenu()
     private var monitor: Any?
-    private weak var button: NSView?
 
     static let requestFeature = URL(string: "https://github.com/roypadina/AgentsSessionHopper/issues/new?template=feature_request.yml")!
     static let contribute = URL(string: "https://github.com/roypadina/AgentsSessionHopper/blob/main/CONTRIBUTING.md")!
@@ -17,7 +17,6 @@ import SessionHopperCore
             guard event.type == .rightMouseDown || event.modifierFlags.contains(.control),
                   let view = event.window?.contentView,
                   String(describing: type(of: event.window!)).contains("NSStatusBarWindow") else { return event }
-            self?.button = view
             NSMenu.popUpContextMenu(self?.menu() ?? NSMenu(), with: event, for: view)
             return nil
         }
@@ -43,10 +42,33 @@ import SessionHopperCore
         return m
     }
 
-    // Click the real status button (found under the status-bar window) to open the popover.
-    @objc private func open() { (button?.subviews.first { $0 is NSButton } as? NSButton ?? button as? NSButton)?.performClick(nil) }
+    @objc private func open() { Self.togglePopover() }
+    /// Opens or closes the menu-bar window. MenuBarExtra has no API for it. Up to macOS 26 a click on the status
+    /// button does it. On macOS 27 that button has no action: the window opens through an "expanded interface
+    /// session" (AppKit SPI, called the way MenuBarExtraAccess does; every selector is checked first).
+    static func togglePopover() {
+        let key = NSSelectorFromString("statusItem")
+        let item = NSApp.windows.lazy
+            .filter { String(describing: type(of: $0)).contains("NSStatusBarWindow") && $0.responds(to: key) }
+            .compactMap { $0.value(forKey: "statusItem") as? NSStatusItem }
+            .first { $0.isVisible }
+        guard let item else { return log.error("hotkey: no status item found") }
+        NSApp.activate()
+        let begin = NSSelectorFromString("_beginExpandedInterfaceSession:"), current = NSSelectorFromString("expandedInterfaceSession")
+        guard item.responds(to: begin), item.responds(to: current) else { return item.button?.performClick(nil) ?? () }
+        if let session = item.perform(current)?.takeUnretainedValue() as? NSObject {
+            if session.responds(to: NSSelectorFromString("cancel")) { session.perform(NSSelectorFromString("cancel")) }
+        } else {
+            // The argument is the triggering event's time; AppKit drops a begin older than the last session's end.
+            typealias Begin = @convention(c) (NSStatusItem, Selector, TimeInterval) -> Void
+            unsafeBitCast(item.method(for: begin), to: Begin.self)(item, begin, .greatestFiniteMagnitude)
+        }
+    }
+
+    static let log = Logger(subsystem: "com.padina.agents-session-hopper", category: "hotkey")
+
     @objc private func settings() { AgentsSessionHopperApp.openSettings() }
-    @objc private func switchLog() {
+    @objc func switchLog() {
         SettingsView.pendingTab = .log
         NotificationCenter.default.post(name: SettingsView.selectTab, object: nil)
         AgentsSessionHopperApp.openSettings()

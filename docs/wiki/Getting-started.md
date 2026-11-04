@@ -68,4 +68,4 @@ continues on the other account.
 - **Park before paid usage** — on by default, at 97%. A session you did not move ends at its next turn
   end instead of running into paid extra usage.
 - **Hold** a session (or all) to keep it where it is: no park, no automatic move. **Release Hold** in the
-  session's **Move…** menu undoes it; it is disabled while **Hold every session** (Settings → Hand-off) is on.
+  session's submenu (the profile row's **sessions** menu) undoes it; it is disabled while **Hold every session** (Settings → Hand-off) is on.
