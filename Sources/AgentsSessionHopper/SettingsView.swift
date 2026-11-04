@@ -450,17 +450,22 @@ private struct AboutSettings: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        Form {
-            Section {
-                LabeledContent("AgentsSessionHopper", value: "Version \(HopperInfo.version)")
-                HStack {
-                    Button("About…") { AboutWindow.show() }
-                    Button("Welcome Guide…") { WelcomeWindow.show(model: model) }
-                    Link("Support on Ko-fi ☕", destination: HopperInfo.koFi)
-                }
-                Text(HopperInfo.disclaimer).font(.caption).foregroundStyle(.secondary)
+        VStack(spacing: 10) {
+            Image(nsImage: AboutView.icon).resizable().frame(width: 64, height: 64).accessibilityHidden(true)
+            Text("AgentsSessionHopper").font(.title2.bold())
+            Text("Version \(HopperInfo.version)").font(.caption).foregroundStyle(.secondary)
+            Button("Check for Updates…") { Updates.check() }  // own row: the button row below is full at 600 pt
+            HStack {
+                Button("About…") { AboutWindow.show() }
+                Button("Welcome Guide…") { WelcomeWindow.show(model: model) }
+                Link("Support on Ko-fi ☕", destination: HopperInfo.koFi).buttonStyle(.borderedProminent)
             }
+            .controlSize(.large)
+            .padding(.top, 4)
+            Text(HopperInfo.disclaimer).font(.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).padding(.top, 8)
         }
-        .formStyle(.grouped)
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.1] - 2026-11-04
+
+### Added
+- **Check for Updates…** in the menu-bar icon's right-click menu; it reads **Install Update X.Y.Z…** once an update has been found.
+
+### Changed
+- Settings → About now matches the About tab in the other apps: app icon, version, a **Check for Updates…** button, and the About, Welcome Guide and Ko-fi buttons.
+
 ## [1.8.0] - 2026-11-04
 
 ### Added
