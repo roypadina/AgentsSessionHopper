@@ -94,6 +94,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             StatusMenu.shared.install()
             HotkeyCenter.register(Hotkey.saved)
+            // Sparkle asks on the second launch before any check; never under the debug hook or a bare `swift run`.
+            if ProcessInfo.processInfo.environment["ASH_DEBUG_OPEN"] == nil, Bundle.main.bundleIdentifier != nil {
+                _ = Updates.controller
+            }
         }
         #if DEBUG
         // Test hook: ASH_DEBUG_OPEN="Settings…" (any status-menu title) fires that item exactly as a click would.

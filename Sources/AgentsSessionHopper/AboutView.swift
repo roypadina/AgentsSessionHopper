@@ -29,6 +29,7 @@ struct AboutView: View {
             VStack(spacing: 2) {
                 Text("AgentsSessionHopper").font(.title.bold())
                 Text("Version \(HopperInfo.version)").font(.callout).foregroundStyle(.secondary)
+                Button("Check for Updates…") { Updates.check() }.padding(.top, 4)
             }
 
             Text("Profiles for Claude Code. Keep your own accounts side by side, and when one runs low, continue the conversation on another with one click.")
