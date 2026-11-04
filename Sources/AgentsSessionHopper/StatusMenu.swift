@@ -30,9 +30,10 @@ import SessionHopperCore
             m.addItem(i)
         }
         item("Open", #selector(open))
-        item("Settings…", #selector(settings), key: ",")
         item("Show Hand-off Log", #selector(switchLog))
+        item(Updates.menuTitle, #selector(checkForUpdates))
         m.addItem(.separator())
+        item("Settings…", #selector(settings), key: ",")
         item("Request a feature", #selector(feature))
         item("Contribute", #selector(contribute))
         item("About AgentsSessionHopper", #selector(about))
@@ -75,6 +76,7 @@ import SessionHopperCore
     }
     @objc private func feature() { NSWorkspace.shared.open(Self.requestFeature) }
     @objc private func contribute() { NSWorkspace.shared.open(Self.contribute) }
+    @objc private func checkForUpdates() { Updates.check() }
     @objc private func about() { AboutWindow.show() }
     @objc private func kofi() { NSWorkspace.shared.open(HopperInfo.koFi) }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
