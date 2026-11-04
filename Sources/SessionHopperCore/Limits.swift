@@ -80,6 +80,22 @@ public struct ProfileLimits: Codable, Equatable, Sendable {
         return resets.contains(nil) ? nil : resets.compactMap { $0 }.max() ?? now
     }
 
+    /// How long each window runs, to tell how fast it filled since it opened. A spend limit has no fixed window.
+    static let windowLength: [String: Double] = ["5h": 5 * 3600, "7d": 7 * 86400]
+
+    /// When a window first reaches `limit` if use goes on at its average pace since the window opened. nil when no
+    /// window gets there before it resets, or one opened under 10 minutes before the sample (too early for a pace).
+    public func reaches(_ limit: Double, now: Double) -> Double? {
+        windows.compactMap { name, w -> Double? in
+            guard w.isLive(now: now), let r = w.resetsAt, let len = Self.windowLength[name] else { return nil }
+            if w.usedPercentage >= limit { return sampledAt }
+            let elapsed = sampledAt - (r - len)
+            guard elapsed >= 600, w.usedPercentage > 0 else { return nil }
+            let at = sampledAt + (limit - w.usedPercentage) * elapsed / w.usedPercentage
+            return at < r ? at : nil
+        }.min()
+    }
+
     /// A sample older than this is shown with its age.
     public static let staleAfter: Double = 600
 
@@ -108,7 +124,7 @@ public struct ProfileLimits: Codable, Equatable, Sendable {
         return f.string(from: Date(timeIntervalSince1970: epoch))
     }
 
-    static func age(_ seconds: Double) -> String {
+    public static func age(_ seconds: Double) -> String {
         let m = Int(seconds / 60)
         return m < 90 ? "\(m) min" : m < 48 * 60 ? "\(m / 60) h" : "\(m / 1440) d"
     }

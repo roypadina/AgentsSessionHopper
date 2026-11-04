@@ -9,16 +9,6 @@ struct AgentsSessionHopperApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(model: model, openSettings: Self.openSettings)
-            Divider()
-            HStack {
-                Button("About") { AboutWindow.show() }
-                Button("Support on Ko-fi ☕") { NSWorkspace.shared.open(HopperInfo.koFi) }
-                Spacer()
-                Button("Quit AgentsSessionHopper") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
         } label: {
             MenuBarLabel(model: model)
         }
@@ -101,7 +91,10 @@ extension AgentsSessionHopperApp {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
-        MainActor.assumeIsolated { StatusMenu.shared.install() }
+        MainActor.assumeIsolated {
+            StatusMenu.shared.install()
+            HotkeyCenter.register(Hotkey.saved)
+        }
         #if DEBUG
         // Test hook: ASH_DEBUG_OPEN="Settings…" (any status-menu title) fires that item exactly as a click would.
         if let title = ProcessInfo.processInfo.environment["ASH_DEBUG_OPEN"] {

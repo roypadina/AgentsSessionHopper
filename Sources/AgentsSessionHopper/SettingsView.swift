@@ -366,6 +366,7 @@ private struct GeneralSettings: View {
                 Toggle("Notify me when a session should move", isOn: $notifications)
                 Toggle("Show usage % next to the menu-bar icon", isOn: $showPercent)
             }
+            Section { HotkeyRecorder() }
             Section {
                 Text("AgentsSessionHopper makes no network requests and never reads your Claude login. Usage comes only from what Claude Code shows its own status line.")
                     .font(.caption).foregroundStyle(.secondary)

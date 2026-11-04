@@ -6,7 +6,7 @@
 When one runs low, continue the same conversation on another with one click. Nothing moves until you
 confirm.
 
-- A **menu-bar app**: usage per profile, a prompt when a session should move, the switch log, settings.
+- A **menu-bar app**: usage per profile and when it switches at the current pace, a prompt when a session should move, the switch log, settings, and an optional global shortcut.
 - A **CLI**, `sessionhopper`: starts and supervises sessions, and does everything the app does.
 - On **Linux** (x86_64): the CLI alone, for servers and bots that run `claude -p`, with an optional
   pay-per-use OpenRouter profile as the last fallback. See [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter).

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-04
+
+### Added
+- A global keyboard shortcut opens the menu-bar window from any app: record it in Settings → General (none by default; no Accessibility permission needed).
+
+### Changed
+- The menu-bar window is short again: one row per profile with a usage bar and the one fact that matters next — when it switches at the current pace (and to which profile), when a full profile is free again, or that it is ready. Both windows and the reset time are in the row's tooltip.
+- Sessions moved into a menu on their profile's row (each session a submenu with its moves and Hold). The recent hand-offs list is gone from the window; it is in Settings → Log and the new More menu (⋯), which also holds About, Ko-fi and Quit.
+
+### Fixed
+- Right-click → Open did nothing on macOS 27; it opens the menu-bar window again.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added

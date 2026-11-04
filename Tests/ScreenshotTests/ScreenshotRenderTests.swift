@@ -92,7 +92,7 @@ final class ScreenshotRenderTests: XCTestCase {
         XCTAssertEqual(model.severity("work"), .near)
         XCTAssertEqual(model.severity("spare"), .unknown)
         let size = NSHostingView(rootView: PopoverView(model: model)).fittingSize
-        XCTAssertEqual(size.width, 400)
+        XCTAssertEqual(size.width, 360)
         XCTAssertGreaterThan(size.height, 200)
         model.moveProfile("spare", by: -1)
         XCTAssertEqual(model.config.profiles.map(\.name), ["personal", "spare", "work", "openrouter"])
