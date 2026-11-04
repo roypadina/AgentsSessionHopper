@@ -254,8 +254,11 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   happens in Claude Code's own flow. The only secrets it handles are ones you give it with `sessionhopper
   profiles key`: an OpenRouter key, or on a server a `claude setup-token` for a profile. Each is kept in
   its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
-- **It makes no network requests** at all: no usage endpoint, no telemetry, no update check. (The
-  optional skill install runs Claude Code's own `claude plugin install`, which downloads it from GitHub.)
+- **It makes no network requests** to Anthropic or anyone else: no usage endpoint, no telemetry. The one
+  exception is the update check, and only with your permission: the app asks once (on its second launch)
+  whether to check automatically, and with your yes downloads the release feed from GitHub once a day,
+  sending nothing about you. (The optional skill install runs Claude Code's own `claude plugin install`,
+  which downloads it from GitHub.)
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
   when a conversation continues elsewhere.
 
@@ -265,11 +268,17 @@ change at any time. If you run it for a bot or service, check Anthropic's terms 
 
 ## Privacy
 
-No network access, no analytics. State lives in `~/Library/Application Support/AgentsSessionHopper/`
+No analytics, and no network access besides the opt-in update check. State lives in `~/Library/Application Support/AgentsSessionHopper/`
 (Linux: `~/.local/state/agents-session-hopper/`)
 (profile list, last-known usage percentages, the switch log). Preferences are in the defaults domain
 `com.padina.agents-session-hopper`. Optional `install-hooks` edits a profile's `settings.json` only when
 you run it, keeps a backup, and `uninstall-hooks` restores it.
+
+## Updating
+
+The app asks once whether to check for updates automatically; with your yes it checks once a day and asks before
+installing a new version (**Check for Updates…** in the About window checks now). An in-app update needs no `xattr`
+step. Homebrew users can also run `brew upgrade --cask agents-session-hopper`. The CLI updates with the app.
 
 ## Build from source
 
