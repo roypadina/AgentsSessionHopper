@@ -117,9 +117,11 @@ struct ProfileRow: View {
             let resets = l.blocking(now: now)?.window.resetsAt.map(ProfileLimits.clock)
             if pct >= c.hardThreshold {
                 text = l.freeAt(under: c.hardThreshold, now: now).map { "Full · free again \(ProfileLimits.clock($0))" } ?? "Full"
-            } else if active, let at = l.reaches(pct < c.suggestThreshold ? c.suggestThreshold : c.hardThreshold, now: now) {
-                // Past the suggest threshold the session already stayed (held, asked, or no room), so the next event is full.
-                let to = pct < c.suggestThreshold ? Policy(config: c, limits: model.snapshot.limits, now: now).pick(c.profiles, excluding: profile.name) : nil
+            } else if active,
+                      // Past the suggest threshold the session already stayed (held, asked, or no room), so the next event is full.
+                      case let to = pct < c.suggestThreshold ? Policy(config: c, limits: model.snapshot.limits, now: now).pick(c.profiles, excluding: profile.name) : nil,
+                      // No profile to switch to: it runs on until the hard threshold.
+                      let at = l.reaches(to == nil ? c.hardThreshold : c.suggestThreshold, now: now) {
                 text = "At this pace: " + (to.map { "switch to \($0.name)" } ?? "full")
                     + (at <= now ? " soon" : " ≈ \(ProfileLimits.clock(at))")
             } else if active {
