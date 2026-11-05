@@ -8,11 +8,13 @@ sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run
                                           prompt on stdin; a limit failure retries the turn on the next profile
 sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
+sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
 sessionhopper status [--json]             profiles, last-known usage, live sessions
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+                                          and the live-session list (messaging across accounts)
 sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
@@ -58,11 +60,18 @@ command) follows Claude Code's own resume hint: see [How it works](How-it-works#
   It waits for its own profile unless "move without asking" is on. Ctrl-C stops waiting;
   `switch <profile> --session <id>` moves it now. `wait off` exits with code 2 as before.
 - `hold` keeps a session on its profile: no park, no automatic move. A move you confirm still happens.
+- `switch --cancel` drops a pending move, also one you confirmed, and counts as "Not now" for its suggestion.
+  A move the engine queued (move without asking, park) can come back at the next usage update; `hold on` stops that.
+  The app has the same as **Cancel Move** in the session's menu.
 - `install-hooks` edits one profile's `settings.json` (with a backup) so sessions started with plain
   `claude` also report usage and limit stops. Optional; `uninstall-hooks` restores your status line.
 - `profiles share` never deletes: a folder with content becomes `<item>.ash-backup-<time>`, its files are
   merged into the first profile (newer copy wins; the replaced one stays in the backup). It refuses while
   `claude` runs on that profile. `--dry-run` shows the plan.
+- `profiles share` also links `sessions/`, Claude Code's list of running sessions. With one list, sessions on
+  every account find each other: `@name`, `/peers` and messages between sessions work across accounts. This
+  relies on undocumented Claude Code behaviour; `doctor` shows it per profile (cross-account messaging on/off).
+  A session moved to another profile keeps the name you gave it with `/rename`.
 - `shell install` picks the file from `$SHELL`: zsh `~/.zshrc` (or `$ZDOTDIR`), bash `~/.bash_profile` (else
   `~/.bashrc`), tcsh `~/.tcshrc` (else `~/.cshrc`), fish its own `~/.config/fish/conf.d/sessionhopper.fish`.
   A symlinked startup file is edited at its target. `--force` adds the line even if you define `claude`

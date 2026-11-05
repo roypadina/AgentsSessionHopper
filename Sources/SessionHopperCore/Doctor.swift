@@ -107,6 +107,14 @@ public enum Doctor {
             let apart = notShared(["todos", "file-history"], dir: p.dir, base: base.dir)
             if !apart.isEmpty { add(.info, "\(p.name): \(apart.joined(separator: ", ")) not shared with \(base.name), so todo lists and /rewind stay behind on a move. Share: sessionhopper profiles share \(p.name)") }
         }
+        // One `sessions/` registry lets sessions on different accounts find each other (undocumented; may change with a Claude Code update).
+        let others = config.profiles.dropFirst().filter { !$0.isGateway && $0.dir != base.dir }
+        if !others.isEmpty {
+            let off = Set(others.filter { !notShared(["sessions"], dir: $0.dir, base: base.dir).isEmpty }.map(\.name))
+            add(off.isEmpty ? .ok : .info, "cross-account messaging (sessions/ shared with \(base.name)): "
+                + others.map { "\($0.name) \(off.contains($0.name) ? "off" : "on")" }.joined(separator: ", ")
+                + (off.isEmpty ? "" : ". Turn on: sessionhopper profiles share <name> (with no claude running on it)"))
+        }
         let shell = Setup.shellKind(env.vars)
         add(.info, Setup.shellInstalled(shell, home: env.home, vars: env.vars)
             ? "\(shell.rawValue): `claude` runs through sessionhopper"

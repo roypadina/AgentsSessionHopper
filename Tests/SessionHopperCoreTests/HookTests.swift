@@ -16,6 +16,18 @@ final class HookTests: XCTestCase {
         #"{"hook_event_name":"\#(name)","session_id":"\#(sid)"\#(extra)}"#
     }
 
+    func testCancelDropsAPendingMoveAndCountsAsNotNow() throws {
+        try FileIO.encode(SessionRecord(session: sid, resume: sid, pid: getpid(), child: getpid(), profile: "work", cwd: "/", started: "t"), to: f.record)
+        XCTAssertNil(try Control.cancelMove(session: sid, env: env), "nothing pending")
+        try FileIO.encode(PendingMove(to: "home", trigger: "confirm", source: "cli"), to: f.pending)
+        FileIO.touch(f.warned)
+        XCTAssertEqual(try Control.cancelMove(session: String(sid.prefix(8)), env: env)?.to, "home")
+        XCTAssertFalse(FileIO.exists(f.pending))
+        XCTAssertFalse(FileIO.exists(f.warned), "a later move is announced to the agent again")
+        XCTAssertEqual(FileIO.decode(Suggestion.self, from: f.suggest)?.dismissed, true, "counts as Not now, so it isn't asked again at once")
+        XCTAssertThrowsError(try Control.cancelMove(session: "nope", env: env))
+    }
+
     func testTurnStateFollowsPromptAndStop() {
         hook(ev("UserPromptSubmit"))
         XCTAssertTrue(FileIO.exists(f.busy))

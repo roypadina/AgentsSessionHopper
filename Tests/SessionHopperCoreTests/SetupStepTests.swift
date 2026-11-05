@@ -24,6 +24,7 @@ final class SetupStepTests: XCTestCase {
         put("# mine", work.appendingPathComponent("CLAUDE.md"))
         put("# base", base.appendingPathComponent("CLAUDE.md"))
         try fm.createDirectory(at: work.appendingPathComponent("todos"), withIntermediateDirectories: true)  // empty
+        put(#"{"pid":999999,"sessionId":"ended"}"#, work.appendingPathComponent("sessions/999999.json"))  // registry of an ended session
 
         let plan = try Setup.share(w, base: b, dryRun: true, now: Date(timeIntervalSince1970: 0))
         XCTAssertTrue(plan.contains { $0.hasPrefix("projects: moved to projects.ash-backup-") }, "\(plan)")
@@ -31,7 +32,7 @@ final class SetupStepTests: XCTestCase {
 
         let did = try Setup.share(w, base: b, dryRun: false, now: Date(timeIntervalSince1970: 0))
         XCTAssertTrue(did.contains("todos: empty folder replaced by a link"), "\(did)")
-        for item in ["projects", "CLAUDE.md", "todos", "file-history"] {
+        for item in ["projects", "CLAUDE.md", "todos", "file-history", "sessions"] {
             XCTAssertNotNil(try? fm.destinationOfSymbolicLink(atPath: work.appendingPathComponent(item).path), item)
         }
         let projects = base.appendingPathComponent("projects")
@@ -39,7 +40,8 @@ final class SetupStepTests: XCTestCase {
         XCTAssertEqual(text(projects.appendingPathComponent("-a/2.jsonl")), "newer in work", "the newer copy wins")
         XCTAssertEqual(text(projects.appendingPathComponent("-b/3.jsonl")), "work only")
         let backups = try fm.contentsOfDirectory(atPath: work.path).filter { $0.contains(".ash-backup-") }
-        XCTAssertEqual(Set(backups.map { $0.components(separatedBy: ".ash-backup-")[0] }), ["projects", "CLAUDE.md"])
+        XCTAssertEqual(Set(backups.map { $0.components(separatedBy: ".ash-backup-")[0] }), ["projects", "CLAUDE.md", "sessions"])
+        XCTAssertFalse(fm.fileExists(atPath: base.appendingPathComponent("sessions/999999.json").path), "ended sessions are not merged into the live list")
         let pb = work.appendingPathComponent(backups.first { $0.hasPrefix("projects") }!)
         XCTAssertEqual(text(pb.appendingPathComponent("-a/1.jsonl")), "older in work", "the profile's own copy is kept")
         XCTAssertEqual(text(pb.appendingPathComponent(".replaced-in-default/-a/2.jsonl")), "old base copy", "the replaced base copy is kept")
@@ -52,6 +54,27 @@ final class SetupStepTests: XCTestCase {
         put(#"{"pid":\#(getpid()),"sessionId":"x"}"#, work.appendingPathComponent("sessions/\(getpid()).json"))
         XCTAssertThrowsError(try Setup.share(Profile(name: "work", dir: work.path, exportConfigDir: true),
                                              base: Profile(name: "default", dir: base.path, exportConfigDir: false), dryRun: false))
+    }
+
+    func testSharedRegistryCountsOnlyThisProfilesSessions() throws {
+        let base = sb.profileDir(".claude"), work = sb.profileDir(".claude-work")
+        let b = Profile(name: "default", dir: base.path, exportConfigDir: false), w = Profile(name: "work", dir: work.path, exportConfigDir: true)
+        put(#"{"pid":\#(getpid()),"sessionId":"x"}"#, base.appendingPathComponent("sessions/\(getpid()).json"))
+        try fm.createSymbolicLink(at: work.appendingPathComponent("sessions"), withDestinationURL: base.appendingPathComponent("sessions"))
+        XCTAssertEqual(Setup.livePIDs(w, configDir: { _ in base.path }), [], "another account's session in the shared list")
+        XCTAssertEqual(Setup.livePIDs(w, configDir: { _ in work.path + "/" }), [getpid()])
+        XCTAssertEqual(Setup.livePIDs(w, configDir: { _ in nil }), [getpid()], "an unknown folder counts, to stay safe")
+        XCTAssertThrowsError(try Setup.share(w, base: b, dryRun: false, configDir: { _ in work.path }))
+        let did = try Setup.share(w, base: b, dryRun: false, configDir: { _ in base.path })
+        XCTAssertTrue(did.contains("sessions: already shared"), "\(did)")
+    }
+
+    func testConfigDirFromPsEnvironment() {
+        let ps = "/x/claude --resume a CLAUDE_CONFIG_DIR=/tmp/arg PATH=/usr/bin CLAUDE_CONFIG_DIR=/Users/r/a b/.claude-x HOME=/Users/r\n"
+        XCTAssertEqual(Setup.configDir(ps: ps), "/Users/r/a b/.claude-x", "the environment's value, spaces kept")
+        XCTAssertEqual(Setup.configDir(ps: "/x/claude PATH=/usr/bin HOME=/h\n", home: "/h"), "/h/.claude", "unset = the default folder")
+        XCTAssertNil(Setup.configDir(ps: "/bin/sleep 3\n"), "no environment shown")
+        XCTAssertNil(Setup.configDir(ps: ""))
     }
 
     func testShellLineInstallRemoveAndClashes() throws {
