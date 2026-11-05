@@ -46,11 +46,13 @@ let usage = """
                                               prompt on stdin; a limit failure retries the turn on the next profile
       sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
       sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
+      sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
       sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
       sessionhopper status [--json]             profiles, last-known usage, live sessions
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+                                              and the live-session list (messaging across accounts)
       sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10): equal priorities
                                               don't trade places before a limit; a freed-up better one is moved back to
       sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
@@ -193,6 +195,16 @@ func sessionArg(_ a: inout [String]) -> String {
 func switchCommand(_ a: [String]) -> Int32 {
     var a = a
     let id = sessionArg(&a)
+    if has("--cancel", in: &a) {
+        let short = (Sessions.find(id, env.paths)?.record.session ?? id).prefix(8)
+        do {
+            guard let p = try Control.cancelMove(session: id, env: env) else { out("Session \(short) has no pending move."); return 0 }
+            let what = p.to == PendingMove.park ? "park" : "move to \(p.to == PendingMove.anywhere ? "the next profile with room" : p.to)"
+            out("Cancelled: session \(short) won't \(what) at turn end."
+                + (p.source == "engine" ? " The engine queued it and may queue it again; to keep this session where it is: sessionhopper hold on" : ""))
+            return 0
+        } catch { die("\(error)") }
+    }
     let now = has("--now", in: &a)
     do {
         let s = try Control.requestMove(session: id, to: a.first, now: now, source: "cli", env: env)

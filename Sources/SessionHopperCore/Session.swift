@@ -96,6 +96,20 @@ public enum Control {
         return s
     }
 
+    /// Drops a pending move, whoever queued it, and treats it as "Not now" so the next usage update doesn't ask again.
+    /// Returns the dropped move, nil when none was pending. The engine may queue an `auto`/`park` move again; `hold` stops that.
+    @discardableResult
+    public static func cancelMove(session id: String, env: HopperEnvironment) throws -> PendingMove? {
+        guard let s = Sessions.find(id, env.paths) else { throw HopperError("no live session \(id)") }
+        guard let p = s.pending else { return nil }
+        let f = env.paths.session(s.record.session)
+        FileIO.remove(f.pending)
+        FileIO.remove(f.warned)
+        let to = [PendingMove.park, PendingMove.anywhere].contains(p.to) ? nil : p.to
+        try? FileIO.encode(Suggestion(from: s.record.profile, to: to, reason: "threshold", dismissed: true), to: f.suggest)
+        return p
+    }
+
     /// "Not now": keep the suggestion out of the way until something changes.
     public static func dismiss(session id: String, env: HopperEnvironment) {
         guard let s = Sessions.find(id, env.paths), var sug = s.suggestion else { return }

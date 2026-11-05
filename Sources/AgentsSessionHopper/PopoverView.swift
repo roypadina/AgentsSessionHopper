@@ -147,6 +147,7 @@ struct SessionsMenu: View {
                     ForEach(model.config.profiles.filter { $0.name != session.record.profile }) { p in
                         Button("Move to \(p.name) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
                     }
+                    if session.pending != nil { Button("Cancel Move") { model.cancelMove(session) } }
                     Divider()
                     // "Hold every session" holds it too and only Settings turns that off, so releasing one here would do nothing.
                     Button(session.held ? "Release Hold" : "Hold") { model.hold(session, on: !session.held) }

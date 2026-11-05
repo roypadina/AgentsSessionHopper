@@ -98,7 +98,7 @@ struct SetupSteps: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             step("2. Share history between profiles",
-                 "A conversation can only continue on another profile if they share Claude Code's history folder. Also shared: todo lists, /rewind checkpoints, CLAUDE.md, agents, commands and skills. Existing folders are moved to a backup and merged, never deleted. Quit sessions on a profile first.")
+                 "A conversation can only continue on another profile if they share Claude Code's history folder. Also shared: todo lists, /rewind checkpoints, CLAUDE.md, agents, commands, skills, and Claude Code's list of running sessions (messaging across accounts). Existing folders are moved to a backup and merged, never deleted. Quit sessions on a profile first.")
             ForEach(model.config.profiles.dropFirst()) { p in
                 HStack {
                     Text(p.name)

@@ -7,34 +7,58 @@ public enum Setup {
     // MARK: - Sharing history and setup with the base profile
 
     /// Claude Code's own registry of running sessions (`<dir>/sessions/<pid>.json`, best effort):
-    /// moving a folder a live `claude` writes to would split its transcript.
-    public static func livePIDs(_ profile: Profile) -> [Int32] {
+    /// moving a folder a live `claude` writes to would split its transcript. A shared (linked) registry lists
+    /// every profile's sessions, so there a pid counts only if `configDir` says it runs in this profile's folder;
+    /// one whose folder can't be read still counts.
+    public static func livePIDs(_ profile: Profile, configDir: (Int32) -> String? = configDir(of:)) -> [Int32] {
         let dir = URL(fileURLWithPath: profile.dir).appendingPathComponent("sessions")
-        return ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []).compactMap { f in
+        let shared = (try? FileManager.default.destinationOfSymbolicLink(atPath: dir.path)) != nil
+        let mine = URL(fileURLWithPath: profile.dir).resolvingSymlinksInPath().path
+        // Resolved: listing a linked folder through its link finds nothing.
+        return ((try? FileManager.default.contentsOfDirectory(at: dir.resolvingSymlinksInPath(), includingPropertiesForKeys: nil)) ?? []).compactMap { f in
             guard f.pathExtension == "json", let pid = (FileIO.jsonObject(FileIO.read(f))?["pid"] as? NSNumber)?.int32Value,
                   FileIO.isAlive(pid) else { return nil }
+            if shared, let d = configDir(pid), URL(fileURLWithPath: d).resolvingSymlinksInPath().path != mine { return nil }
             return pid
         }
+    }
+
+    /// The config folder a running `claude` uses, from its environment (`ps eww`, own processes only).
+    public static func configDir(of pid: Int32) -> String? {
+        configDir(ps: Shell.run("/bin/ps", ["eww", "-o", "command=", "-p", String(pid)], timeout: 5).stdout)
+    }
+
+    /// `ps eww` output → its `CLAUDE_CONFIG_DIR` (up to the next ` NAME=`, so a path may hold spaces), `~/.claude` when
+    /// unset. nil when `ps` showed no environment (macOS hides it for system binaries and other users' processes).
+    static func configDir(ps: String, home: String = NSHomeDirectory()) -> String? {
+        guard ps.contains(" PATH=") else { return nil }
+        // The environment follows the arguments, so the last match is the real one.
+        let re = try! NSRegularExpression(pattern: #"(?:^| )CLAUDE_CONFIG_DIR=(.*?)(?= [A-Za-z_][A-Za-z0-9_]*=|\n|$)"#)
+        guard let last = re.matches(in: ps, range: NSRange(ps.startIndex..., in: ps)).last,
+              let r = Range(last.range(at: 1), in: ps) else { return home + "/.claude" }
+        return String(ps[r])
     }
 
     /// Links `projects/` (always) and `items` of `profile` to the base profile's. A missing item is linked;
     /// an empty folder is replaced by the link; a folder with content is moved to `<item>.ash-backup-<time>`,
     /// its files copied into the base (on a clash the newer file wins; the base's older copy goes into the
     /// backup too), then linked. `dryRun` only reports. Refuses while `claude` runs on that profile.
+    /// `sessions` (the live-session registry) is not merged: with no `claude` running there, its entries are of ended sessions.
     public static func share(_ profile: Profile, base: Profile, items: [String] = Profiles.sharedSetup,
-                             dryRun: Bool, now: Date = Date()) throws -> [String] {
+                             dryRun: Bool, now: Date = Date(), configDir: (Int32) -> String? = configDir(of:)) throws -> [String] {
         let fm = FileManager.default
         let dir = URL(fileURLWithPath: profile.dir), baseDir = URL(fileURLWithPath: base.dir)
         guard dir.standardizedFileURL != baseDir.standardizedFileURL else { return ["\(profile.name) is the base profile; nothing to share"] }
-        if !dryRun, !livePIDs(profile).isEmpty {
-            throw HopperError("claude is running on \(profile.name) (pid \(livePIDs(profile).map(String.init).joined(separator: ", "))). Quit those sessions first, then share.")
+        let live = dryRun ? [] : livePIDs(profile, configDir: configDir)
+        if !live.isEmpty {
+            throw HopperError("claude is running on \(profile.name) (pid \(live.map(String.init).joined(separator: ", "))). Quit those sessions first, then share.")
         }
         let stamp = { let f = DateFormatter(); f.dateFormat = "yyyyMMdd-HHmmss"; return f.string(from: now) }()
         var did: [String] = []
         for item in ["projects"] + items.filter({ $0 != "projects" }) {
             let at = dir.appendingPathComponent(item), src = baseDir.appendingPathComponent(item)
             if !fm.fileExists(atPath: src.path) {
-                guard item == "projects" || item == "todos" || item == "file-history" else { continue }  // folders Claude Code creates on first use
+                guard ["projects", "todos", "file-history", "sessions"].contains(item) else { continue }  // folders Claude Code creates on first use
                 if !dryRun { try fm.createDirectory(at: src, withIntermediateDirectories: true) }
             }
             let target = src.resolvingSymlinksInPath()
@@ -50,10 +74,11 @@ public enum Setup {
                     did.append("\(item): empty folder replaced by a link")
                     if !dryRun { try fm.removeItem(at: at) }
                 } else {
-                    did.append("\(item): moved to \(backup.lastPathComponent)" + (isDir.boolValue ? ", its files merged into \(base.name)" : "; \(base.name)'s copy is used"))
+                    let merged = isDir.boolValue && item != "sessions"
+                    did.append("\(item): moved to \(backup.lastPathComponent)" + (merged ? ", its files merged into \(base.name)" : isDir.boolValue ? "" : "; \(base.name)'s copy is used"))
                     if !dryRun {
                         try fm.moveItem(at: at, to: backup)
-                        if isDir.boolValue { try merge(backup, into: target, keepReplacedIn: backup.appendingPathComponent(".replaced-in-\(base.name)")) }
+                        if merged { try merge(backup, into: target, keepReplacedIn: backup.appendingPathComponent(".replaced-in-\(base.name)")) }
                     }
                 }
             } else {

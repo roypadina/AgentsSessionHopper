@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-05
+
+### Added
+- **Messaging across accounts**: `sessionhopper profiles share <name>` also links `sessions/`, Claude Code's list of
+  running sessions, so `@name`, `/peers` and messages between sessions reach sessions on every account. `doctor`
+  shows it per profile. It relies on undocumented Claude Code behaviour.
+- **Cancel a pending move**: `sessionhopper switch --cancel [--session <id>]`, and **Cancel Move** in a session's menu.
+  It drops a move you confirmed too; before, `hold` dropped only the moves the engine queued.
+
+### Fixed
+- `profiles share` now sees the sessions running on a profile whose `sessions/` folder is a link, and with a
+  shared list it counts only that profile's own sessions (from each process's `CLAUDE_CONFIG_DIR`).
+
 ## [1.8.1] - 2026-11-04
 
 ### Added

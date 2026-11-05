@@ -37,6 +37,8 @@ final class AppModel: ObservableObject {
         act { _ = try Control.requestMove(session: s.record.session, to: to ?? s.suggestion?.to, now: false, source: "menu", env: env) }
     }
 
+    func cancelMove(_ s: LiveSession) { act { _ = try Control.cancelMove(session: s.record.session, env: env) } }
+
     func notNow(_ s: LiveSession) { Control.dismiss(session: s.record.session, env: env); refresh() }
 
     func hold(_ s: LiveSession, on: Bool = true) { act { try Control.setHold(session: s.record.session, on: on, env: env) } }
