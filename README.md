@@ -42,7 +42,7 @@ brew install --cask roypadina/tap/agents-session-hopper
 - **Live usage per account**, from what Claude Code reports to its own status line (5-hour and weekly
   windows). Your own status line keeps working. The menu-bar window shows one row per profile with a
   usage bar and what comes next: when it switches at the current pace, when a full profile is free
-  again, or that it is ready. Each row's sessions sit in a menu with their moves and Hold.
+  again, or that it is ready. Each row's sessions sit in a menu with their moves, Cancel Move and Hold.
 - **You confirm every move.** At 85% (adjustable), when another profile has room, a notification and
   the menu bar ask: *"work is near its usage limit (88%). Continue this conversation on personal?"*
   Confirm, and the session moves when the current turn ends, resuming the same conversation.
@@ -59,6 +59,9 @@ brew install --cask roypadina/tap/agents-session-hopper
   from any app. The icon's tooltip and VoiceOver label read the fullest profile's usage.
 - **A summary when a session ends:** its name, what it is about, your last three prompts, how it
   ended, when it started and was last used, its folder and the resume command.
+- **Messaging across accounts.** Shared profiles also share Claude Code's list of running sessions, so
+  `@name`, `/peers` and messages between sessions reach sessions on every account. A session keeps its
+  `/rename` name when it moves. `doctor` shows whether it is on per profile.
 - **A CLI** (`sessionhopper`) that does all of it from the terminal, plus a shim for cmux and IDEs.
 
 <div align="center">

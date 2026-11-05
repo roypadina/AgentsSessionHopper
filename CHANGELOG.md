@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-05
+
 ### Added
 - **Messaging across accounts**: `sessionhopper profiles share <name>` also links `sessions/`, Claude Code's list of
   running sessions, so `@name`, `/peers` and messages between sessions reach sessions on every account. `doctor`
