@@ -8,7 +8,7 @@ changes anything:
 
 - **Share history** for profiles you already had: `sessionhopper profiles share <name>`. Links
   `projects/`, `todos/`, `file-history/` (/rewind), `sessions/` (so sessions on every account can message each
-  other), CLAUDE.md, agents, commands and skills to your first profile. A folder with content is moved to `<name>.ash-backup-<time>` and its files merged in (the newer
+  other; backed up, not merged), CLAUDE.md, agents, commands and skills to your first profile. A folder with content is moved to `<name>.ash-backup-<time>` and its files merged in (the newer
   copy wins; the other is kept in the backup). Quit sessions on that profile first.
 - **Make `claude` use it**: `sessionhopper shell install` adds one marked alias line to the startup file of
   your shell (zsh, bash, fish or tcsh), after a backup; `sessionhopper shell remove` takes it out.

@@ -104,7 +104,8 @@ click per step, and shows what each step changes before it does it:
 1. **Profiles**: finds your Claude Code folders (`~/.claude`, `~/.claude-*`) or adds new ones, and logs
    each in with Claude Code's own login.
 2. **Share history**: links conversation history, todo lists, `/rewind` checkpoints and your
-   CLAUDE.md/agents/commands/skills, so a conversation can continue on any profile. Existing folders are
+   CLAUDE.md/agents/commands/skills, so a conversation can continue on any profile, and Claude Code's list of
+   running sessions (messaging across accounts). Existing folders are
    moved to a backup and merged, never deleted.
 3. **Make `claude` use it**: adds one marked alias line to your shell's startup file (zsh, bash, fish or
    tcsh), after a backup. Remove it with one click.

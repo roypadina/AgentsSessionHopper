@@ -231,7 +231,8 @@ final class PanelSession: @unchecked Sendable {
             if let p = config.profile(named: to) { return move(to: p, trigger: "auto", replayTurn: false) }
         case .suggest(let to, let pct):
             let old = FileIO.decode(Suggestion.self, from: f.suggest)
-            if old?.to != to || old?.dismissed != true {
+            // A dismissed suggestion without a target (a cancelled "next with room" move) covers every target.
+            if old?.dismissed != true || (old?.to != nil && old?.to != to) {
                 try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
             }
         case .park, .none: break
