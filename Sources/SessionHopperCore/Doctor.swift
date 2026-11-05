@@ -104,8 +104,10 @@ public enum Doctor {
         // Not required for a move, but without them the todo list and /rewind checkpoints stay behind.
         let base = config.profiles[0]
         for p in config.profiles.dropFirst() {
-            let apart = notShared(["todos", "file-history"], dir: p.dir, base: base.dir)
-            if !apart.isEmpty { add(.info, "\(p.name): \(apart.joined(separator: ", ")) not shared with \(base.name), so todo lists and /rewind stay behind on a move. Share: sessionhopper profiles share \(p.name)") }
+            // Only folders the base has: Claude Code moved task lists from `todos` to `tasks`, so one of them is gone.
+            let used = ["todos", "tasks", "file-history"].filter { FileManager.default.fileExists(atPath: URL(fileURLWithPath: base.dir).appendingPathComponent($0).path) }
+            let apart = notShared(used, dir: p.dir, base: base.dir)
+            if !apart.isEmpty { add(.info, "\(p.name): \(apart.joined(separator: ", ")) not shared with \(base.name), so task lists and /rewind stay behind on a move. Share: sessionhopper profiles share \(p.name)") }
         }
         // One `sessions/` registry lets sessions on different accounts find each other (undocumented; may change with a Claude Code update).
         let others = config.profiles.dropFirst().filter { !$0.isGateway && $0.dir != base.dir }

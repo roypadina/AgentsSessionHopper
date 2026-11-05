@@ -13,7 +13,7 @@ sessionhopper hold on|off [--all]         never park or auto-move this session (
 sessionhopper status [--json]             profiles, last-known usage, live sessions
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
-sessionhopper profiles share <name> [--dry-run]  link history, todos, /rewind and setup to the first profile
+sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewind and setup to the first profile
                                           and the live-session list (messaging across accounts)
 sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to

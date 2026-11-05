@@ -58,12 +58,13 @@ public enum Setup {
         for item in ["projects"] + items.filter({ $0 != "projects" }) {
             let at = dir.appendingPathComponent(item), src = baseDir.appendingPathComponent(item)
             if !fm.fileExists(atPath: src.path) {
-                guard ["projects", "todos", "file-history", "sessions"].contains(item) else { continue }  // folders Claude Code creates on first use
+                guard ["projects", "todos", "tasks", "file-history", "sessions"].contains(item) else { continue }  // folders Claude Code creates on first use
                 if !dryRun { try fm.createDirectory(at: src, withIntermediateDirectories: true) }
             }
             let target = src.resolvingSymlinksInPath()
             if let dest = try? fm.destinationOfSymbolicLink(atPath: at.path) {
-                did.append(URL(fileURLWithPath: dest, relativeTo: dir).resolvingSymlinksInPath() == target ? "\(item): already shared" : "\(item): links elsewhere, left alone")
+                // Paths, not URLs: a folder created just now has no trailing "/" in `target`, the link's does.
+                did.append(URL(fileURLWithPath: dest, relativeTo: dir).resolvingSymlinksInPath().path == target.path ? "\(item): already shared" : "\(item): links elsewhere, left alone")
                 continue
             }
             var isDir: ObjCBool = false

@@ -32,7 +32,7 @@ final class SetupStepTests: XCTestCase {
 
         let did = try Setup.share(w, base: b, dryRun: false, now: Date(timeIntervalSince1970: 0))
         XCTAssertTrue(did.contains("todos: empty folder replaced by a link"), "\(did)")
-        for item in ["projects", "CLAUDE.md", "todos", "file-history", "sessions"] {
+        for item in ["projects", "CLAUDE.md", "todos", "tasks", "file-history", "sessions"] {
             XCTAssertNotNil(try? fm.destinationOfSymbolicLink(atPath: work.appendingPathComponent(item).path), item)
         }
         let projects = base.appendingPathComponent("projects")
@@ -54,6 +54,15 @@ final class SetupStepTests: XCTestCase {
         put(#"{"pid":\#(getpid()),"sessionId":"x"}"#, work.appendingPathComponent("sessions/\(getpid()).json"))
         XCTAssertThrowsError(try Setup.share(Profile(name: "work", dir: work.path, exportConfigDir: true),
                                              base: Profile(name: "default", dir: base.path, exportConfigDir: false), dryRun: false))
+    }
+
+    func testShareCreatesTheMissingBaseFolderBehindADanglingLink() throws {
+        let base = sb.profileDir(".claude"), work = sb.profileDir(".claude-work")
+        try fm.createSymbolicLink(at: work.appendingPathComponent("todos"), withDestinationURL: base.appendingPathComponent("todos"))
+        let did = try Setup.share(Profile(name: "work", dir: work.path, exportConfigDir: true),
+                                  base: Profile(name: "default", dir: base.path, exportConfigDir: false), dryRun: false)
+        XCTAssertTrue(did.contains("todos: already shared"), "\(did)")
+        XCTAssertTrue(fm.fileExists(atPath: base.appendingPathComponent("todos").path))
     }
 
     func testSharedRegistryCountsOnlyThisProfilesSessions() throws {

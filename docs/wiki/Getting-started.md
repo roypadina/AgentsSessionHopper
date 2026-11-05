@@ -7,7 +7,7 @@ brings the window back. It covers everything on this page plus three extras, eac
 changes anything:
 
 - **Share history** for profiles you already had: `sessionhopper profiles share <name>`. Links
-  `projects/`, `todos/`, `file-history/` (/rewind), `sessions/` (so sessions on every account can message each
+  `projects/`, `tasks/` (task lists; `todos/` on older Claude Code), `file-history/` (/rewind), `sessions/` (so sessions on every account can message each
   other; backed up, not merged), CLAUDE.md, agents, commands and skills to your first profile. A folder with content is moved to `<name>.ash-backup-<time>` and its files merged in (the newer
   copy wins; the other is kept in the backup). Quit sessions on that profile first.
 - **Make `claude` use it**: `sessionhopper shell install` adds one marked alias line to the startup file of

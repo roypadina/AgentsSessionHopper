@@ -12,7 +12,7 @@ This installs `AgentsSessionHopper.app` and links the `sessionhopper` command
 
 ## Linux
 
-x86_64, any glibc distribution (the Swift runtime is built in). The CLI only, no menu-bar app:
+x86_64, glibc 2.35 or newer, e.g. Ubuntu 22.04+ or Debian 12+ (the Swift runtime is built in). The CLI only, no menu-bar app:
 
 ```bash
 curl -LO https://github.com/roypadina/AgentsSessionHopper/releases/latest/download/sessionhopper-linux-x86_64.tar.gz
