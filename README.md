@@ -228,7 +228,7 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
   `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.
 - On Linux a killed `sessionhopper` (a caller's timeout) takes the running `claude` with it.
 
-**Linux install** (x86_64, any glibc distribution; the Swift runtime is built in):
+**Linux install** (x86_64, glibc 2.35 or newer, e.g. Ubuntu 22.04+ or Debian 12+; the Swift runtime is built in):
 
 ```bash
 curl -LO https://github.com/roypadina/AgentsSessionHopper/releases/latest/download/sessionhopper-linux-x86_64.tar.gz
@@ -293,7 +293,7 @@ git clone https://github.com/roypadina/AgentsSessionHopper.git
 cd AgentsSessionHopper
 swift test                        # unit + integration tests (fake `claude`, no real sessions)
 Scripts/package_app.sh            # dist/AgentsSessionHopper.app, CLI in Contents/Helpers/
-Scripts/package_linux.sh          # dist/sessionhopper-linux-x86_64.tar.gz, built in Docker (swift:6.4)
+Scripts/package_linux.sh          # dist/sessionhopper-linux-x86_64.tar.gz, built in Docker (swift:6.4-jammy)
 ```
 
 On Linux itself: `swift test` and `swift build -c release --static-swift-stdlib --product sessionhopper`.

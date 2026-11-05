@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-06
+
+### Fixed
+- Task lists move with a session again: `profiles share` (and `profiles add`) also link `tasks/`, where Claude Code
+  now keeps them (`todos/` before). `doctor` checks only the folders the first profile has, so it no longer reports
+  `todos` as not shared after Claude Code stopped using it.
+- `profiles share` no longer says "links elsewhere" for a link to a folder it has just created in the first profile.
+- The Linux CLI runs on glibc 2.35 or newer (Ubuntu 22.04+, Debian 12+). 1.8.1 and 1.9.0 needed glibc 2.43 and did
+  not start on Ubuntu 24.04.
+
 ## [1.9.0] - 2026-11-05
 
 ### Added

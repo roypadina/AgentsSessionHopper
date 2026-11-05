@@ -41,10 +41,11 @@ public enum Profiles {
 
     /// Items shared with the base profile when "share my setup" is on. `settings.json` is copied instead:
     /// Claude Code rewrites it by temp file + rename, which would replace a symlink.
-    /// `todos` and `file-history` carry a session's todo list and /rewind checkpoints across a move.
+    /// `tasks` (`todos` before Claude Code moved task lists there) and `file-history` carry a session's task list
+    /// and /rewind checkpoints across a move.
     /// `sessions` is Claude Code's live-session registry: one list lets sessions on every account find each other
     /// (`@name`, `/peers`, SendMessage). Undocumented Claude Code behaviour; `doctor` shows whether it is on.
-    public static let sharedSetup = ["CLAUDE.md", "agents", "commands", "skills", "todos", "file-history", "sessions"]
+    public static let sharedSetup = ["CLAUDE.md", "agents", "commands", "skills", "todos", "tasks", "file-history", "sessions"]
 
     /// Creates a new profile directory next to `base`. Never overwrites anything that exists.
     /// `projects/` is always linked to the base's (required for hand-off). Returns what it did.
@@ -76,7 +77,7 @@ public enum Profiles {
     private static func link(_ at: URL, to target: URL) -> String {
         let fm = FileManager.default
         if let dest = try? fm.destinationOfSymbolicLink(atPath: at.path) {
-            return URL(fileURLWithPath: dest).resolvingSymlinksInPath() == target ? "\(at.lastPathComponent): already linked" : "\(at.lastPathComponent): links elsewhere, left alone"
+            return URL(fileURLWithPath: dest).resolvingSymlinksInPath().path == target.path ? "\(at.lastPathComponent): already linked" : "\(at.lastPathComponent): links elsewhere, left alone"
         }
         if fm.fileExists(atPath: at.path) { return "\(at.lastPathComponent): exists, left alone" }
         do {
