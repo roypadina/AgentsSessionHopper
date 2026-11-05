@@ -3,7 +3,7 @@
 **Does it work without the app?** Yes. The CLI does everything; the app adds the menu bar,
 notifications and settings.
 
-**Does it read my usage from Anthropic's servers?** No. It makes no network requests. It only uses the
+**Does it read my usage from Anthropic's servers?** No. It makes no network requests to Anthropic (its only network use is the update check against GitHub, and only if you allow it). It only uses the
 numbers Claude Code gives its own status line, so a profile with no running session shows "unknown".
 
 **Does it move sessions on its own?** Only if you turn on **Move without asking** (off by default).

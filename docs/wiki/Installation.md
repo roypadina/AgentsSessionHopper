@@ -37,6 +37,10 @@ On first launch a **Welcome** window explains what the app does and never does, 
 to start Claude Code with it. It has an **Open at Login** switch (also in Settings → General) and a
 **Set Up Profiles…** button that opens the setup window.
 
+## Updating
+
+AgentsSessionHopper 1.8.0 and later ask once whether to check for updates automatically; with your yes they check once a day and ask before installing a new version. Check by hand with **Check for Updates…** in the About window. An update installed this way needs no `xattr` step, and the `sessionhopper` CLI comes with it. Homebrew works too: `brew upgrade --cask agents-session-hopper`.
+
 ## Uninstall
 
 ```bash
