@@ -78,7 +78,7 @@ let usage = """
                                               go straight to claude (or link the binary as *-shim)
 
     Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login, and makes
-    no network requests. A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
+    no network requests of its own (`refresh` runs `claude`, one small request per profile). A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
     """
 
 // MARK: - Subcommands
@@ -577,8 +577,9 @@ func refreshCommand(_ a: [String]) -> Int32 {
         let due = Set(UsageRefresh.due(config, limits: LimitStore.all(config, env.paths), now: Date().timeIntervalSince1970).map(\.name))
         ps = ps.filter { due.contains($0.name) }
     }
-    UsageRefresh.run(ps, env: env).forEach(out)
-    return 0
+    let r = UsageRefresh.run(ps, env: env, stop: Terminator())
+    r.lines.forEach(out)
+    return r.ok ? 0 : 1
 }
 
 func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version)"); return 0 }

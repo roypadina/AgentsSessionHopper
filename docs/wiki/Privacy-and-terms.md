@@ -16,8 +16,8 @@ accounts.
   OpenRouter API key, or on a server a `claude setup-token` for a profile. Each is kept in its own
   Keychain item (macOS) or a private file (Linux), and handed only to the `claude` it launches for that
   profile.
-- It makes no network requests to Anthropic or anyone else: no usage endpoint, no telemetry. The update check is opt-in: the app asks once whether to check automatically; with your yes it downloads the release feed from GitHub once a day, sending nothing about you. The optional skill
-  install runs Claude Code's own `claude plugin install`, which downloads the plugin from GitHub.
+- It makes no network requests of its own to Anthropic or anyone else: no usage endpoint, no telemetry. The update check is opt-in: the app asks once whether to check automatically; with your yes it downloads the release feed from GitHub once a day, sending nothing about you. The optional skill
+  install runs Claude Code's own `claude plugin install`, which downloads the plugin from GitHub. To refresh usage it runs `claude`: one tiny `claude -p` on Haiku per profile, a request to Anthropic on that account that uses a little of its usage and can start an idle account's 5-hour window. It runs by itself for a profile not seen for 6 hours, or when you click Refresh / run `sessionhopper refresh`.
 - It edits your shell's startup file only when you click **Add the line** (or run `sessionhopper shell
   install`): one marked line, after a backup, removable the same way.
 - It never modifies, patches or wraps the `claude` binary's traffic, and never logs in for you. Login

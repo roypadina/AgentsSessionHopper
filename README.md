@@ -247,7 +247,7 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
 - `sessionhopper` starts the **official, unmodified `claude`** with the profile's configuration folder
   and `--settings` that add a status line and a few hooks for that session only. No settings file is
   written. Claude Code's traffic is never changed, proxied or inspected.
-- **Usage** comes only from the documented
+- **Usage** comes from the documented
   [status-line input](https://code.claude.com/docs/en/statusline) (`rate_limits`), and limit stops
   from the documented [`StopFailure` hook](https://code.claude.com/docs/en/hooks) (`error: "rate_limit"`).
   A refresh reads the `rate_limit_event` that `claude -p --output-format stream-json` prints.
@@ -260,12 +260,12 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   happens in Claude Code's own flow. The only secrets it handles are ones you give it with `sessionhopper
   profiles key`: an OpenRouter key, or on a server a `claude setup-token` for a profile. Each is kept in
   its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
-- **It makes no network requests** to Anthropic or anyone else: no usage endpoint, no telemetry. The one
+- **It makes no network requests of its own** to Anthropic or anyone else: no usage endpoint, no telemetry. The one
   exception is the update check, and only with your permission: the app asks once (on its second launch)
   whether to check automatically, and with your yes downloads the release feed from GitHub once a day,
   sending nothing about you. (The optional skill install runs Claude Code's own `claude plugin install`,
   which downloads it from GitHub.)
-  To refresh usage (the Refresh button, `sessionhopper refresh`, and by itself for a profile not seen for 6 hours) it runs Claude Code itself: one tiny `claude -p` on Haiku per profile, a normal small request on that account.
+  To refresh usage it runs `claude`: one tiny `claude -p` on Haiku per profile, a request to Anthropic on that account that uses a little of its usage and can start an idle account's 5-hour window. It runs by itself for a profile not seen for 6 hours, or when you click Refresh / run `sessionhopper refresh`.
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
   when a conversation continues elsewhere.
 
@@ -275,7 +275,7 @@ change at any time. If you run it for a bot or service, check Anthropic's terms 
 
 ## Privacy
 
-No analytics, and no network access besides the opt-in update check (usage refresh runs `claude` itself, see above). State lives in `~/Library/Application Support/AgentsSessionHopper/`
+No analytics, and no network access of its own besides the opt-in update check (a usage refresh runs `claude`, see above). State lives in `~/Library/Application Support/AgentsSessionHopper/`
 (Linux: `~/.local/state/agents-session-hopper/`)
 (profile list, last-known usage percentages, the switch log). Preferences are in the defaults domain
 `com.padina.agents-session-hopper`. Optional `install-hooks` edits a profile's `settings.json` only when

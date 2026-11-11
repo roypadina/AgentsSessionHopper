@@ -36,7 +36,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Starts the official, unmodified `claude`, one config folder per account.", systemImage: "checkmark")
                     Label("Never reads your Claude login or Claude Code's Keychain items; it keeps only secrets you give it.", systemImage: "checkmark")
-                    Label("Makes no network requests. Usage comes only from Claude Code's own status line.", systemImage: "checkmark")
+                    Label("Makes no network requests of its own. Usage comes from Claude Code's status line, or a tiny `claude -p` refresh (one small request on that account).", systemImage: "checkmark")
                     Label("Use it only with accounts that are yours, never shared with anyone.", systemImage: "person.fill.checkmark")
                 }
                 .font(.callout)

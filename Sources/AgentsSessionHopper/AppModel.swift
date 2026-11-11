@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     private var timer: Timer?
     private var staleTimer: Timer?
     @Published private(set) var refreshing = false
+    /// Profile → last automatic refresh attempt, so one that never reports (logged out, offline) is not retried every 10 min.
+    private var tried: [String: Double] = [:]
 
     init(env: HopperEnvironment, autoRefresh: Bool = true) {
         self.env = env
@@ -31,11 +33,13 @@ final class AppModel: ObservableObject {
     func refreshUsage(onlyStale: Bool = false) {
         guard !refreshing else { return }
         let config = config, env = env
-        let profiles = onlyStale ? UsageRefresh.due(config, limits: snapshot.limits, now: Date().timeIntervalSince1970) : config.profiles
+        let now = Date().timeIntervalSince1970
+        let profiles = onlyStale ? UsageRefresh.due(config, limits: snapshot.limits, tried: tried, now: now) : config.profiles
         guard !profiles.isEmpty else { return }
+        for p in profiles { tried[p.name] = now }
         refreshing = true
         Task.detached {
-            UsageRefresh.run(profiles, env: env)
+            UsageRefresh.run(profiles, env: env, stop: Terminator(handleSignals: false))
             await MainActor.run { self.refreshing = false; self.refresh() }
         }
     }

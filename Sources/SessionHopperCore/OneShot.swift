@@ -5,7 +5,7 @@ import Foundation
 /// retries the same turn on the next profile.
 ///
 /// Usage comes from Claude Code's own output: with `--output-format stream-json` every run prints a
-/// `rate_limit_event` with the 5-hour and 7-day utilization and reset times. No network, no token read.
+/// `rate_limit_event` with the 5-hour and 7-day utilization and reset times. We read no token; `claude` makes the request.
 public enum OneShot {
     public enum Format: String, Sendable { case text, json, streamJSON = "stream-json" }
 
@@ -315,13 +315,15 @@ public enum OneShot {
 }
 
 /// SIGTERM / SIGINT / SIGHUP (systemd stop, Ctrl-C) end the running `claude` and stop retrying.
-final class Terminator: @unchecked Sendable {
+public final class Terminator: @unchecked Sendable {
     private let lock = NSLock()
     private var _child: Process?
     private var _requested = false
     private var sources: [DispatchSourceSignal] = []
 
-    init() {
+    /// `handleSignals: false` (the app): no process-wide signal handling, only `child` for a timeout.
+    public init(handleSignals: Bool = true) {
+        guard handleSignals else { return }
         for sig in [SIGTERM, SIGINT, SIGHUP] {
             signal(sig, SIG_IGN)
             let s = DispatchSource.makeSignalSource(signal: sig, queue: .global())

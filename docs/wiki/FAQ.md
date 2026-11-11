@@ -3,8 +3,7 @@
 **Does it work without the app?** Yes. The CLI does everything; the app adds the menu bar,
 notifications and settings.
 
-**Does it read my usage from Anthropic's servers?** No. It makes no network requests to Anthropic (its only network use is the update check against GitHub, and only if you allow it). It only uses the
-numbers Claude Code gives its own status line, so a profile with no running session shows "unknown".
+**Does it read my usage from Anthropic's servers?** Not by itself: it makes no network requests of its own (its only network use is the update check against GitHub, and only if you allow it). It uses the numbers Claude Code gives its own status line. To refresh usage it runs `claude`: one tiny `claude -p` on Haiku per profile, a request to Anthropic on that account that uses a little of its usage and can start an idle account's 5-hour window. It runs by itself for a profile not seen for 6 hours, or when you click Refresh / run `sessionhopper refresh`.
 
 **Does it move sessions on its own?** Only if you turn on **Move without asking** (off by default).
 Otherwise every move is your click or command. **Park before paid usage** only ever ends a session (and

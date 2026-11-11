@@ -11,5 +11,8 @@ final class UsageRefreshTests: XCTestCase {
         let sample = { (age: Double) in ProfileLimits(fiveHour: nil, sevenDay: LimitWindow(usedPercentage: 97, resetsAt: now + 86400), sampledAt: now - age) }
         let due = UsageRefresh.due(c, limits: ["fresh": sample(3600), "old": sample(3 * 86400)], now: now).map(\.name)
         XCTAssertEqual(due, ["old", "none"])
+        // A profile tried within 6 h is not probed again, even when that probe stored nothing.
+        let tried = UsageRefresh.due(c, limits: ["fresh": sample(3600)], tried: ["none": now - 600, "old": now - 7 * 3600], now: now).map(\.name)
+        XCTAssertEqual(tried, ["old"])
     }
 }
