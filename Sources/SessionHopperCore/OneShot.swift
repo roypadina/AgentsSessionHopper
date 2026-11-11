@@ -256,10 +256,12 @@ public enum OneShot {
     }
 
     /// One `claude` run: stdin in, stdout parsed line by line, stderr shown and kept for classification.
-    static func attempt(_ claude: String, args: [String], env: [String: String], stdin: Data, passThrough: Bool, stop: Terminator) -> Attempt {
+    static func attempt(_ claude: String, args: [String], env: [String: String], stdin: Data, passThrough: Bool, stop: Terminator,
+                        cwd: URL? = nil) -> Attempt {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: claude)
         proc.arguments = args
+        if let cwd { proc.currentDirectoryURL = cwd }
         #if os(Linux)
         // A caller that SIGKILLs us (a timeout) cannot have it forwarded: the kernel ends claude with us instead,
         // so no orphaned turn keeps the conversation busy. setpriv is util-linux, on every common distribution.

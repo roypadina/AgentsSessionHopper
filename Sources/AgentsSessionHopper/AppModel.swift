@@ -3,13 +3,16 @@ import SessionHopperCore
 import SwiftUI
 
 /// Reads the engine's state directory every couple of seconds and writes the user's choices back
-/// through the same files the CLI uses. No network, no credentials: only that directory.
+/// through the same files the CLI uses. No network, no credentials: only that directory, plus a tiny `claude -p`
+/// per profile whose usage is over 6 hours old (`UsageRefresh`) or on Refresh.
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var snapshot: HopperSnapshot
     @Published var lastError: String?
     let env: HopperEnvironment
     private var timer: Timer?
+    private var staleTimer: Timer?
+    @Published private(set) var refreshing = false
 
     init(env: HopperEnvironment, autoRefresh: Bool = true) {
         self.env = env
@@ -17,6 +20,23 @@ final class AppModel: ObservableObject {
         guard autoRefresh else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
+        }
+        refreshUsage(onlyStale: true)
+        staleTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshUsage(onlyStale: true) }
+        }
+    }
+
+    /// Fresh usage from Claude itself (`UsageRefresh`): every Claude profile, or only those with no sample in 6 h.
+    func refreshUsage(onlyStale: Bool = false) {
+        guard !refreshing else { return }
+        let config = config, env = env
+        let profiles = onlyStale ? UsageRefresh.due(config, limits: snapshot.limits, now: Date().timeIntervalSince1970) : config.profiles
+        guard !profiles.isEmpty else { return }
+        refreshing = true
+        Task.detached {
+            UsageRefresh.run(profiles, env: env)
+            await MainActor.run { self.refreshing = false; self.refresh() }
         }
     }
 

@@ -12,6 +12,12 @@ struct PopoverView: View {
             HStack {
                 Text("AgentsSessionHopper").font(.headline)
                 Spacer()
+                Button { model.refreshUsage() } label: { Image(systemName: "arrow.clockwise") }
+                    .buttonStyle(.borderless)
+                    .disabled(model.refreshing)
+                    .keyboardShortcut("r")
+                    .help(model.refreshing ? "Refreshing usage…" : "Refresh usage now (one tiny request per profile)")
+                    .accessibilityLabel("Refresh usage")
                 Button(action: openSettings) { Image(systemName: "gearshape") }
                     .buttonStyle(.borderless)
                     .keyboardShortcut(",")
