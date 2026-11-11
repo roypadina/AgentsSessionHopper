@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-11
+
+### Added
+- Refresh button in the menu-bar window (⌘R) and `sessionhopper refresh [profile...] [--stale]`: fresh usage for every
+  Claude profile from one tiny `claude -p` on Haiku per profile (no tools, no MCP, no saved transcript).
+- The app refreshes any Claude profile whose usage is over 6 hours old by itself (checked every 10 minutes).
+
+### Fixed
+- An idle profile kept usage numbers for days. A limit reset on the account page went unseen, so sessions moved to
+  that profile were sent straight back by the old 97% sample.
+
 ## [1.9.1] - 2026-11-06
 
 ### Fixed

@@ -11,6 +11,8 @@ sessionhopper switch [profile] [--now]    move this session at turn end (--sessi
 sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
 sessionhopper status [--json]             profiles, last-known usage, live sessions
+sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
+                                        (--stale: only profiles with no sample in 6 h; the app does this by itself)
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                         |remove <name>|order a,b,c|export-config-dir <name> on|off]
 sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewind and setup to the first profile

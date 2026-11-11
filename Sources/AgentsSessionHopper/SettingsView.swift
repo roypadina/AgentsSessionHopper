@@ -368,7 +368,7 @@ private struct GeneralSettings: View {
             }
             Section { HotkeyRecorder() }
             Section {
-                Text("AgentsSessionHopper makes no network requests and never reads your Claude login. Usage comes only from what Claude Code shows its own status line.")
+                Text("AgentsSessionHopper makes no network requests of its own and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.")
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Run setup again") { OnboardingWindow.show(model: model) }
             }

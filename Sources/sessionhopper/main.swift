@@ -49,6 +49,8 @@ let usage = """
       sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
       sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
       sessionhopper status [--json]             profiles, last-known usage, live sessions
+      sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
+                                              (--stale: only profiles with no sample in 6 h; the app does this by itself)
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
       sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewind and setup to the first profile
@@ -76,7 +78,7 @@ let usage = """
                                               go straight to claude (or link the binary as *-shim)
 
     Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login, and makes
-    no network requests. A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
+    no network requests of its own (`refresh` runs `claude`, one small request per profile). A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
     """
 
 // MARK: - Subcommands
@@ -565,11 +567,26 @@ func pluginCommand(_ a: [String]) -> Int32 {
     return rc
 }
 
+func refreshCommand(_ a: [String]) -> Int32 {
+    var a = a
+    let stale = has("--stale", in: &a)
+    let config = HopperConfig.load(env.paths)
+    var ps = a.isEmpty ? config.profiles : config.profiles.filter { a.contains($0.name) }
+    if let bad = a.first(where: { n in !config.profiles.contains { $0.name == n } }) { die("no profile named \(bad)") }
+    if stale {
+        let due = Set(UsageRefresh.due(config, limits: LimitStore.all(config, env.paths), now: Date().timeIntervalSince1970).map(\.name))
+        ps = ps.filter { due.contains($0.name) }
+    }
+    let r = UsageRefresh.run(ps, env: env, stop: Terminator())
+    r.lines.forEach(out)
+    return r.ok ? 0 : 1
+}
+
 func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.version)"); return 0 }
 
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand, "run": runCommand,
-    "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "sessions": sessionsCommand,
+    "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "refresh": refreshCommand, "sessions": sessionsCommand,
     "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
