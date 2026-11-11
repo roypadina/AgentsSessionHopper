@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-11
+
 ### Added
 - Refresh button in the menu-bar window (⌘R) and `sessionhopper refresh [profile...] [--stale]`: fresh usage for every
   Claude profile from one tiny `claude -p` on Haiku per profile (no tools, no MCP, no saved transcript).
