@@ -349,6 +349,8 @@ If this app saves you time, a coffee keeps the next one coming:
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/roypadina)
 
+Once in a while, AgentsSessionHopper asks too. A small receipt card shows up about 10 seconds after you close the menu-bar window, only within 12 hours after a hop kept a conversation going and when nothing needs you: no profile in use is on pace to reach the suggest threshold within the hour, and nothing was logged in the last 2 minutes. It only appears after more than 10 hops (about 3 weeks), and at most 3 times a year. "Ask me in 2 weeks" snoozes it, and "Nope, don't ask again" keeps it away until the next major version, and for at least 90 days. If an AgentsSessionHopper window opens or a session hits a limit while the card is still open, it closes and counts as a snooze; one left unanswered for 5 minutes, or when you step away, fades and counts as a snooze too. It never shows next to a limit or an error, never takes keyboard focus, and its counts stay on your Mac.
+
 ## License
 
 MIT © Roy Padina
