@@ -96,6 +96,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             StatusMenu.shared.install()
             HotkeyCenter.register(Hotkey.saved)
+            // The menu-bar panel opens only on a click or the hotkey (user actions): force the activation when it becomes key.
+            // SwiftUI's own activation may be the request macOS 14+ refuses; a menu in the panel then forces it and closes
+            // (traced in PullPing). The panel window comes from PopoverWindowReader (SupportPrompt.swift).
+            NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { note in
+                let w = note.object as? NSWindow
+                MainActor.assumeIsolated {
+                    if let w, w === SupportPrompt.shared.popover { NSApp.activate(ignoringOtherApps: true) }
+                }
+            }
             // Sparkle asks on the second launch before any check; never under the debug hook or a bare `swift run`.
             if ProcessInfo.processInfo.environment["ASH_DEBUG_OPEN"] == nil, Bundle.main.bundleIdentifier != nil {
                 _ = Updates.controller
