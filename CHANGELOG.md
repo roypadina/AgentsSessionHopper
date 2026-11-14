@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-11-14
+
+### Fixed
+- In-app updates: 1.11.0 kept the previous build number, so Check for Updates on 1.10.0 said it was up to date. 1.11.1 has a higher build number, so the update is offered again. No other changes.
+
 ## [1.11.0] - 2026-11-14
 
 ### Added
