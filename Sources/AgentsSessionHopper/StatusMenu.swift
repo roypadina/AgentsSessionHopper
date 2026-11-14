@@ -65,7 +65,9 @@ import SessionHopperCore
             .compactMap { $0.value(forKey: "statusItem") as? NSStatusItem }
             .first { $0.isVisible }
         guard let item else { return log.error("hotkey: no status item found") }
-        NSApp.activate()
+        // Forceful: hotkey or menu (user action). On macOS 14+ activate() is a request the front app can refuse, and the
+        // panel's first menu then forces the activation, which closes that menu (traced in PullPing).
+        NSApp.activate(ignoringOtherApps: true)
         let begin = NSSelectorFromString("_beginExpandedInterfaceSession:"), current = NSSelectorFromString("expandedInterfaceSession")
         guard item.responds(to: begin), item.responds(to: current) else { return item.button?.performClick(nil) ?? () }
         if let session = item.perform(current)?.takeUnretainedValue() as? NSObject {
