@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-11-15
+
+### Fixed
+- On macOS 14 and later, Settings, About, Welcome and Setup windows opened from the menu bar come to the front and stay there, instead of opening behind the app you were using.
+- The menu-bar panel brings AgentsSessionHopper to the front when it opens (click or shortcut), so a menu in the panel no longer closes on its first click.
+- Check for Updates… brings the update window to the front.
+
 ## [1.11.1] - 2026-11-14
 
 ### Fixed
