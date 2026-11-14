@@ -7,7 +7,7 @@ final class SupportPromptTests: XCTestCase {
     private let day = SupportPromptState.day
     private let install = Date(timeIntervalSince1970: 1_794_528_000)  // 2026-11-13 (UTC)
 
-    private func mayAsk(_ s: SupportPromptState, day d: Double, hops: Int = 20, version: String = "1.11.0") -> Bool {
+    private func mayAsk(_ s: SupportPromptState, day d: Double, hops: Int = 20, version: String = "1.11.1") -> Bool {
         s.mayAsk(now: install.addingTimeInterval(d * day), installDate: install, hops: hops, appVersion: version)
     }
 
@@ -20,21 +20,21 @@ final class SupportPromptTests: XCTestCase {
 
     func testSnoozeHidesFourteenDays() {
         var s = SupportPromptState()
-        s.record(.snooze, now: install.addingTimeInterval(10 * day), appVersion: "1.11.0")
+        s.record(.snooze, now: install.addingTimeInterval(10 * day), appVersion: "1.11.1")
         XCTAssertFalse(mayAsk(s, day: 23.9))
         XCTAssertTrue(mayAsk(s, day: 24))
     }
 
     func testSupportQuietFor180Days() {
         var s = SupportPromptState()
-        s.record(.support, now: install.addingTimeInterval(10 * day), appVersion: "1.11.0")
+        s.record(.support, now: install.addingTimeInterval(10 * day), appVersion: "1.11.1")
         XCTAssertFalse(mayAsk(s, day: 189))
         XCTAssertTrue(mayAsk(s, day: 190))
     }
 
     func testNeverLastsUntilNextMajorAndNinetyDays() {
         var s = SupportPromptState()
-        s.record(.never, now: install.addingTimeInterval(10 * day), appVersion: "1.11.0")
+        s.record(.never, now: install.addingTimeInterval(10 * day), appVersion: "1.11.1")
         XCTAssertFalse(mayAsk(s, day: 300, version: "1.12.0"), "a feature release must not undo 'never'")
         XCTAssertFalse(mayAsk(s, day: 50, version: "2.0.0"), "a major release within 90 days must not undo it")
         XCTAssertTrue(mayAsk(s, day: 100, version: "2.0.0"))
