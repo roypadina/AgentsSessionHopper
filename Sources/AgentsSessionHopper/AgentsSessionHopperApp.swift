@@ -9,6 +9,7 @@ struct AgentsSessionHopperApp: App {
     var body: some Scene {
         MenuBarExtra {
             PopoverView(model: model, openSettings: Self.openSettings)
+                .background(PopoverWindowReader())  // the Ko-fi card's moment is this window closing (SupportPrompt.swift)
         } label: {
             MenuBarLabel(model: model)
         }
@@ -28,6 +29,7 @@ struct AgentsSessionHopperApp: App {
         SettingsWindow.model = model
         EventLog.prune(model.env.paths, days: 90)
         model.notifier = Notifier(model: model)
+        SupportPrompt.shared.start(model: model)
         DispatchQueue.main.async {
             WelcomeWindow.showIfNeeded(model: model)
             model.checkLogins()

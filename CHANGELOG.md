@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-14
+
+### Added
+- Ko-fi support card: after a hop kept a conversation going (still running on the new profile 30 seconds later, or a
+  `run` turn served by another profile after a retry), the next time you close the menu-bar window with nothing
+  needing you (no suggestion, pending move, parked session or error, the profiles in use under the suggest threshold
+  and not on pace to reach it within the hour), a small receipt card may ask for a tip about 10 seconds later, only
+  within 12 hours of the hop and never within 2 minutes of a logged event. It waits until 7 days after you install
+  or update to this version, and until more than 10 hops (about 3 weeks of normal use) were counted since this
+  version. It asks at most 3 times a year and once per hop, only when you used the Mac in the last 10 seconds, and
+  never while you are typing, a menu or an AgentsSessionHopper window is open, a mouse button is held down, a usage
+  refresh runs, the screen is locked or the microphone is in use; a park, limit stop or failed run since the hop
+  cancels it. "Ask me in 2 weeks" snoozes it, a tip keeps it quiet for 180 days, and "Nope, don't ask again" keeps
+  it quiet until the next major version, and for at least 90 days. A card still open when an AgentsSessionHopper
+  window or update prompt opens, a session parks or hits a limit, or the Mac sleeps or locks, closes and counts as a
+  snooze; one left unanswered for 5 minutes, or 2 minutes without input, fades and counts as a snooze too. The card
+  never takes keyboard focus, and the same three choices head the right-click menu while it shows, for keyboard and
+  VoiceOver users. Hold ⌥ in the right-click menu for "Show Support Prompt Now" to preview it. Its count (hops since
+  this version) stays on your Mac, in the app's preferences; nothing is sent.
+
 ## [1.10.0] - 2026-11-11
 
 ### Added

@@ -9,7 +9,8 @@ final class StatusMenuTests: XCTestCase {
         let m = StatusMenu.shared.menu()
         XCTAssertEqual(m.items.map { $0.isSeparatorItem ? "-" : $0.title }, [
             "Open", "Show Hand-off Log", Updates.menuTitle, "-", "Settings…", "Request a feature", "Contribute",
-            "About AgentsSessionHopper", "Support on Ko-fi ☕", "-", "Quit AgentsSessionHopper"])
+            "About AgentsSessionHopper", "Support on Ko-fi ☕", "Show Support Prompt Now", "-", "Quit AgentsSessionHopper"])
+        XCTAssertTrue(m.items.first { $0.title == "Show Support Prompt Now" }?.isAlternate == true)
         XCTAssertEqual(m.items.last?.keyEquivalent, "q")
         XCTAssertTrue(m.items.filter { !$0.isSeparatorItem }.allSatisfy { $0.action != nil && $0.target != nil })
     }

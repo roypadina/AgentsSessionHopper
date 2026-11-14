@@ -24,10 +24,18 @@ import SessionHopperCore
 
     func menu() -> NSMenu {
         let m = NSMenu()
-        func item(_ title: String, _ action: Selector, key: String = "") {
+        @discardableResult func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
             let i = NSMenuItem(title: title, action: action, keyEquivalent: key)
             i.target = self
             m.addItem(i)
+            return i
+        }
+        if SupportPrompt.shared.showing {  // the receipt card is mouse-only; same three answers here
+            m.addItem(.sectionHeader(title: "Support AgentsSessionHopper"))
+            for (tag, title) in ["Tip a Coffee on Ko-fi ☕", "Ask Me in 2 Weeks", "Don't Ask Again"].enumerated() {
+                item(title, #selector(answerSupport(_:))).tag = tag  // index into supportAnswers
+            }
+            m.addItem(.separator())
         }
         item("Open", #selector(open))
         item("Show Hand-off Log", #selector(switchLog))
@@ -37,7 +45,10 @@ import SessionHopperCore
         item("Request a feature", #selector(feature))
         item("Contribute", #selector(contribute))
         item("About AgentsSessionHopper", #selector(about))
-        item("Support on Ko-fi ☕", #selector(kofi))
+        item("Support on Ko-fi ☕", #selector(kofi)).keyEquivalentModifierMask = []  // no modifier, so ⌥ swaps in the alternate below
+        let preview = item("Show Support Prompt Now", #selector(previewSupport))  // hold ⌥; never recorded
+        preview.keyEquivalentModifierMask = .option
+        preview.isAlternate = true
         m.addItem(.separator())
         item("Quit AgentsSessionHopper", #selector(quit), key: "q")
         return m
@@ -79,5 +90,8 @@ import SessionHopperCore
     @objc private func checkForUpdates() { Updates.check() }
     @objc private func about() { AboutWindow.show() }
     @objc private func kofi() { NSWorkspace.shared.open(HopperInfo.koFi) }
+    @objc private func previewSupport() { SupportPrompt.shared.present(record: false) }
+    private static let supportAnswers: [SupportPromptState.Answer] = [.support, .snooze, .never]
+    @objc private func answerSupport(_ sender: NSMenuItem) { SupportPrompt.shared.answerFromMenu(Self.supportAnswers[sender.tag]) }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 }
