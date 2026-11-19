@@ -7,19 +7,25 @@ public struct HopperSnapshot: Codable, Equatable, Sendable {
     public var sessions: [LiveSession]
     public var events: [HopperEvent]
     public var now: Double
+    /// Profile name → login email, for profiles where Claude Code's `.claude.json` has one.
+    public var emails: [String: String]
 
-    public init(config: HopperConfig, limits: [String: ProfileLimits], sessions: [LiveSession], events: [HopperEvent], now: Double) {
+    public init(config: HopperConfig, limits: [String: ProfileLimits], sessions: [LiveSession], events: [HopperEvent], now: Double,
+                emails: [String: String] = [:]) {
         self.config = config
         self.limits = limits
         self.sessions = sessions
         self.events = events
         self.now = now
+        self.emails = emails
     }
 
     public static func load(_ paths: StatePaths, events n: Int = 5) -> HopperSnapshot {
         let config = HopperConfig.load(paths)
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let emails = Dictionary(uniqueKeysWithValues: config.profiles.compactMap { p in Profiles.email(of: p, home: home).map { (p.name, $0) } })
         return HopperSnapshot(config: config, limits: LimitStore.all(config, paths), sessions: Sessions.live(paths),
-                              events: EventLog.read(paths, last: n), now: FileIO.now())
+                              events: EventLog.read(paths, last: n), now: FileIO.now(), emails: emails)
     }
 
     public func sessions(on profile: String) -> [LiveSession] { sessions.filter { $0.record.profile == profile } }

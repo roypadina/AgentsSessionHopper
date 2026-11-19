@@ -29,6 +29,19 @@ public enum Profiles {
         return String(entry.dropFirst())
     }
 
+    /// The login email Claude Code keeps in `.claude.json` (`oauthAccount.emailAddress`); not a credential.
+    /// Claude Code reads `<CLAUDE_CONFIG_DIR>/.claude.json`, or `~/.claude.json` when the variable is unset.
+    /// nil: gateway profile, no file, or no such field.
+    public static func email(of profile: Profile, home: URL) -> String? {
+        if profile.isGateway { return nil }
+        let file = URL(fileURLWithPath: profile.dir).appendingPathComponent(".claude.json")
+        let files = profile.exportConfigDir ? [file] : [home.appendingPathComponent(".claude.json"), file]
+        for f in files {
+            if let e = (FileIO.jsonObject(FileIO.read(f))?["oauthAccount"] as? [String: Any])?["emailAddress"] as? String, !e.isEmpty { return e }
+        }
+        return nil
+    }
+
     public static func isValidName(_ name: String) -> Bool {
         !name.isEmpty && name.count <= 32 && name.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     }

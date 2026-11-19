@@ -177,6 +177,9 @@ private struct ProfilesSettings: View {
                         VStack(alignment: .leading) {
                             Text(p.name)
                             Text(p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir)).font(.caption).foregroundStyle(.secondary)
+                            if let email = model.snapshot.emails[p.name] {
+                                Text(email).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                            }
                         }
                         Spacer()
                         LoginBadge(model: model, profile: p)

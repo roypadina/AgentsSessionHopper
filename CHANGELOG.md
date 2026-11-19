@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Each Claude profile now shows its login email (read from the profile's `.claude.json`, not a credential): under the name in the menu-bar panel and in Settings, in `sessionhopper profiles list` and `status`, and as `emails` in `status --json`.
+
 ## [1.11.3] - 2026-11-15
 
 ### Fixed
