@@ -143,6 +143,15 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Empty = clear. Display only; the profile's name is untouched.
+    func setLabel(_ name: String, _ text: String) {
+        update { c in
+            guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
+            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            c.profiles[i].label = t.isEmpty ? nil : t
+        }
+    }
+
     func priority(_ p: Profile) -> Int { Policy(config: config, limits: [:], now: 0).priority(p) }
 
     func checkLogins() {

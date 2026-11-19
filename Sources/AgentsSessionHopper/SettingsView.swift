@@ -168,6 +168,8 @@ private struct ProfilesSettings: View {
     @ObservedObject var model: AppModel
     @State private var adding = false
     @State private var removing: Profile?
+    @State private var renaming: String?
+    @State private var draft = ""
 
     var body: some View {
         Form {
@@ -175,8 +177,16 @@ private struct ProfilesSettings: View {
                 ForEach(Array(model.config.profiles.enumerated()), id: \.element.id) { i, p in
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(p.name)
-                            Text(p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir)).font(.caption).foregroundStyle(.secondary)
+                            if renaming == p.name {
+                                HStack {
+                                    TextField("Display name", text: $draft).onSubmit { saveLabel(p.name) }
+                                    Button("Save") { saveLabel(p.name) }
+                                    Button("Cancel") { renaming = nil }
+                                }
+                            } else {
+                                Text(p.displayName)
+                            }
+                            Text((p.label == nil ? "" : "\(p.name) · ") + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir))).font(.caption).foregroundStyle(.secondary)
                             if let email = model.snapshot.emails[p.name] {
                                 Text(email).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                             }
@@ -198,6 +208,7 @@ private struct ProfilesSettings: View {
                     }
                     .buttonStyle(.borderless)
                     .contextMenu {
+                        Button("Rename…") { draft = p.label ?? ""; renaming = p.name }
                         Button("Move Up") { model.moveProfile(p.name, by: -1) }.disabled(i == 0)
                         Button("Move Down") { model.moveProfile(p.name, by: 1) }.disabled(i == model.config.profiles.count - 1)
                         Divider()
@@ -207,7 +218,7 @@ private struct ProfilesSettings: View {
             } header: {
                 Text("Profiles")
             } footer: {
-                Text("Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
+                Text("The list order is also the fallback order. Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -226,13 +237,17 @@ private struct ProfilesSettings: View {
         }
         .formStyle(.grouped)
         .sheet(isPresented: $adding) { AddProfileSheet(model: model, isPresented: $adding) }
-        .confirmationDialog("Remove \(removing?.name ?? "") from the list?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+        .confirmationDialog("Remove \(removing?.displayName ?? "") from the list?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             presenting: removing) { p in
             Button("Remove", role: .destructive) { model.removeProfile(p.name) }
         } message: { p in
             Text(p.isGateway ? "Its key stays in the Keychain." : "Its folder and login stay on disk; add it again with Import.")
         }
     }
+}
+
+extension ProfilesSettings {
+    fileprivate func saveLabel(_ name: String) { model.setLabel(name, draft); renaming = nil }
 }
 
 struct LoginBadge: View {

@@ -87,7 +87,7 @@ struct ProfileRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
                     Image(systemName: severity.symbol).foregroundStyle(severity.color).frame(width: 14)
-                    Text(profile.name).lineLimit(1).frame(width: 76, alignment: .leading)
+                    Text(profile.displayName).lineLimit(1).frame(width: 76, alignment: .leading)
                     Gauge(value: min(w?.window.usedPercentage ?? 0, 100), in: 0...100) { EmptyView() }
                         .gaugeStyle(.linearCapacity)
                         .tint(severity.color)
@@ -103,7 +103,7 @@ struct ProfileRow: View {
             .help([five.map { "5h \(percentText($0))" }, week.map { "7d \(percentText($0))" }, l?.note(now: s.now)]
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(profile.name), \(s.emails[profile.name].map { $0 + ", " } ?? "")\(severity.spoken), 5-hour usage \(spoken(five)), weekly \(spoken(week))")
+            .accessibilityLabel("\(profile.displayName), \(s.emails[profile.name].map { $0 + ", " } ?? "")\(severity.spoken), 5-hour usage \(spoken(five)), weekly \(spoken(week))")
             .accessibilityValue(next)
 
             SessionsMenu(model: model, sessions: sessions)
@@ -131,7 +131,7 @@ struct ProfileRow: View {
                       case let to = pct < c.suggestThreshold ? Policy(config: c, limits: model.snapshot.limits, now: now).pick(c.profiles, excluding: profile.name) : nil,
                       // No profile to switch to: it runs on until the hard threshold.
                       let at = l.reaches(to == nil ? c.hardThreshold : c.suggestThreshold, now: now) {
-                text = "At this pace: " + (to.map { "switch to \($0.name)" } ?? "full")
+                text = "At this pace: " + (to.map { "switch to \($0.displayName)" } ?? "full")
                     + (at <= now ? " soon" : " ≈ \(ProfileLimits.clock(at))")
             } else if active {
                 text = resets.map { "Lasts until the reset at \($0)" } ?? "Has room"
@@ -154,7 +154,7 @@ struct SessionsMenu: View {
             ForEach(sessions) { session in
                 Menu(title(session)) {
                     ForEach(model.config.profiles.filter { $0.name != session.record.profile }) { p in
-                        Button("Move to \(p.name) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
+                        Button("Move to \(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
                     }
                     if session.pending != nil { Button("Cancel Move") { model.cancelMove(session) } }
                     Divider()
@@ -175,7 +175,7 @@ struct SessionsMenu: View {
         if session.held { parts.append("held") }
         if let t = session.waitingUntil { parts.append("parked, waits for a reset until \(ProfileLimits.clock(t))") }
         if let p = session.pending {
-            parts.append(p.to == PendingMove.park ? "parks at turn end" : "moves to \(p.to == PendingMove.anywhere ? "next" : p.to) at turn end")
+            parts.append(p.to == PendingMove.park ? "parks at turn end" : "moves to \(p.to == PendingMove.anywhere ? "next" : model.config.display(p.to)) at turn end")
         }
         parts.append(String(session.id.prefix(8)))
         return parts.joined(separator: " · ")
@@ -194,7 +194,7 @@ struct SuggestionCard: View {
             Text("\(model.tilde(session.record.cwd)) · \(session.busy ? "working" : "idle")")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Button(sug.to.map { "Move to \($0) at turn end" } ?? "Move at turn end") { model.confirmMove(session) }
+                Button(sug.to.map { "Move to \(model.config.display($0)) at turn end" } ?? "Move at turn end") { model.confirmMove(session) }
                     .buttonStyle(.borderedProminent)
                     .disabled(sug.to == nil)
                 Button("Not now") { model.notNow(session) }
@@ -210,7 +210,8 @@ struct SuggestionCard: View {
 
     private func headline(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
-        let head = s.reason == "login" ? "\(s.from)'s Claude login expired." : s.reason == "limit" ? "\(s.from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")." : "\(s.from) is near its usage limit\(pct)."
-        return head + (s.to.map { " Continue this conversation on \($0)?" } ?? " No other profile has room right now.")
+        let from = model.config.display(s.from)
+        let head = s.reason == "login" ? "\(from)'s Claude login expired." : s.reason == "limit" ? "\(from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")." : "\(from) is near its usage limit\(pct)."
+        return head + (s.to.map { " Continue this conversation on \(model.config.display($0))?" } ?? " No other profile has room right now.")
     }
 }

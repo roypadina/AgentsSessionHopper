@@ -52,8 +52,9 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             let key = "\(s.record.session)|\(sug.from)|\(sug.reason)"
             guard posted.insert(key).inserted else { continue }
             let content = UNMutableNotificationContent()
-            content.title = sug.reason == "login" ? "\(sug.from)'s Claude login expired" : sug.reason == "limit" ? "\(sug.from) hit its usage limit" : "\(sug.from) is near its usage limit"
-            content.body = (sug.detail.map { "\($0). " } ?? "") + (sug.to.map { "Continue this conversation on \($0)? " } ?? "No other profile has room right now. ")
+            let from = model?.config.display(sug.from) ?? sug.from
+            content.title = sug.reason == "login" ? "\(from)'s Claude login expired" : sug.reason == "limit" ? "\(from) hit its usage limit" : "\(from) is near its usage limit"
+            content.body = (sug.detail.map { "\($0). " } ?? "") + (sug.to.map { "Continue this conversation on \(model?.config.display($0) ?? $0)? " } ?? "No other profile has room right now. ")
                 + "(\(model?.tilde(s.record.cwd) ?? s.record.cwd))"
             content.categoryIdentifier = sug.to == nil ? "" : Self.category
             content.userInfo = ["session": s.record.session]
