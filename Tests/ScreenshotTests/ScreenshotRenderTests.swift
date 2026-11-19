@@ -56,17 +56,18 @@ final class ScreenshotRenderTests: XCTestCase {
         try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 88, resetsAt: now + 5400),
                                            sevenDay: LimitWindow(usedPercentage: 30, resetsAt: now + 400_000), sampledAt: now - 60), profile: "work", p)
         let me = getpid()
-        for (id, prof, cwd, busy) in [("1a2b3c4d-0000-0000-0000-000000000001", "work", "/Users/me/Code/app", true),
-                                      ("5e6f7a8b-0000-0000-0000-000000000002", "personal", "/Users/me/Code/site", false)] {
+        let code = home.appendingPathComponent("Code").path  // under the sample home, so the Folder column shows ~/Code/…
+        for (id, prof, cwd, busy) in [("1a2b3c4d-0000-0000-0000-000000000001", "work", "\(code)/app", true),
+                                      ("5e6f7a8b-0000-0000-0000-000000000002", "personal", "\(code)/site", false)] {
             try FileIO.encode(SessionRecord(session: id, resume: id, pid: me, child: me, profile: prof, cwd: cwd, started: id), to: p.session(id).record)
             if busy { FileIO.touch(p.session(id).busy) }
         }
         try FileIO.encode(Suggestion(from: "work", to: "personal", percent: 88, reason: "threshold"), to: p.session("1a2b3c4d-0000-0000-0000-000000000001").suggest)
         let today = ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600))
-        EventLog.append(HopperEvent(type: "limit", session: "9", cwd: "/Users/me/Code/api", from: "spare", trigger: "limit", source: "hook", ts: today), p)
-        EventLog.append(HopperEvent(type: "switch", session: "9", cwd: "/Users/me/Code/api", from: "spare", to: "personal", trigger: "confirm", source: "menu", ts: today), p)
-        EventLog.append(HopperEvent(type: "suggest", session: "1", cwd: "/Users/me/Code/app", from: "work", to: "personal", trigger: "threshold", source: "engine", ts: today), p)
-        EventLog.append(HopperEvent(type: "park", session: "7", cwd: "/Users/me/Code/docs", from: "work", trigger: "park", source: "engine", ts: today), p)
+        EventLog.append(HopperEvent(type: "limit", session: "9", cwd: "\(code)/api", from: "spare", trigger: "limit", source: "hook", ts: today), p)
+        EventLog.append(HopperEvent(type: "switch", session: "9", cwd: "\(code)/api", from: "spare", to: "personal", trigger: "confirm", source: "menu", ts: today), p)
+        EventLog.append(HopperEvent(type: "suggest", session: "1", cwd: "\(code)/app", from: "work", to: "personal", trigger: "threshold", source: "engine", ts: today), p)
+        EventLog.append(HopperEvent(type: "park", session: "7", cwd: "\(code)/docs", from: "work", trigger: "park", source: "engine", ts: today), p)
         return (AppModel(env: env, autoRefresh: false), root)
     }
 

@@ -112,7 +112,7 @@ extension SettingsView.Tab {
     var height: CGFloat {
         switch self {
         case .general: 460
-        case .handOff: 640
+        case .handOff: 800
         case .profiles: 460
         case .commandLine: 470
         case .log: 480
@@ -237,7 +237,7 @@ private struct ProfilesSettings: View {
                     Divider().frame(height: 14)
                     Button { removing = selection.flatMap(model.config.profile(named:)) } label: { Image(systemName: "minus").frame(width: 24, height: 22) }
                         .help("Remove from List…").accessibilityLabel("Remove Profile from List")
-                        .disabled(selection == nil)
+                        .disabled(selection.flatMap(model.config.profile(named:)) == nil)  // a removed row may stay selected
                 }
                 .buttonStyle(.borderless)
                 Spacer()
