@@ -10,7 +10,7 @@ sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywh
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
 sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
-sessionhopper status [--json]             profiles, last-known usage, live sessions
+sessionhopper status [--json]             profiles (with login email), last-known usage, live sessions
 sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
                                         (--stale: only profiles with no sample in 6 h; the app does this by itself)
 sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
