@@ -41,7 +41,7 @@ public struct HopperSnapshot: Codable, Equatable, Sendable {
 }
 
 public enum HopperInfo {
-    public static let version = "1.13.0"
+    public static let version = "1.14.0"
     public static let repo = URL(string: "https://github.com/roypadina/AgentsSessionHopper")!
     public static let koFi = URL(string: "https://ko-fi.com/roypadina")!
     public static let disclaimer = "AgentsSessionHopper is an independent open-source tool. It is not made by, affiliated with, or endorsed by Anthropic. Claude and Claude Code are trademarks of Anthropic, PBC."
