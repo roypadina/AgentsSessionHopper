@@ -103,7 +103,7 @@ struct SettingsView: View {
             case .about: AboutSettings(model: model)
             }
         }
-        .frame(width: 600, height: nav.tab.height)  // one width, height per pane (SET-8): grouped Forms have no ideal height
+        .frame(width: 600, height: min(nav.tab.height, (NSScreen.main?.visibleFrame.height ?? 800) - 90))  // one width, height per pane (SET-8): grouped Forms have no ideal height; capped so a small screen scrolls
     }
 }
 
