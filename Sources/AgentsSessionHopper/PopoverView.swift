@@ -95,12 +95,15 @@ struct ProfileRow: View {
                     Text(w.map { "\($0.name) \(percentText($0.window.usedPercentage))" } ?? "–")
                         .monospacedDigit().foregroundStyle(.secondary).frame(width: 52, alignment: .trailing)
                 }
+                if let email = s.emails[profile.name] {
+                    Text(email).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle).padding(.leading, 22)
+                }
                 Text(next).font(.caption).foregroundStyle(.secondary).padding(.leading, 22)
             }
             .help([five.map { "5h \(percentText($0))" }, week.map { "7d \(percentText($0))" }, l?.note(now: s.now)]
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(profile.name), \(severity.spoken), 5-hour usage \(spoken(five)), weekly \(spoken(week))")
+            .accessibilityLabel("\(profile.name), \(s.emails[profile.name].map { $0 + ", " } ?? "")\(severity.spoken), 5-hour usage \(spoken(five)), weekly \(spoken(week))")
             .accessibilityValue(next)
 
             SessionsMenu(model: model, sessions: sessions)

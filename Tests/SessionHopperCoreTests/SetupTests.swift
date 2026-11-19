@@ -213,3 +213,17 @@ final class RetentionTests: XCTestCase {
         XCTAssertTrue(text.hasSuffix("auth login\n"))
     }
 }
+
+final class ProfileEmailTests: XCTestCase {
+    func testEmailFromClaudeJson() throws {
+        let sb = Sandbox()
+        let dir = sb.profileDir(".claude-e")
+        let p = Profile(name: "e", dir: dir.path, exportConfigDir: true)
+        XCTAssertNil(Profiles.email(of: p, home: sb.home), "no file")
+        try #"{"oauthAccount":{"emailAddress":"a@b.co"}}"#.write(to: dir.appendingPathComponent(".claude.json"), atomically: true, encoding: .utf8)
+        XCTAssertEqual(Profiles.email(of: p, home: sb.home), "a@b.co")
+        var gw = p
+        gw.kind = Gateway.openRouter
+        XCTAssertNil(Profiles.email(of: gw, home: sb.home))
+    }
+}

@@ -99,7 +99,7 @@ func statusLineCommand(_ a: [String]) -> Int32 {
 
 func statusCommand(_ a: [String]) -> Int32 {
     var a = a
-    let s = HopperSnapshot.load(env.paths, events: 5)
+    let s = HopperSnapshot.load(env.paths, home: env.home, events: 5)
     if has("--json", in: &a) {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -115,7 +115,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let p = s.percent(p.name), p >= s.config.suggestThreshold { note += ", near limit" }
         let n = s.sessions(on: p.name).count
-        out("  \(i + 1). \(pad(p.name, 10)) \(pad(p.isGateway ? "openrouter" : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")")
+        out("  \(i + 1). \(pad(p.name, 10)) \(pad(p.isGateway ? "openrouter" : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(s.emails[p.name].map { "  \($0)" } ?? "")")
     }
     let c = s.config
     out("Hand-off: suggest at \(Int(c.suggestThreshold))%, park at \(Int(c.hardThreshold))% (\(c.parkBeforePaid ? "on" : "off")), move without asking: \(c.autoMove ? "on" : "off")")
@@ -246,7 +246,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         }
         let policy = Policy(config: config, limits: [:], now: 0)
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")")
+            out("  \(i + 1). \(pad(p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))

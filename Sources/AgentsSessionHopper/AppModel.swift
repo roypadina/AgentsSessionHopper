@@ -18,7 +18,7 @@ final class AppModel: ObservableObject {
 
     init(env: HopperEnvironment, autoRefresh: Bool = true) {
         self.env = env
-        snapshot = HopperSnapshot.load(env.paths, events: 200)
+        snapshot = HopperSnapshot.load(env.paths, home: env.home, events: 200)
         guard autoRefresh else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
@@ -48,7 +48,7 @@ final class AppModel: ObservableObject {
     var notifier: Notifier?
 
     func refresh() {
-        let s = HopperSnapshot.load(env.paths, events: 200)
+        let s = HopperSnapshot.load(env.paths, home: env.home, events: 200)
         if s != snapshot { snapshot = s }
         notifier?.update(s)
     }
