@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.13.0] - 2026-11-19
 
 ### Added
-- Rename a profile's display name (Settings → Profiles → Rename, or `sessionhopper profiles label <name> <text>|--clear`). The profile's name, used by aliases and `-P`, never changes. The label shows in the menu-bar window, session menus, notifications, Settings, `profiles list` and `status` (`status --json` has a `label` field).
+- Rename a profile's display name (Settings → Profiles → Rename, or `sessionhopper profiles label <name> <text>|--clear`). The profile's name, used by aliases and `-P`, never changes. The label shows in the menu-bar window, session menus, notifications, Settings, `profiles list` and `status` (`status --json`: `config.profiles[].label`, when set).
 - Settings notes that the profile list order is also the fallback order.
 
 ## [1.12.0] - 2026-11-19

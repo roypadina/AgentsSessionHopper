@@ -108,6 +108,11 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public func profile(named name: String) -> Profile? { profiles.first { $0.name == name } }
     /// The label of profile `name` if set, else `name` itself (also for unknown names, e.g. old log entries).
     public func display(_ name: String) -> String { profile(named: name)?.displayName ?? name }
+    /// True when `label` would read like another profile ("Move to X" must stay unambiguous).
+    public func labelClashes(_ label: String, for name: String) -> Bool {
+        profiles.contains { $0.name != name && ($0.name.caseInsensitiveCompare(label) == .orderedSame
+                                                || $0.displayName.caseInsensitiveCompare(label) == .orderedSame) }
+    }
 
     /// `prefer` moves to the front, the rest keep their order behind it; `only` drops the rest.
     public func order(prefer: [String], only: Bool) throws -> [Profile] {

@@ -143,13 +143,15 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Empty = clear. Display only; the profile's name is untouched.
-    func setLabel(_ name: String, _ text: String) {
+    /// Empty = clear. Display only; the profile's name is untouched. false = clashes with another profile.
+    @discardableResult func setLabel(_ name: String, _ text: String) -> Bool {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if config.labelClashes(t, for: name) { return false }
         update { c in
             guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
-            let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
             c.profiles[i].label = t.isEmpty ? nil : t
         }
+        return true
     }
 
     func priority(_ p: Profile) -> Int { Policy(config: config, limits: [:], now: 0).priority(p) }
@@ -199,7 +201,7 @@ final class AppModel: ObservableObject {
 
     func share(_ p: Profile, dryRun: Bool) {
         guard let base = config.profiles.first else { return }
-        do { setupLog = (dryRun ? ["\(p.name), would do:"] : ["\(p.name):"]) + (try Setup.share(p, base: base, dryRun: dryRun)) }
+        do { setupLog = (dryRun ? ["\(p.displayName), would do:"] : ["\(p.displayName):"]) + (try Setup.share(p, base: base, dryRun: dryRun)) }
         catch { setupLog = ["\(error)"] }
     }
 

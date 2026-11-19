@@ -100,7 +100,7 @@ struct ProfileRow: View {
                 }
                 Text(next).font(.caption).foregroundStyle(.secondary).padding(.leading, 22)
             }
-            .help([five.map { "5h \(percentText($0))" }, week.map { "7d \(percentText($0))" }, l?.note(now: s.now)]
+            .help([profile.displayName == profile.name ? profile.name : "\(profile.displayName) (\(profile.name))", five.map { "5h \(percentText($0))" }, week.map { "7d \(percentText($0))" }, l?.note(now: s.now)]
                 .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(profile.displayName), \(s.emails[profile.name].map { $0 + ", " } ?? "")\(severity.spoken), 5-hour usage \(spoken(five)), weekly \(spoken(week))")

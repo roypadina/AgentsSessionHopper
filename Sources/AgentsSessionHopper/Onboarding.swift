@@ -130,7 +130,7 @@ struct SetupSteps: View {
                  "Installs the agents-session-hopper skill from github.com/\(Setup.marketplace) into every profile, with Claude Code's own `claude plugin install`. Claude then knows which account it is on, how to switch or hold, and how to pick work back up after a move.")
             HStack {
                 ForEach(model.config.profiles) { p in
-                    Label(p.name, systemImage: model.pluginState[p.name] == true ? "checkmark.circle.fill" : "circle")
+                    Label(p.displayName, systemImage: model.pluginState[p.name] == true ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(model.pluginState[p.name] == true ? .green : .secondary)
                 }
                 Spacer()

@@ -13,4 +13,14 @@ final class LabelTests: XCTestCase {
         XCTAssertEqual(back.profiles[0].name, "claude5")
         XCTAssertEqual(back.display("gone"), "gone")
     }
+
+    func testLabelClashesWithAnotherProfilesNameOrLabel() throws {
+        let json = #"{"profiles":[{"name":"a","dir":"/a","exportConfigDir":true,"label":"Work"},{"name":"b","dir":"/b","exportConfigDir":true}]}"#
+        let c = try JSONDecoder().decode(HopperConfig.self, from: Data(json.utf8))
+        XCTAssertTrue(c.labelClashes("B", for: "a"))
+        XCTAssertTrue(c.labelClashes("work", for: "b"))
+        XCTAssertFalse(c.labelClashes("Work", for: "a"))
+        XCTAssertFalse(c.labelClashes("Home", for: "b"))
+        XCTAssertFalse(c.labelClashes("", for: "b"))
+    }
 }

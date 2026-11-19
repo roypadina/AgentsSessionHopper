@@ -186,7 +186,7 @@ private struct ProfilesSettings: View {
                             } else {
                                 Text(p.displayName)
                             }
-                            Text((p.label == nil ? "" : "\(p.name) · ") + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir))).font(.caption).foregroundStyle(.secondary)
+                            Text((p.displayName == p.name ? "" : "\(p.name) · ") + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir))).font(.caption).foregroundStyle(.secondary)
                             if let email = model.snapshot.emails[p.name] {
                                 Text(email).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                             }
@@ -247,7 +247,7 @@ private struct ProfilesSettings: View {
 }
 
 extension ProfilesSettings {
-    fileprivate func saveLabel(_ name: String) { model.setLabel(name, draft); renaming = nil }
+    fileprivate func saveLabel(_ name: String) { if model.setLabel(name, draft) { renaming = nil } }  // a clash keeps the field open
 }
 
 struct LoginBadge: View {
