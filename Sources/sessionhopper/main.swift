@@ -53,6 +53,7 @@ let usage = """
                                               (--stale: only profiles with no sample in 6 h; the app does this by itself)
       sessionhopper profiles [list|import|add <name> [--dir D] [--no-share] [--no-login]
                               |remove <name>|order a,b,c|export-config-dir <name> on|off]
+      sessionhopper profiles label <name> <text>|--clear  display name shown in the app and lists; the name itself never changes
       sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewind and setup to the first profile
                                               and the live-session list (messaging across accounts)
       sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10): equal priorities
@@ -115,7 +116,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let p = s.percent(p.name), p >= s.config.suggestThreshold { note += ", near limit" }
         let n = s.sessions(on: p.name).count
-        out("  \(i + 1). \(pad(p.name, 10)) \(pad(p.isGateway ? "openrouter" : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(s.emails[p.name].map { "  \($0)" } ?? "")")
+        out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) \(pad(p.isGateway ? "openrouter" : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(s.emails[p.name].map { "  \($0)" } ?? "")")
     }
     let c = s.config
     out("Hand-off: suggest at \(Int(c.suggestThreshold))%, park at \(Int(c.hardThreshold))% (\(c.parkBeforePaid ? "on" : "off")), move without asking: \(c.autoMove ? "on" : "off")")
@@ -246,7 +247,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         }
         let policy = Policy(config: config, limits: [:], now: 0)
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")")
+            out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "OpenRouter, pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))
@@ -289,6 +290,14 @@ func profilesCommand(_ a: [String]) -> Int32 {
         config.profiles.removeAll { $0.name == name }
         save()
         out("Removed \(name) from the list. Its folder and login are untouched.")
+    case "label":
+        guard a.count >= 2 else { die("usage: sessionhopper profiles label <name> <text>|--clear   (display name only; the profile name stays)") }
+        guard let i = config.profiles.firstIndex(where: { $0.name == a[0] }) else { die("No profile named \(a[0]). See: sessionhopper profiles list") }
+        let text = a[1] == "--clear" ? "" : a.dropFirst().joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        if config.labelClashes(text, for: a[0]) { die("\"\(text)\" is already another profile's name or label.") }
+        config.profiles[i].label = text.isEmpty ? nil : text
+        save()
+        out("\(a[0]): " + (config.profiles[i].label.map { "label \"\($0)\"" } ?? "label cleared"))
     case "order":
         guard let list = a.first else { die("usage: sessionhopper profiles order a,b,c") }
         do { config.profiles = try config.order(prefer: list.split(separator: ",").map(String.init), only: false) } catch { die("\(error)") }

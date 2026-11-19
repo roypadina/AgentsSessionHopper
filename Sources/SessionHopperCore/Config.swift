@@ -23,13 +23,16 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var resets: String?
     /// Lower is preferred (see `Policy.priority` for the default). Equal priorities don't trade places before a limit.
     public var priority: Int?
+    /// Display name only; `name` stays the id that aliases, `-P` and scripts use. nil/empty = show `name`.
+    public var label: String?
 
     public var id: String { name }
+    public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
     /// Billed per use (an API key), not a subscription: used only when no subscription profile has room.
     public var isGateway: Bool { kind == Gateway.openRouter }
 
     public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
-                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil) {
+                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil) {
         self.name = name
         self.dir = dir
         self.exportConfigDir = exportConfigDir
@@ -39,6 +42,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
         self.baseURL = baseURL
         self.resets = resets
         self.priority = priority
+        self.label = label
     }
 }
 
@@ -102,6 +106,13 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     }
 
     public func profile(named name: String) -> Profile? { profiles.first { $0.name == name } }
+    /// The label of profile `name` if set, else `name` itself (also for unknown names, e.g. old log entries).
+    public func display(_ name: String) -> String { profile(named: name)?.displayName ?? name }
+    /// True when `label` would read like another profile ("Move to X" must stay unambiguous).
+    public func labelClashes(_ label: String, for name: String) -> Bool {
+        profiles.contains { $0.name != name && ($0.name.caseInsensitiveCompare(label) == .orderedSame
+                                                || $0.displayName.caseInsensitiveCompare(label) == .orderedSame) }
+    }
 
     /// `prefer` moves to the front, the rest keep their order behind it; `only` drops the rest.
     public func order(prefer: [String], only: Bool) throws -> [Profile] {

@@ -53,7 +53,7 @@ struct OnboardingView: View {
             ForEach(model.config.profiles) { p in
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
-                    Text(p.name)
+                    Text(p.displayName)
                     Text(model.tilde(p.dir)).foregroundStyle(.secondary)
                     Spacer()
                     LoginBadge(model: model, profile: p)
@@ -101,10 +101,10 @@ struct SetupSteps: View {
                  "A conversation can only continue on another profile if they share Claude Code's history folder. Also shared: todo lists, /rewind checkpoints, CLAUDE.md, agents, commands, skills, and Claude Code's list of running sessions (messaging across accounts). Existing folders are moved to a backup and merged, never deleted. Quit sessions on a profile first.")
             ForEach(model.config.profiles.dropFirst()) { p in
                 HStack {
-                    Text(p.name)
+                    Text(p.displayName)
                     Spacer()
                     Button("Preview") { model.share(p, dryRun: true) }
-                    Button("Share with \(model.config.profiles.first?.name ?? "")") { model.share(p, dryRun: false) }
+                    Button("Share with \(model.config.profiles.first?.displayName ?? "")") { model.share(p, dryRun: false) }
                 }
             }
 
@@ -130,7 +130,7 @@ struct SetupSteps: View {
                  "Installs the agents-session-hopper skill from github.com/\(Setup.marketplace) into every profile, with Claude Code's own `claude plugin install`. Claude then knows which account it is on, how to switch or hold, and how to pick work back up after a move.")
             HStack {
                 ForEach(model.config.profiles) { p in
-                    Label(p.name, systemImage: model.pluginState[p.name] == true ? "checkmark.circle.fill" : "circle")
+                    Label(p.displayName, systemImage: model.pluginState[p.name] == true ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(model.pluginState[p.name] == true ? .green : .secondary)
                 }
                 Spacer()
