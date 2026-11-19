@@ -20,10 +20,10 @@ public struct HopperSnapshot: Codable, Equatable, Sendable {
         self.emails = emails
     }
 
-    public static func load(_ paths: StatePaths, events n: Int = 5) -> HopperSnapshot {
+    public static func load(_ paths: StatePaths, home: URL, events n: Int = 5) -> HopperSnapshot {
         let config = HopperConfig.load(paths)
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let emails = Dictionary(uniqueKeysWithValues: config.profiles.compactMap { p in Profiles.email(of: p, home: home).map { (p.name, $0) } })
+        var emails: [String: String] = [:]   // a loop, not uniqueKeysWithValues: a hand-edited config may repeat a name
+        for p in config.profiles where emails[p.name] == nil { emails[p.name] = Profiles.email(of: p, home: home) }
         return HopperSnapshot(config: config, limits: LimitStore.all(config, paths), sessions: Sessions.live(paths),
                               events: EventLog.read(paths, last: n), now: FileIO.now(), emails: emails)
     }

@@ -99,7 +99,7 @@ func statusLineCommand(_ a: [String]) -> Int32 {
 
 func statusCommand(_ a: [String]) -> Int32 {
     var a = a
-    let s = HopperSnapshot.load(env.paths, events: 5)
+    let s = HopperSnapshot.load(env.paths, home: env.home, events: 5)
     if has("--json", in: &a) {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

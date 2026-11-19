@@ -261,7 +261,9 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   profiles key`: an OpenRouter key, or on a server a `claude setup-token` for a profile. Each is kept in
   its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
   To show which account a profile is, it reads the login email Claude Code keeps in the profile's
-  `.claude.json` (`oauthAccount.emailAddress`); that is not a credential, and it is never sent anywhere.
+  `.claude.json` (`~/.claude.json` for the default profile, `oauthAccount.emailAddress`). That is not a
+  credential. It only displays it (menu-bar panel, Settings, `sessionhopper status` and `profiles list`)
+  and never sends it anywhere itself; remove it before you paste command output publicly.
 - **It makes no network requests of its own** to Anthropic or anyone else: no usage endpoint, no telemetry. The one
   exception is the update check, and only with your permission: the app asks once (on its second launch)
   whether to check automatically, and with your yes downloads the release feed from GitHub once a day,

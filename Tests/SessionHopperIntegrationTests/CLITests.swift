@@ -123,7 +123,7 @@ final class CLITests: XCTestCase {
         XCTAssertEqual(try h.run(["config", "suggest", "99"]).code, 1, "suggest must stay below park")
 
         let s = try h.run(["status", "--json"])
-        XCTAssertNotNil(try JSONDecoder().decode(HopperSnapshot.self, from: Data(s.stdout.utf8)))
+        XCTAssertEqual(try JSONDecoder().decode(HopperSnapshot.self, from: Data(s.stdout.utf8)).emails, [:], "sandbox home has no .claude.json")
         XCTAssertTrue(try h.run(["status"]).stdout.contains("1. default"))
         XCTAssertTrue(try h.run(["log"]).stdout.contains("No hand-offs yet"))
     }
