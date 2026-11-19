@@ -39,6 +39,8 @@ brew install --cask roypadina/tap/agents-session-hopper
   [Claude Code documents running several accounts](https://code.claude.com/docs/en/authentication).
   Existing `~/.claude` and `~/.claude-*` folders are picked up; new ones are created with your
   setup and history shared, and logged in through Claude Code's own `claude auth login`.
+  Give a profile a display name (Settings → Profiles → right-click → Rename…, or
+  `sessionhopper profiles label <name> <text>`); its name, used by aliases and `-P`, never changes.
 - **Live usage per account**, from what Claude Code reports to its own status line (5-hour and weekly
   windows). Your own status line keeps working. The menu-bar window shows one row per profile with its
   login email, a usage bar and what comes next: when it switches at the current pace, when a full profile is free

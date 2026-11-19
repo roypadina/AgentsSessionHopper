@@ -200,11 +200,11 @@ private struct ProfilesSettings: View {
                         }
                         .labelsHidden().fixedSize()
                         .help("Priority \(model.priority(p)): lower is preferred")
-                        .accessibilityLabel("Priority of \(p.name)")
+                        .accessibilityLabel("Priority of \(p.displayName)")
                         Button { model.moveProfile(p.name, by: -1) } label: { Image(systemName: "chevron.up") }
-                            .disabled(i == 0).accessibilityLabel("Move \(p.name) up")
+                            .disabled(i == 0).accessibilityLabel("Move \(p.displayName) up")
                         Button { model.moveProfile(p.name, by: 1) } label: { Image(systemName: "chevron.down") }
-                            .disabled(i == model.config.profiles.count - 1).accessibilityLabel("Move \(p.name) down")
+                            .disabled(i == model.config.profiles.count - 1).accessibilityLabel("Move \(p.displayName) down")
                     }
                     .buttonStyle(.borderless)
                     .contextMenu {

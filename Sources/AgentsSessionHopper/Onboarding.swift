@@ -53,7 +53,7 @@ struct OnboardingView: View {
             ForEach(model.config.profiles) { p in
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).accessibilityHidden(true)
-                    Text(p.name)
+                    Text(p.displayName)
                     Text(model.tilde(p.dir)).foregroundStyle(.secondary)
                     Spacer()
                     LoginBadge(model: model, profile: p)
@@ -101,10 +101,10 @@ struct SetupSteps: View {
                  "A conversation can only continue on another profile if they share Claude Code's history folder. Also shared: todo lists, /rewind checkpoints, CLAUDE.md, agents, commands, skills, and Claude Code's list of running sessions (messaging across accounts). Existing folders are moved to a backup and merged, never deleted. Quit sessions on a profile first.")
             ForEach(model.config.profiles.dropFirst()) { p in
                 HStack {
-                    Text(p.name)
+                    Text(p.displayName)
                     Spacer()
                     Button("Preview") { model.share(p, dryRun: true) }
-                    Button("Share with \(model.config.profiles.first?.name ?? "")") { model.share(p, dryRun: false) }
+                    Button("Share with \(model.config.profiles.first?.displayName ?? "")") { model.share(p, dryRun: false) }
                 }
             }
 
