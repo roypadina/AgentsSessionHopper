@@ -12,7 +12,7 @@ import SwiftUI
         guard let model else { return }
         if window == nil {
             let nav = SettingsNav()
-            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model, nav: nav).frame(width: 600, height: 480)))  // grouped Forms have no ideal height outside a Settings scene
+            let w = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model, nav: nav)))
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
             let tb = SettingsToolbar(nav: nav, window: w)
@@ -93,14 +93,40 @@ struct SettingsView: View {
     static let selectTab = Notification.Name("SettingsView.selectTab")
 
     var body: some View {
-        switch nav.tab {
-        case .general: GeneralSettings(model: model)
-        case .handOff: HandOffSettings(model: model)
-        case .profiles: ProfilesSettings(model: model)
-        case .commandLine: CommandLineSettings(model: model)
-        case .log: LogSettings(model: model)
-        case .about: AboutSettings(model: model)
+        Group {
+            switch nav.tab {
+            case .general: GeneralSettings(model: model)
+            case .handOff: HandOffSettings(model: model)
+            case .profiles: ProfilesSettings(model: model)
+            case .commandLine: CommandLineSettings(model: model)
+            case .log: LogSettings(model: model)
+            case .about: AboutSettings(model: model)
+            }
         }
+        .frame(width: 600, height: nav.tab.height)  // one width, height per pane (SET-8): grouped Forms have no ideal height
+    }
+}
+
+extension SettingsView.Tab {
+    /// Chosen from each pane's rows; re-pick when rows change.
+    var height: CGFloat {
+        switch self {
+        case .general: 460
+        case .handOff: 640
+        case .profiles: 460
+        case .commandLine: 470
+        case .log: 480
+        case .about: 330
+        }
+    }
+}
+
+extension View {
+    /// System Settings look for a Section footer (mac-design SET-6).
+    func formFooter() -> some View {
+        font(.subheadline).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .multilineTextAlignment(.leading)
     }
 }
 
@@ -110,25 +136,23 @@ private struct HandOffSettings: View {
     var body: some View {
         Form {
             Section {
-                Stepper(value: binding(\.suggestThreshold), in: 50...95, step: 1) {
-                    LabeledContent("Suggest a move at", value: "\(Int(model.config.suggestThreshold))%")
-                }
-                Text("When a session's profile reaches this share of its 5-hour or weekly limit and another profile has room, you are asked whether to continue the conversation there. Nothing moves until you confirm.")
-                    .font(.caption).foregroundStyle(.secondary)
+                PercentStepper(title: "Suggest a move at", value: binding(\.suggestThreshold), range: 50...95)
+            } header: { Text("Suggestions") } footer: {
+                Text("When a session's profile reaches this share of its 5-hour or weekly limit and another profile has room, you are asked whether to continue the conversation there. Nothing moves until you confirm.").formFooter()
             }
             Section {
                 Toggle("Move without asking", isOn: binding(\.autoMove))
-                Text("Off by default. When on, a session past the threshold moves to the next profile with room at the end of its current turn, without a prompt. Every move is still written to the log. Use it only with accounts that are all yours.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } footer: {
+                Text("Off by default. When on, a session past the threshold moves to the next profile with room at the end of its current turn, without a prompt. Every move is still written to the log. Use it only with accounts that are all yours.").formFooter()
             }
             Section {
                 Toggle("Park before paid usage", isOn: binding(\.parkBeforePaid))
-                Stepper(value: binding(\.hardThreshold), in: 80...100, step: 1) {
-                    LabeledContent("Park at", value: "\(Int(model.config.hardThreshold))%")
-                }
-                .disabled(!model.config.parkBeforePaid)
-                Text("Past this, a session you have not moved ends at its next turn end, so it does not run into paid extra usage. It is never moved for you; resume it later or on another profile.")
-                    .font(.caption).foregroundStyle(.secondary)
+                PercentStepper(title: "Park at", value: binding(\.hardThreshold), range: 80...100)
+                    .disabled(!model.config.parkBeforePaid)
+            } header: { Text("Paid Usage") } footer: {
+                Text("Past this, a session you have not moved ends at its next turn end, so it does not run into paid extra usage. It is never moved for you; resume it later or on another profile.").formFooter()
+            }
+            Section {
                 Toggle("Hold every session", isOn: Binding(get: { model.holdAll }, set: { model.setHoldAll($0) }))
             }
             ContinuePromptSection(model: model)
@@ -142,6 +166,23 @@ private struct HandOffSettings: View {
     }
 }
 
+/// Label on the left, value next to its stepper on the trailing edge.
+private struct PercentStepper: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                Text("\(Int(value))%").monospacedDigit()
+                Stepper(title, value: $value, in: range, step: 1).labelsHidden()
+                    .accessibilityValue("\(Int(value)) percent")
+            }
+        }
+    }
+}
+
 /// The message a session that was cut off by a move resumes with. Idle sessions resume without one.
 private struct ContinuePromptSection: View {
     @ObservedObject var model: AppModel
@@ -150,93 +191,73 @@ private struct ContinuePromptSection: View {
     var body: some View {
         Section {
             TextEditor(text: $text).font(.system(.caption, design: .monospaced)).frame(height: 110)
+                .accessibilityLabel("Continue prompt")
             HStack {
-                Text(model.config.continuePrompt == nil ? "Built-in" : "Your own").font(.caption).foregroundStyle(.secondary)
+                Text(model.config.continuePrompt == nil ? "Built-in" : "Your own").foregroundStyle(.secondary)
                 Spacer()
-                Button("Reset to built-in") { model.update { $0.continuePrompt = nil }; text = LaunchPlan.defaultContinuePrompt }
+                Button("Reset to Built-in") { model.update { $0.continuePrompt = nil }; text = LaunchPlan.defaultContinuePrompt }
                 Button("Save") { model.update { $0.continuePrompt = text == LaunchPlan.defaultContinuePrompt ? nil : text } }
                     .disabled(text == (model.config.continuePrompt ?? LaunchPlan.defaultContinuePrompt))
             }
-            Text("Sent when a move cut work off. Placeholders: {reason} why it stopped, {jobs} and {crons} what was running, {from} and {to} profile names. \"[sessionhopper] \" is always put in front.")
-                .font(.caption).foregroundStyle(.secondary)
-        } header: { Text("Continue prompt") }
+        } header: { Text("Continue Prompt") } footer: {
+            Text("Sent when a move cut work off. Placeholders: {reason} why it stopped, {jobs} and {crons} what was running, {from} and {to} profile names. \"[sessionhopper] \" is always put in front.").formFooter()
+        }
         .onAppear { text = model.config.continuePrompt ?? LaunchPlan.defaultContinuePrompt }
     }
 }
 
 private struct ProfilesSettings: View {
     @ObservedObject var model: AppModel
+    @State private var selection: String?
     @State private var adding = false
     @State private var removing: Profile?
-    @State private var renaming: String?
-    @State private var draft = ""
+    @State private var renaming: Profile?
 
     var body: some View {
-        Form {
-            Section {
-                ForEach(Array(model.config.profiles.enumerated()), id: \.element.id) { i, p in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            if renaming == p.name {
-                                HStack {
-                                    TextField("Display name", text: $draft).onSubmit { saveLabel(p.name) }
-                                    Button("Save") { saveLabel(p.name) }
-                                    Button("Cancel") { renaming = nil }
-                                }
-                            } else {
-                                Text(p.displayName)
-                            }
-                            Text((p.displayName == p.name ? "" : "\(p.name) · ") + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir))).font(.caption).foregroundStyle(.secondary)
-                            if let email = model.snapshot.emails[p.name] {
-                                Text(email).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                            }
-                        }
-                        Spacer()
-                        LoginBadge(model: model, profile: p)
-                        Picker("Priority", selection: Binding(get: { p.priority ?? 0 }, set: { model.setPriority(p.name, $0 == 0 ? nil : $0) })) {
-                            Text("Default (\(model.priority({ var d = p; d.priority = nil; return d }())))").tag(0)
-                            Divider()
-                            ForEach(1...10, id: \.self) { Text("\($0)").tag($0) }
-                        }
-                        .labelsHidden().fixedSize()
-                        .help("Priority \(model.priority(p)): lower is preferred")
-                        .accessibilityLabel("Priority of \(p.displayName)")
-                        Button { model.moveProfile(p.name, by: -1) } label: { Image(systemName: "chevron.up") }
-                            .disabled(i == 0).accessibilityLabel("Move \(p.displayName) up")
-                        Button { model.moveProfile(p.name, by: 1) } label: { Image(systemName: "chevron.down") }
-                            .disabled(i == model.config.profiles.count - 1).accessibilityLabel("Move \(p.displayName) down")
-                    }
-                    .buttonStyle(.borderless)
-                    .contextMenu {
-                        Button("Rename…") { draft = p.label ?? ""; renaming = p.name }
-                        Button("Move Up") { model.moveProfile(p.name, by: -1) }.disabled(i == 0)
-                        Button("Move Down") { model.moveProfile(p.name, by: 1) }.disabled(i == model.config.profiles.count - 1)
-                        Divider()
-                        Button("Remove from List…", role: .destructive) { removing = p }
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            List(selection: $selection) {
+                ForEach(model.config.profiles) { p in
+                    ProfileSettingsRow(model: model, profile: p)
+                        .accessibilityAction(named: "Rename") { renaming = p }
+                        .accessibilityAction(named: "Move Up") { model.moveProfile(p.name, by: -1) }
+                        .accessibilityAction(named: "Move Down") { model.moveProfile(p.name, by: 1) }
                 }
-            } header: {
-                Text("Profiles")
-            } footer: {
-                Text("The list order is also the fallback order. Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
-                    .font(.caption).foregroundStyle(.secondary)
+                .onMove { model.moveProfiles(from: $0, to: $1) }
             }
-            Section {
-                HStack {
-                    Button("Add Profile…") { adding = true }
-                    let found = model.discovered
-                    if !found.isEmpty {
-                        Button("Import \(found.count) found (\(found.map(\.name).joined(separator: ", ")))") { model.importDiscovered() }
-                    }
-                    Spacer()
-                    Button(model.checkingLogins ? "Checking…" : "Check logins") { model.checkLogins() }
-                        .disabled(model.checkingLogins)
+            .listStyle(.bordered(alternatesRowBackgrounds: true))
+            .contextMenu(forSelectionType: String.self) { names in
+                if let p = names.first.flatMap(model.config.profile(named:)) { menu(p) }
+            } primaryAction: { names in
+                renaming = names.first.flatMap(model.config.profile(named:))  // double-click or Return
+            }
+            HStack(spacing: 8) {
+                HStack(spacing: 0) {  // +/− under the list, like System Settings
+                    Button { adding = true } label: { Image(systemName: "plus").frame(width: 24, height: 22) }
+                        .help("Add Profile…").accessibilityLabel("Add Profile")
+                    Divider().frame(height: 14)
+                    Button { removing = selection.flatMap(model.config.profile(named:)) } label: { Image(systemName: "minus").frame(width: 24, height: 22) }
+                        .help("Remove from List…").accessibilityLabel("Remove Profile from List")
+                        .disabled(selection == nil)
                 }
+                .buttonStyle(.borderless)
+                Spacer()
+                let found = model.discovered
+                if !found.isEmpty {
+                    Button("Import \(found.count) Found (\(found.map(\.name).joined(separator: ", ")))") { model.importDiscovered() }
+                        .help("Profiles on disk that are not in the list yet")
+                }
+                Button(model.checkingLogins ? "Checking…" : "Check Logins") { model.checkLogins() }
+                    .disabled(model.checkingLogins)
             }
-            if let err = model.lastError { Text(err).foregroundStyle(.red) }
+            .padding(.top, 6)
+            Text("The list order is also the fallback order: drag to reorder. Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
+                .formFooter().fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+            if let err = model.lastError { Text(err).foregroundStyle(.red).padding(.top, 6) }
         }
-        .formStyle(.grouped)
+        .padding(20)
         .sheet(isPresented: $adding) { AddProfileSheet(model: model, isPresented: $adding) }
+        .sheet(item: $renaming) { RenameProfileSheet(model: model, profile: $0) }
         .confirmationDialog("Remove \(removing?.displayName ?? "") from the list?", isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             presenting: removing) { p in
             Button("Remove", role: .destructive) { model.removeProfile(p.name) }
@@ -244,10 +265,89 @@ private struct ProfilesSettings: View {
             Text(p.isGateway ? "Its key stays in the Keychain." : "Its folder and login stay on disk; add it again with Import.")
         }
     }
+
+    @ViewBuilder private func menu(_ p: Profile) -> some View {
+        let i = model.config.profiles.firstIndex { $0.name == p.name } ?? 0
+        Button("Rename…") { renaming = p }
+        Button("Move Up") { model.moveProfile(p.name, by: -1) }.disabled(i == 0)
+        Button("Move Down") { model.moveProfile(p.name, by: 1) }.disabled(i == model.config.profiles.count - 1)
+        Divider()
+        Button("Remove from List…", role: .destructive) { removing = p }
+    }
 }
 
-extension ProfilesSettings {
-    fileprivate func saveLabel(_ name: String) { if model.setLabel(name, draft) { renaming = nil } }  // a clash keeps the field open
+/// Display name (bold), login email, then `name · folder`; login state and priority on the trailing edge.
+private struct ProfileSettingsRow: View {
+    @ObservedObject var model: AppModel
+    let profile: Profile
+
+    var body: some View {
+        let p = profile
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(p.displayName).bold()
+                if let email = model.snapshot.emails[p.name] {
+                    Text(email).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Text("\(p.name) · " + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir)))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer()
+            LoginBadge(model: model, profile: p)
+            Picker("Priority", selection: Binding(get: { p.priority ?? 0 }, set: { model.setPriority(p.name, $0 == 0 ? nil : $0) })) {
+                Text("Default (\(model.priority({ var d = p; d.priority = nil; return d }())))").tag(0)
+                Divider()
+                ForEach(1...10, id: \.self) { Text("\($0)").tag($0) }
+            }
+            .labelsHidden().fixedSize()
+            .help("Priority \(model.priority(p)): lower is preferred")
+            .accessibilityLabel("Priority of \(p.displayName)")
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+/// A sheet, not an inline field: a TextField inside a List row with `.onMove` can lose its clicks to the drag.
+struct RenameProfileSheet: View {
+    @ObservedObject var model: AppModel
+    let profile: Profile
+    @Environment(\.dismiss) private var dismiss
+    @State private var draft: String
+    @State private var clash = false
+    @FocusState private var focused: Bool
+
+    init(model: AppModel, profile: Profile) {
+        self.model = model
+        self.profile = profile
+        _draft = State(initialValue: profile.label ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Rename \(profile.displayName)").font(.headline)
+            TextField("Display name", text: $draft, prompt: Text(profile.name))
+                .focused($focused)
+                .onSubmit(save)
+                .onChange(of: draft) { clash = false }
+            if clash {
+                Text("\"\(draft.trimmingCharacters(in: .whitespaces))\" is already another profile's name or label.").font(.caption).foregroundStyle(.red)
+            } else {
+                Text("Shown instead of \(profile.name) everywhere. Leave it empty to show \(profile.name). The profile name itself, used by aliases and -P, doesn't change.")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("Rename", action: save).keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 380)
+        .defaultFocus($focused, true)
+        .onAppear { focused = true }
+    }
+
+    private func save() { if model.setLabel(profile.name, draft) { dismiss() } else { clash = true } }  // a clash keeps the sheet open
 }
 
 struct LoginBadge: View {
@@ -384,11 +484,11 @@ private struct GeneralSettings: View {
                 Toggle("Notify me when a session should move", isOn: $notifications)
                 Toggle("Show usage % next to the menu-bar icon", isOn: $showPercent)
             }
-            Section { HotkeyRecorder() }
+            Section("Keyboard Shortcut") { HotkeyRecorder() }
             Section {
-                Text("AgentsSessionHopper makes no network requests of its own and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Button("Run setup again") { OnboardingWindow.show(model: model) }
+                LabeledContent("Profiles, logins and shell") { Button("Run Setup Again…") { OnboardingWindow.show(model: model) } }
+            } header: { Text("Setup") } footer: {
+                Text("AgentsSessionHopper makes no network requests of its own and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.").formFooter()
             }
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
@@ -403,20 +503,20 @@ private struct CommandLineSettings: View {
         let cli = model.env.selfPath
         Form {
             Section {
-                LabeledContent("CLI", value: model.tilde(cli))
-                Text("Installed with Homebrew, `sessionhopper` is already on your PATH. Otherwise link it yourself:")
-                    .font(.caption).foregroundStyle(.secondary)
+                LabeledContent("CLI") { Text(model.tilde(cli)).textSelection(.enabled).lineLimit(1).truncationMode(.middle) }
                 CopyRow(text: "ln -s \(FileIOQuote(cli)) /usr/local/bin/sessionhopper")
-            } header: { Text("Command line") }
+            } header: { Text("Command Line") } footer: {
+                Text("Installed with Homebrew, `sessionhopper` is already on your PATH. Otherwise link it yourself with the command above.").formFooter()
+            }
             Section {
-                Text("Start sessions with `sessionhopper` instead of `claude`. To make every interactive `claude` a supervised session, add to your shell profile:")
-                    .font(.caption).foregroundStyle(.secondary)
                 CopyRow(text: "alias claude='sessionhopper shim'")
-                Text("For cmux or an IDE that asks for a Claude binary path, link the CLI under a name ending in -shim and use that path. Subcommands, -p and --version still go straight to claude.")
-                    .font(.caption).foregroundStyle(.secondary)
+            } header: { Text("Use It by Default (Optional)") } footer: {
+                Text("Start sessions with `sessionhopper` instead of `claude`. To make every interactive `claude` a supervised session, add this line to your shell profile. The app edits your shell file only when you click Add the line in setup.").formFooter()
+            }
+            Section {
                 CopyRow(text: "ln -s \(FileIOQuote(cli)) ~/.local/bin/sessionhopper-shim")
-            } header: { Text("Use it by default (optional)") } footer: {
-                Text("The app edits your shell file only when you click Add the line in setup.").font(.caption).foregroundStyle(.secondary)
+            } header: { Text("cmux or an IDE") } footer: {
+                Text("For cmux or an IDE that asks for a Claude binary path, link the CLI under a name ending in -shim and use that path. Subcommands, -p and --version still go straight to claude.").formFooter()
             }
         }
         .formStyle(.grouped)
@@ -453,6 +553,12 @@ private struct LogSettings: View {
                 TableColumn("Folder") { e in Text(e.cwd.map(model.tilde) ?? "").lineLimit(1).truncationMode(.head) }
             }
             .frame(minHeight: 260)
+            .overlay {
+                if model.snapshot.events.isEmpty {
+                    ContentUnavailableView("No Hand-offs Yet", systemImage: "list.bullet.rectangle",
+                                           description: Text("Suggestions, moves and parked sessions show up here."))
+                }
+            }
             HStack {
                 Text("\(model.snapshot.events.count) entries · \(model.env.paths.events.lastPathComponent)")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)

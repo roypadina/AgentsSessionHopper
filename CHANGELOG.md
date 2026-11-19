@@ -5,6 +5,14 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Settings redesign, closer to System Settings. Profiles is a real list: select a row, drag to reorder (the list order is still the fallback order), double-click or press Return to rename in a small sheet, + and − under the list, right-click for Rename, Move Up, Move Down and Remove. Each row shows the display name in bold, the login email, then the profile name and folder.
+- Every Settings pane is sized to its content instead of one fixed size, with help text in section footers and titled sections (Suggestions, Paid Usage, Continue Prompt, Keyboard Shortcut, Setup, Command Line).
+- The Log pane says "No Hand-offs Yet" when the log is empty.
+- Renaming to a name or label another profile already uses now says so instead of silently keeping the field open.
+
 ## [1.13.0] - 2026-11-19
 
 ### Added

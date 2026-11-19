@@ -2,7 +2,7 @@
 
 The quickest way: open the app. On first launch a **Welcome** window explains it (Settings → About →
 **Welcome Guide…** shows it again); its **Set Up Profiles…** button opens the **setup window**. The
-panel offers the same button while there are no profiles, and Settings → General → **Run setup again**
+panel offers the same button while there are no profiles, and Settings → General → **Run Setup Again…**
 brings the window back. It covers everything on this page plus three extras, each shown before it
 changes anything:
 
@@ -23,12 +23,12 @@ way to use several accounts: one `CLAUDE_CONFIG_DIR` per account.
 
 - **Already have them?** `sessionhopper profiles import` (or **Use these** in the setup window)
   picks up `~/.claude`, `~/.claude-*` and `~/.claudeN`. Nothing inside them is changed.
-- **New one:** `sessionhopper profiles add work` (or Settings → Profiles → **Add Profile…**). It creates
+- **New one:** `sessionhopper profiles add work` (or Settings → Profiles → **+**). It creates
   `~/.claude-work`, links `projects/` (conversation history) to your first profile, optionally shares
   CLAUDE.md, agents, commands and skills, copies settings.json, then runs Claude Code's own
   `claude auth login` for it.
 
-The order in the list is the fallback order: new sessions start on the first profile with room (Settings → Profiles: the ⌃ ⌄ arrows). Right-click a profile → **Rename…** to give it a display name; its name, used by aliases and `-P`, stays the same. Each profile also has a priority (Settings → Profiles, or `sessionhopper profiles priority <name> <n>`): lower is preferred, so a fallback account at 2 or an OpenRouter key (10 by default) is used only when every better one is full.
+The order in the list is the fallback order: new sessions start on the first profile with room (Settings → Profiles: drag a row, or right-click → Move Up / Move Down). Double-click a profile (or right-click → **Rename…**) to give it a display name; its name, used by aliases and `-P`, stays the same. Each profile also has a priority (Settings → Profiles, or `sessionhopper profiles priority <name> <n>`): lower is preferred, so a fallback account at 2 or an OpenRouter key (10 by default) is used only when every better one is full.
 
 Check everything with:
 

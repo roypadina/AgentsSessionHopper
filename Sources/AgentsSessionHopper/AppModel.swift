@@ -84,6 +84,11 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Drag-to-reorder in Settings; the list order is the fallback order (same as `profiles order`).
+    func moveProfiles(from source: IndexSet, to destination: Int) {
+        update { $0.profiles.move(fromOffsets: source, toOffset: destination) }
+    }
+
     // MARK: Profiles and logins
 
     /// Logged-in state per profile from `claude auth status` (nil = not checked or claude not found).
