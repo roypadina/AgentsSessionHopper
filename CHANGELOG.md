@@ -5,6 +5,11 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-11-22
+
+### Fixed
+- `sessionhopper run` no longer hangs when the caller keeps stdin open, such as a `--input-format stream-json` caller that writes its message and keeps the pipe open for control messages. `run` used to read stdin to the end before it started `claude`; it now passes the input to `claude` as it arrives and keeps a copy, so a retry on the next profile after a usage limit gets the same input again. A turn that fails on a limit, credits or login now closes that `claude`'s input, so it ends and the retry starts without waiting for the caller. `run` stays one turn per call: a retry sends everything the caller wrote since the start.
+
 ## [1.15.0] - 2026-11-22
 
 ### Added

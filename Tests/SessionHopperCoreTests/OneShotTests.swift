@@ -60,6 +60,15 @@ final class OneShotTests: XCTestCase {
         XCTAssertEqual(OneShot.resetEpoch("limit reached|1793715000000", now: now), 1_793_715_000)
     }
 
+    func testInputForAnEndedClaudeFailsTheWriteInsteadOfEndingUs() {
+        let feed = InputFeed(Data("hi\n".utf8))
+        let pipe = Pipe()
+        try? pipe.fileHandleForReading.close() // claude has ended: a write now raises SIGPIPE unless guarded
+        let done = DispatchSemaphore(value: 0)
+        Thread.detachNewThread { feed.copy(to: pipe.fileHandleForWriting, turn: feed.turn); done.signal() }
+        XCTAssertEqual(done.wait(timeout: .now() + 5), .success)
+    }
+
     func testRetryResumesOnlyAnExistingTranscript() throws {
         let box = Sandbox()
         let projects = box.root.appendingPathComponent("projects")

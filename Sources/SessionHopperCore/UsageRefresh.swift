@@ -35,7 +35,7 @@ public enum UsageRefresh {
             let childEnv = LaunchPlan.childEnvironment(base: env.vars, profile: p, sessionID: "", env: env, userStatusCommand: nil)
             let watchdog = DispatchWorkItem { if let c = stop.child, c.isRunning { c.terminate() } }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: watchdog)
-            let a = OneShot.attempt(claude, args: args, env: childEnv, stdin: Data("reply ok".utf8), passThrough: false,
+            let a = OneShot.attempt(claude, args: args, env: childEnv, stdin: InputFeed(Data("reply ok".utf8)), passThrough: false,
                                     stop: stop, cwd: scratch)
             watchdog.cancel()
             let now = FileIO.now()

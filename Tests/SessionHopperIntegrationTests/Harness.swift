@@ -98,7 +98,7 @@ final class Harness {
     /// Runs the CLI in `cwd` (default: the work dir) and waits up to `timeout`.
     @discardableResult
     func run(_ args: [String], cwd: URL? = nil, exe: URL? = nil, extraEnv: [String: String] = [:], timeout: TimeInterval = 20,
-             stdin: String? = nil, onStart: ((Process) -> Void)? = nil) throws -> Result {
+             stdin: String? = nil, input: Pipe? = nil, onStart: ((Process) -> Void)? = nil) throws -> Result {
         let p = Process()
         p.executableURL = exe ?? Harness.binary
         p.arguments = args
@@ -114,7 +114,9 @@ final class Harness {
         FileManager.default.createFile(atPath: out.path + ".e", contents: nil)
         p.standardOutput = try FileHandle(forWritingTo: URL(fileURLWithPath: out.path + ".o"))
         p.standardError = try FileHandle(forWritingTo: URL(fileURLWithPath: out.path + ".e"))
-        if let stdin {
+        if let input {
+            p.standardInput = input
+        } else if let stdin {
             try write(stdin, "stdin-\(out.lastPathComponent)")
             p.standardInput = try FileHandle(forReadingFrom: t.appendingPathComponent("stdin-\(out.lastPathComponent)"))
         } else {

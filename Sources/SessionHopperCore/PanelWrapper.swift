@@ -361,6 +361,6 @@ final class PanelSession: @unchecked Sendable {
     }
 }
 
-extension NSLock {
+extension NSLocking {
     func sync<T>(_ body: () throws -> T) rethrows -> T { lock(); defer { unlock() }; return try body() }
 }
