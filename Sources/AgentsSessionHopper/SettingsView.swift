@@ -32,7 +32,7 @@ final class SettingsNav: ObservableObject {
 /// Classic preferences toolbar: icon + label per tab, selected one highlighted, window title follows the tab.
 @MainActor final class SettingsToolbar: NSObject, NSToolbarDelegate {
     private static let tabs: [(SettingsView.Tab, String, String)] = [
-        (.general, "General", "gearshape"), (.handOff, "Hand-off", "arrow.triangle.swap"),
+        (.general, "General", "gearshape"), (.handOff, "Hand-off", "arrow.triangle.swap"), (.alerts, "Alerts", "bell"),
         (.profiles, "Profiles", "person.2"), (.commandLine, "Command line", "terminal"),
         (.log, "Log", "list.bullet.rectangle"), (.about, "About", "info.circle"),
     ]
@@ -87,7 +87,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var nav: SettingsNav
 
-    enum Tab: Hashable { case general, handOff, profiles, commandLine, log, about }
+    enum Tab: Hashable { case general, handOff, alerts, profiles, commandLine, log, about }
     /// Set by the status-item menu; SettingsToolbar applies it (window already open → notification, else on show).
     static var pendingTab: Tab?
     static let selectTab = Notification.Name("SettingsView.selectTab")
@@ -97,6 +97,7 @@ struct SettingsView: View {
             switch nav.tab {
             case .general: GeneralSettings(model: model)
             case .handOff: HandOffSettings(model: model)
+            case .alerts: AlertsSettings(model: model)
             case .profiles: ProfilesSettings(model: model)
             case .commandLine: CommandLineSettings(model: model)
             case .log: LogSettings(model: model)
@@ -111,8 +112,9 @@ extension SettingsView.Tab {
     /// Chosen from each pane's rows; re-pick when rows change.
     var height: CGFloat {
         switch self {
-        case .general: 460
-        case .handOff: 800
+        case .general: 680
+        case .handOff: 900
+        case .alerts: 900
         case .profiles: 460
         case .commandLine: 470
         case .log: 480
@@ -153,6 +155,20 @@ private struct HandOffSettings: View {
                 Text("Past this, a session you have not moved ends at its next turn end, so it does not run into paid extra usage. It is never moved for you; resume it later or on another profile.").formFooter()
             }
             Section {
+                ForEach(model.config.profiles.filter { !$0.isGateway }) { p in
+                    Toggle("\(p.displayName): own thresholds", isOn: ownThresholds(p.name))
+                        .toggleStyle(.switch).controlSize(.mini)
+                    if p.suggestThreshold != nil || p.hardThreshold != nil {
+                        PercentStepper(title: "Suggest a move at", value: profileValue(p.name, \.suggestThreshold, global: model.config.suggestThreshold), range: 50...95)
+                            .padding(.leading, 16)
+                        PercentStepper(title: "Park at", value: profileValue(p.name, \.hardThreshold, global: model.config.hardThreshold), range: 80...100)
+                            .padding(.leading, 16)
+                    }
+                }
+            } header: { Text("Per Profile") } footer: {
+                Text("A profile with its own thresholds is measured against them: when to suggest or make a move away from it, when to park it, and when it counts as having room. The others use the values above.").formFooter()
+            }
+            Section {
                 Toggle("Hold every session", isOn: Binding(get: { model.holdAll }, set: { model.setHoldAll($0) }))
             }
             ContinuePromptSection(model: model)
@@ -163,6 +179,23 @@ private struct HandOffSettings: View {
 
     private func binding<T>(_ key: WritableKeyPath<HopperConfig, T>) -> Binding<T> {
         Binding(get: { model.config[keyPath: key] }, set: { v in model.update { $0[keyPath: key] = v } })
+    }
+
+    /// On: start from the global values; off: back to them.
+    private func ownThresholds(_ name: String) -> Binding<Bool> {
+        Binding(get: { model.config.profile(named: name).map { $0.suggestThreshold != nil || $0.hardThreshold != nil } ?? false },
+                set: { on in model.update { c in
+                    guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
+                    c.profiles[i].suggestThreshold = on ? c.suggestThreshold : nil
+                    c.profiles[i].hardThreshold = on ? c.hardThreshold : nil
+                } })
+    }
+
+    private func profileValue(_ name: String, _ key: WritableKeyPath<Profile, Double?>, global: Double) -> Binding<Double> {
+        Binding(get: { model.config.profile(named: name)?[keyPath: key] ?? global },
+                set: { v in model.update { c in
+                    if let i = c.profiles.firstIndex(where: { $0.name == name }) { c.profiles[i][keyPath: key] = v }
+                } })
     }
 }
 
@@ -491,23 +524,146 @@ private struct GeneralSettings: View {
     @ObservedObject var model: AppModel
     @AppStorage(Notifier.enabledKey) private var notifications = true
     @AppStorage(MenuBarLabel.showPercentKey) private var showPercent = true
+    @AppStorage(MenuBarLabel.modeKey) private var modeRaw = ""
+    @AppStorage(MenuBarLabel.chosenKey) private var chosen = ""
+
+    private var mode: Binding<MenuBarLabel.Mode> {
+        Binding(get: { MenuBarLabel.Mode(rawValue: modeRaw) ?? (showPercent ? .fullest : .off) }, set: { modeRaw = $0.rawValue })
+    }
+    private func picked(_ name: String) -> Binding<Bool> {
+        Binding(get: { chosen.split(separator: ",").contains { $0 == name } },
+                set: { on in
+                    var names = chosen.split(separator: ",").map(String.init).filter { $0 != name }
+                    if on { names.append(name) }
+                    chosen = names.joined(separator: ",")
+                })
+    }
 
     var body: some View {
         Form {
             Section {
                 LaunchAtLoginToggle()
                 Toggle("Notify me when a session should move", isOn: $notifications)
-                Toggle("Show usage % next to the menu-bar icon", isOn: $showPercent)
+            }
+            Section {
+                Picker("Usage next to the icon", selection: mode) {
+                    ForEach(MenuBarLabel.Mode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.radioGroup)
+                if mode.wrappedValue == .chosen {
+                    ForEach(model.config.profiles) { p in
+                        Toggle(p.displayName, isOn: picked(p.name)).toggleStyle(.switch).controlSize(.mini)
+                    }
+                }
+            } header: { Text("Menu Bar") } footer: {
+                Text("\"In use\" means a session runs on it now. Each profile shows the shortest start of its name that tells it apart; give a profile a short label in Profiles to choose it.").formFooter()
             }
             Section("Keyboard Shortcut") { HotkeyRecorder() }
             Section {
                 LabeledContent("Profiles, logins and shell") { Button("Run Setup Again…") { OnboardingWindow.show(model: model) } }
             } header: { Text("Setup") } footer: {
-                Text("AgentsSessionHopper makes no network requests of its own and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.").formFooter()
+                Text("AgentsSessionHopper makes no network requests of its own (besides ntfy alerts you set up) and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.").formFooter()
             }
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Which alerts go where: a Mac notification and/or ntfy, per profile and kind (`AlertSettings`).
+private struct AlertsSettings: View {
+    @ObservedObject var model: AppModel
+    @State private var server = ""
+    @State private var topic = ""
+    @State private var token = ""
+    @State private var note: String?
+    @State private var hasToken = false
+
+    var body: some View {
+        let s = model.config.alerts
+        Form {
+            Section {
+                TextField("Server", text: $server, prompt: Text("https://ntfy.sh"))
+                    .onChange(of: server) { _, _ in apply() }
+                TextField("Topic", text: $topic, prompt: Text("none: ntfy off"))
+                    .onChange(of: topic) { _, _ in apply() }
+                SecureField("Access token", text: $token, prompt: Text(hasToken ? "stored in the Keychain" : "optional"))
+                    .onSubmit(storeToken)
+                LabeledContent("Test") {
+                    HStack {
+                        if let note { Text(note).foregroundStyle(.secondary) }
+                        Button("Send Test Alert") { test() }
+                    }
+                }
+            } header: { Text("ntfy") } footer: {
+                Text("Alerts can also go to your phone through ntfy (ntfy.sh or your own server): the only requests the app sends besides the update check, and only while a topic is set. Clear the topic to turn ntfy off. Press Return to store the token in the Keychain.").formFooter()
+            }
+            ForEach([AlertSettings.everyProfile] + model.config.profiles.filter { !$0.isGateway }.map(\.name), id: \.self) { name in
+                Section {
+                    ForEach(AlertKind.allCases, id: \.self) { kind in row(name, kind, ntfyOn: s.ntfyOn) }
+                } header: {
+                    Text(name == AlertSettings.everyProfile ? "All Profiles" : model.config.display(name))
+                } footer: {
+                    if name == AlertSettings.everyProfile {
+                        Text("Changing a box here sets it for every profile; a profile's own box overrides it. ntfy boxes are off until a topic is set above. Many sessions moving off one profile at once give one alert, then it stays quiet until that profile frees up. \"Only with a session here\": usage alerts only while a session on this Mac runs on that profile.").formFooter()
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            server = s.ntfyServer ?? ""
+            topic = s.ntfyTopic ?? ""
+            // Screenshot renders run with a temp state dir: never ask the real Keychain there.
+            hasToken = ProcessInfo.processInfo.environment["RENDER_SCREENSHOTS"] == nil && (try? Gateway.key(Alerts.tokenEntry, env: model.env)) != nil
+        }
+    }
+
+    private func row(_ name: String, _ kind: AlertKind, ntfyOn: Bool) -> some View {
+        let e = model.config.alerts.effective(name, kind)
+        func bind(_ get: Bool, _ set: @escaping (Bool) -> Void) -> Binding<Bool> { Binding(get: { get }, set: set) }
+        return LabeledContent(kind.label) {
+            // Mac and ntfy last, so their boxes line up down the pane.
+            HStack(spacing: 14) {
+                if kind == .usageWarning || kind == .usageCritical {
+                    Toggle("Only with a session here", isOn: bind(e.activeOnly) { v in model.update { $0.alerts.set(name, kind, activeOnly: v) } })
+                }
+                Toggle("Mac", isOn: bind(e.mac) { v in model.update { $0.alerts.set(name, kind, mac: v) } })
+                Toggle("ntfy", isOn: bind(e.ntfy) { v in model.update { $0.alerts.set(name, kind, ntfy: v) } })
+                    .disabled(!ntfyOn)
+            }
+            .toggleStyle(.checkbox)
+        }
+    }
+
+    /// Applies as you type (SET-4): an empty topic turns ntfy off; a half-typed URL or topic is not saved yet.
+    private func apply() {
+        let t = topic.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { if model.config.alerts.ntfyOn { model.update { $0.alerts.ntfyTopic = nil } }; return }
+        // An empty server means the one the field shows: ntfy.sh.
+        let typed = server.trimmingCharacters(in: .whitespaces)
+        let url = typed.isEmpty ? "https://ntfy.sh" : typed
+        guard Gateway.validURL(url), Alerts.validTopic(t) else { return }
+        let root = url.hasSuffix("/") ? String(url.dropLast()) : url
+        guard model.config.alerts.ntfyServer != root || model.config.alerts.ntfyTopic != t else { return }
+        model.update { $0.alerts.ntfyServer = root; $0.alerts.ntfyTopic = t }
+    }
+
+    private func storeToken() {
+        guard !token.isEmpty else { return }
+        do { _ = try Gateway.storeKey(token, for: Alerts.tokenEntry, env: model.env); token = ""; hasToken = true; note = "Token stored" }
+        catch { note = "\(error)" }
+    }
+
+    private func test() {
+        let env = model.env
+        let r = Alerts.test(env: env)
+        guard r.ntfy else { note = "Mac notification sent; ntfy is not set up"; return }
+        note = "Sending…"
+        Task.detached {
+            let status = Alerts.sendNtfy(r, env: env)
+            await MainActor.run { note = status.map { (200..<300).contains($0) ? "ntfy: sent" : "ntfy: refused (HTTP \($0))" } ?? "ntfy: no answer" }
+        }
     }
 }
 

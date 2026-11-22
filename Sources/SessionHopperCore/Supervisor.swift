@@ -133,10 +133,10 @@ public final class Supervisor {
             let pct = policy.percent(profile.name).map { "\(Int($0.rounded()))%" } ?? "usage unknown"
             if let from = current, from.name != profile.name {
                 say("moving to \(profile.name) (\(pct)), resuming the same conversation")
-                EventLog.append(HopperEvent(type: "switch", session: resumeID, cwd: fm.currentDirectoryPath, from: from.name,
+                logAlerting(HopperEvent(type: "switch", session: resumeID, cwd: fm.currentDirectoryPath, from: from.name,
                                             to: profile.name, trigger: request?.trigger, source: request?.source,
                                             detail: loggedOut.isEmpty ? nil : "skipped \(loggedOut.sorted().joined(separator: ", ")): not logged in",
-                                            profiles: EventLog.samples(config, env.paths, now: FileIO.now())), env.paths)
+                                            profiles: EventLog.samples(config, env.paths, now: FileIO.now())))
             } else if current == nil {
                 let skipped = request == nil ? policy.skipped(order, before: profile) : []
                 say("starting on \(profile.name) (\(pct))" + (skipped.isEmpty ? "" : ", skipped " + skipped.joined(separator: ", ")))
@@ -335,17 +335,23 @@ public final class Supervisor {
     /// Nowhere to run without paid usage. With `waitForReset` and a known reset, waits for it (Ctrl-C stops the
     /// wait) and returns nil with `request` set to carry on there, or to a move the user confirms meanwhile;
     /// otherwise the exit code.
+    /// Logs a move or park and lets `Alerts` decide whether it is news.
+    private func logAlerting(_ e: HopperEvent) {
+        EventLog.append(e, env.paths)
+        Alerts.event(e, env: env)
+    }
+
     private func park(sessionID: String, from: Profile?, request: inout PendingMove?, policy: Policy, order: [Profile], files: SessionFiles) -> Int32? {
         let config = policy.config
         // Moving to another profile needs the user's OK unless they opted in: else wait for this one.
         let candidates = config.autoMove || from == nil ? order : order.filter { $0.name == from?.name }
         let next = config.waitForReset ? policy.nextRoom(candidates).map { (profile: $0.profile, at: $0.at + env.resetSlack) } : nil
-        EventLog.append(HopperEvent(type: "park", session: sessionID, cwd: FileManager.default.currentDirectoryPath,
+        logAlerting(HopperEvent(type: "park", session: sessionID, cwd: FileManager.default.currentDirectoryPath,
                                     from: from?.name, to: next?.profile.name, trigger: request?.trigger ?? "launch", source: request?.source ?? "engine",
                                     detail: next.map { "waiting for a reset, continues on \($0.profile.name) at \(ProfileLimits.clock($0.at))" },
-                                    profiles: EventLog.samples(config, env.paths, now: policy.now)), env.paths)
+                                    profiles: EventLog.samples(config, env.paths, now: policy.now)))
         if let from, request?.trigger == "park" {
-            say("parked: \(from.name) reached \(Int(config.hardThreshold))% and \"park before paid usage\" is on")
+            say("parked: \(from.name) reached \(Int(config.hard(from.name)))% and \"park before paid usage\" is on")
         } else if from != nil {
             say("parked: no other profile has room")
         } else {

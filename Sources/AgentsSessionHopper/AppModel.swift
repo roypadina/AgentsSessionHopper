@@ -61,6 +61,16 @@ final class AppModel: ObservableObject {
         act { _ = try Control.requestMove(session: s.record.session, to: to ?? s.suggestion?.to, now: false, source: "menu", env: env) }
     }
 
+    /// Every live session not already on `to` moves there at its turn end (like Move on each one). Held sessions too:
+    /// the user asked for it by name.
+    func moveAll(to: String) {
+        act {
+            for s in snapshot.sessions where s.record.profile != to {
+                _ = try Control.requestMove(session: s.record.session, to: to, now: false, source: "menu", env: env)
+            }
+        }
+    }
+
     func cancelMove(_ s: LiveSession) { act { _ = try Control.cancelMove(session: s.record.session, env: env) } }
 
     func notNow(_ s: LiveSession) { Control.dismiss(session: s.record.session, env: env); refresh() }
@@ -272,7 +282,7 @@ final class AppModel: ObservableObject {
 
     func severity(_ profile: String) -> Severity {
         guard let p = snapshot.percent(profile) else { return .unknown }
-        return p >= config.hardThreshold ? .full : p >= config.suggestThreshold ? .near : .ok
+        return p >= config.hard(profile) ? .full : p >= config.suggest(profile) ? .near : .ok
     }
 
     func tilde(_ path: String) -> String { env.tilde(path) }

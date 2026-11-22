@@ -105,6 +105,12 @@ public enum Profiles {
     public static func environment(for profile: Profile, base: [String: String]) -> [String: String] {
         var env = base
         env["CLAUDE_CONFIG_DIR"] = profile.exportConfigDir ? profile.dir : nil
+        // Inherited from a session on the shared MCP store: each profile's logins live in its own folder, and only
+        // an opted-in token profile gets the store back (`McpShare.apply`). `claude auth login` must never write there.
+        if env.removeValue(forKey: McpShare.envVar) != nil {
+            env["DISABLE_LOGIN_COMMAND"] = nil
+            env["DISABLE_LOGOUT_COMMAND"] = nil
+        }
         return env
     }
 

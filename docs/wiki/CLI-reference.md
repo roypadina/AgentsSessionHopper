@@ -3,12 +3,14 @@
 ```
 sessionhopper [claude args...]            start a session on the first profile with room
 sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
-sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker;
+                                          a unique start of an id works too, 4+ characters)
 sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run (bots, services): the
                                           prompt on stdin; a limit failure retries the turn on the next profile
 sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
 sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
+sessionhopper switch <profile> --all [--now]  move every live session there (at turn end unless --now)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
 sessionhopper status [--json]             profiles (with login email), last-known usage, live sessions
 sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
@@ -19,6 +21,7 @@ sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewi
                                           and the live-session list (messaging across accounts)
 sessionhopper profiles label <name> <text>|--clear  display name shown in the app, `status` and `profiles list`
                                           (the name used by aliases and -P never changes)
+sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park thresholds
 sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
@@ -29,6 +32,18 @@ sessionhopper profiles add <name> --gateway <url> [--model opus=<name> ...] [--k
 sessionhopper profiles key <name> < file  store that profile's secret: its API key, or for a Claude profile on a
                                           server a `claude setup-token` (Keychain on macOS, private file on Linux)
 sessionhopper login <profile>             run `claude auth login` for that profile
+sessionhopper login <profile> --token     make a `claude setup-token` for it in a throwaway folder, paste it
+                                          (several lines are fine), check it works and is not another profile's account
+sessionhopper mcp share on|off <profile...>  share one MCP login store between profiles that run on a
+                                          setup-token; /login and /logout are off there (see Shared MCP logins)
+sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
+sessionhopper alerts [status]             which alerts go where: Mac notification and/or ntfy, per profile
+sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
+                        [ntfy on|off] [active-only on|off]
+sessionhopper alerts ntfy <server url> [<topic>] | ntfy off | ntfy token < file | ntfy fallback < file
+                                          topic on stdin keeps a public one out of shell history; off also forgets
+                                          the token and fallback; each send is a line in ntfy.log in the state folder
+sessionhopper alerts test | alerts log [-n 20]
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains

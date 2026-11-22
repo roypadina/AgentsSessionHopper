@@ -25,6 +25,12 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var priority: Int?
     /// Display name only; `name` stays the id that aliases, `-P` and scripts use. nil/empty = show `name`.
     public var label: String?
+    /// Opt-in: share one MCP login store with the other opted-in profiles (`McpShare`). Takes effect only while
+    /// the profile runs on a setup-token.
+    public var mcpShare: Bool?
+    /// This profile's own suggest / park thresholds (percent). nil = the global ones (`HopperConfig`).
+    public var suggestThreshold: Double?
+    public var hardThreshold: Double?
 
     public var id: String { name }
     public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
@@ -32,7 +38,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var isGateway: Bool { Gateway.kinds.contains(kind ?? "") }
 
     public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
-                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil) {
+                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil, mcpShare: Bool? = nil) {
         self.name = name
         self.dir = dir
         self.exportConfigDir = exportConfigDir
@@ -43,6 +49,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
         self.resets = resets
         self.priority = priority
         self.label = label
+        self.mcpShare = mcpShare
     }
 }
 
@@ -72,10 +79,14 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     /// A shell command run (not waited for) on every move, limit stop and park, with `SESSIONHOPPER_EVENT`,
     /// `_FROM`, `_TO`, `_REASON`, `_DETAIL` and `_SESSION` set. nil = none.
     public var onSwitch: String?
+    /// The shared MCP login store (`McpShare`). nil = `~/.claude-mcp-store`.
+    public var mcpStore: String?
+    /// Which alerts go where, per profile (`Alerts`).
+    public var alerts = AlertSettings()
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore, alerts }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -91,6 +102,8 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         continuePrompt = try c.decodeIfPresent(String.self, forKey: .continuePrompt)
         gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
         onSwitch = try c.decodeIfPresent(String.self, forKey: .onSwitch)
+        mcpStore = try c.decodeIfPresent(String.self, forKey: .mcpStore)
+        alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? d.alerts
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {
@@ -101,11 +114,18 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         guard suggestThreshold > 0, suggestThreshold < hardThreshold, hardThreshold <= 100 else {
             throw HopperError("thresholds must satisfy 0 < suggest (\(Int(suggestThreshold))) < hard (\(Int(hardThreshold))) <= 100")
         }
+        for p in profiles where p.suggestThreshold != nil || p.hardThreshold != nil {
+            let s = suggest(p.name), h = hard(p.name)
+            guard s > 0, s < h, h <= 100 else { throw HopperError("\(p.name): thresholds must satisfy 0 < suggest (\(Int(s))) < park (\(Int(h))) <= 100") }
+        }
         guard Self.gatewayUses.contains(gatewayUse) else { throw HopperError("gateway use is one of: \(Self.gatewayUses.joined(separator: ", "))") }
         try FileIO.encode(self, to: paths.config)
     }
 
     public func profile(named name: String) -> Profile? { profiles.first { $0.name == name } }
+    /// The suggest / park threshold for profile `name`: its own, else the global one.
+    public func suggest(_ name: String) -> Double { profile(named: name)?.suggestThreshold ?? suggestThreshold }
+    public func hard(_ name: String) -> Double { profile(named: name)?.hardThreshold ?? hardThreshold }
     /// The label of profile `name` if set, else `name` itself (also for unknown names, e.g. old log entries).
     public func display(_ name: String) -> String { profile(named: name)?.displayName ?? name }
     /// True when `label` would read like another profile ("Move to X" must stay unambiguous).

@@ -87,8 +87,8 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 - **Several Claude accounts on a server.** Claude Code ranks `CLAUDE_CODE_OAUTH_TOKEN` above the login in
   a profile's folder, so a token in the service's environment would run every profile on one account.
   `sessionhopper` keeps that token for the first Claude profile only and never gives it to OpenRouter.
-  Give each other profile its own `claude setup-token` with `sessionhopper profiles key <name> < file`
-  (or log it in inside its folder); `doctor` shows which one each profile uses.
+  Give each other profile its own `claude setup-token` with `sessionhopper login <name> --token`
+  (or `sessionhopper profiles key <name> < file`, or log it in inside its folder); `doctor` shows which one each profile uses.
 - **Notify on a switch:** `sessionhopper config on-switch "<command>"` runs the command, not waited for,
   on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `SESSIONHOPPER_FROM`, `SESSIONHOPPER_TO`,
   `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.

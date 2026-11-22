@@ -38,6 +38,21 @@ import SessionHopperCore
             m.addItem(.separator())
         }
         item("Open", #selector(open))
+        if let model = SettingsWindow.model {
+            let all = NSMenuItem(title: "Move All Sessions To", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for p in model.config.profiles {
+                let i = NSMenuItem(title: "\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))", action: #selector(moveAll(_:)), keyEquivalent: "")
+                i.target = self
+                i.representedObject = p.name
+                i.isEnabled = model.snapshot.sessions.contains { $0.record.profile != p.name }
+                sub.addItem(i)
+            }
+            sub.autoenablesItems = false
+            all.submenu = sub
+            all.isEnabled = !model.snapshot.sessions.isEmpty
+            m.addItem(all)
+        }
         item("Show Hand-off Log", #selector(switchLog))
         item(Updates.menuTitle, #selector(checkForUpdates))
         m.addItem(.separator())
@@ -81,6 +96,9 @@ import SessionHopperCore
 
     static let log = Logger(subsystem: "com.padina.agents-session-hopper", category: "hotkey")
 
+    @objc private func moveAll(_ sender: NSMenuItem) {
+        if let to = sender.representedObject as? String { SettingsWindow.model?.moveAll(to: to) }
+    }
     @objc private func settings() { AgentsSessionHopperApp.openSettings() }
     @objc func switchLog() {
         SettingsView.pendingTab = .log

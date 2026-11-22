@@ -72,7 +72,7 @@ public enum Gateway {
     @discardableResult
     public static func storeKey(_ key: String, for p: Profile, env: HopperEnvironment) throws -> String {
         let k = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !k.isEmpty, k.count <= 512, k.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.".contains($0)) }) else {
+        guard !k.isEmpty, k.count <= 512, k.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.:/".contains($0)) }) else {
             throw HopperError("that does not look like an API key or token (letters, digits, - _ . only)")
         }
         #if os(macOS)
@@ -86,6 +86,17 @@ public enum Gateway {
         let url = URL(fileURLWithPath: p.keyFile.map(expand) ?? defaultKeyFile(p, env: env).path)
         try writePrivate(Data((k + "\n").utf8), to: url)
         return env.tilde(url.path)
+    }
+
+    /// Removes what `storeKey` stored for `p` (Keychain item or key file). Missing is fine.
+    public static func deleteKey(_ p: Profile, env: HopperEnvironment) {
+        #if os(macOS)
+        if p.keyFile == nil {
+            _ = Shell.run("/usr/bin/security", ["delete-generic-password", "-s", keychainService, "-a", p.name], timeout: 15)
+            return
+        }
+        #endif
+        try? FileManager.default.removeItem(atPath: p.keyFile.map(expand) ?? defaultKeyFile(p, env: env).path)
     }
 
     /// Variables that send this `claude` to the gateway. Set even when the caller's environment has them.
@@ -145,11 +156,24 @@ public enum Gateway {
     /// run every profile on one account. A profile's own stored token (`profiles key`, a `claude setup-token`)
     /// wins; else the caller's token is kept only for the first Claude profile and removed for the others, which
     /// then use their own login. Never passed to a gateway profile.
-    public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment) {
-        if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; return }
-        if let t = try? key(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = t; return }
-        if !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+    /// `share`: then point an opted-in token profile at the shared MCP login store (`McpShare.apply`).
+    public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment, share: Bool = true) {
+        if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; e[tokenOwner] = nil; return }
+        if let t = try? key(p, env: env) {
+            e["CLAUDE_CODE_OAUTH_TOKEN"] = t
+            e[tokenOwner] = p.name
+        } else {
+            // A token inherited from another profile's session (a `run` started by a tool in it) is that profile's
+            // account, not the caller's: never hand it on.
+            let inherited = e[tokenOwner].map { $0 != p.name } ?? false
+            if inherited || !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+            e[tokenOwner] = nil
+        }
+        if share { McpShare.apply(&e, p, env: env) }
     }
+
+    /// Set next to a stored token we pass on: names the profile it belongs to.
+    public static let tokenOwner = "SESSIONHOPPER_TOKEN_PROFILE"
 
     /// The caller's `CLAUDE_CODE_OAUTH_TOKEN` belongs to the first Claude (non-gateway) profile.
     public static func ownsEnvToken(_ p: Profile, env: HopperEnvironment) -> Bool {
@@ -174,7 +198,7 @@ public enum Gateway {
     }
 
     /// Created 0600 in a 0700 folder, then renamed into place: never readable by others, not even briefly.
-    static func writePrivate(_ data: Data, to url: URL) throws {
+    public static func writePrivate(_ data: Data, to url: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let tmp = url.path + ".tmp-\(getpid())"

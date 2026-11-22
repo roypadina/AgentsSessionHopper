@@ -55,6 +55,19 @@ brew install --cask roypadina/tap/agents-session-hopper
   next turn end instead of running into paid extra usage, then waits for the usage window to reset and
   carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
+- **Thresholds per profile** (Settings → Hand-off → Per Profile, or `sessionhopper profiles thresholds <name> <suggest> <park>`):
+  leave a work account early and run a spare one to the edge. Each profile is measured against its own pair,
+  both when sessions leave it and when it counts as having room.
+- **Move all sessions at once** to one profile (⋯ menu or right-click → Move All Sessions To, or
+  `sessionhopper switch <profile> --all`): each session moves when its current turn ends.
+- **Alerts on your Mac and your phone** (Settings → Alerts, or `sessionhopper alerts`): when sessions
+  move off a profile and where to, when no profile has room, and when a profile passes the warning or
+  critical threshold. Each kind is switched on per profile, as a Mac notification and/or an
+  [ntfy](https://ntfy.sh) push (ntfy.sh or your own server). Usage alerts can wait for a profile a session
+  here runs on, so an account also used elsewhere stays quiet. Many sessions moving off one profile at
+  once give one alert, then that profile stays quiet until it frees up.
+- **Menu-bar usage your way** (Settings → General): the fullest profile in use, every profile in use,
+  the profiles you pick, or nothing.
 - **Switch log** of every suggestion, move, park and limit stop (90 days), browsable in Settings → Log or
   from the right-click and ⋯ menus (Show Hand-off Log).
 - **Hard to lose.** Open the app again from Applications or Raycast and Settings appears, even when a full
@@ -69,6 +82,10 @@ brew install --cask roypadina/tap/agents-session-hopper
 
 <div align="center">
 <img src="docs/screenshots/settings-handoff.png" alt="Settings, Hand-off tab: suggest threshold, move without asking (off), park before paid usage at 97%" width="520">
+</div>
+
+<div align="center">
+<img src="docs/screenshots/settings-alerts.png" alt="Settings, Alerts tab: ntfy server and topic, then per profile which alerts go to the Mac and to ntfy" width="520">
 </div>
 
 ## Requirements
@@ -133,6 +150,7 @@ sessionhopper                            # start a session on the first profile 
 sessionhopper -P work "fix the tests"    # start on work; the others stay fallbacks
 sessionhopper -c                         # continue the newest session in this folder
 sessionhopper --resume                   # pick one from a numbered list (names included)
+sessionhopper --resume 3f2a9c            # or an id, a unique start of one (4+ characters), or a name
 sessionhopper switch                     # inside a session: move at turn end
 sessionhopper status                     # profiles, usage, live sessions
 ```
@@ -254,8 +272,8 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 - **Several Claude accounts on a server.** Claude Code ranks `CLAUDE_CODE_OAUTH_TOKEN` above the login in
   a profile's folder, so a token in the service's environment would run every profile on one account.
   `sessionhopper` keeps that token for the first Claude profile only and never gives it to OpenRouter.
-  Give each other profile its own `claude setup-token` with `sessionhopper profiles key <name> < file`
-  (or log it in inside its folder); `doctor` shows which one each profile uses.
+  Give each other profile its own `claude setup-token` with `sessionhopper login <name> --token`
+  (or `sessionhopper profiles key <name> < file`, or log it in inside its folder); `doctor` shows which one each profile uses.
 - **Notify on a switch:** `sessionhopper config on-switch "<command>"` runs the command, not waited for,
   on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `SESSIONHOPPER_FROM`, `SESSIONHOPPER_TO`,
   `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.
@@ -274,6 +292,32 @@ State lives in `${XDG_STATE_HOME:-~/.local/state}/agents-session-hopper/`. A sys
 change other than calling `sessionhopper run --` where it called `claude`; give it the OpenRouter key
 with `LoadCredential=openrouter:/path/to/key` (the credential name is the profile name).
 
+## Shared MCP logins (opt-in)
+
+Each profile normally keeps its own MCP logins (Atlassian, Slack, Notion, Figma, …), so every MCP server
+has to be logged in once per profile. Profiles that run on a `claude setup-token` can share one store instead:
+
+```bash
+sessionhopper login work --token          # makes a setup-token in a throwaway folder; paste it (several lines are fine)
+sessionhopper login work2 --token
+sessionhopper mcp share on work work2     # log in to each MCP server once (/mcp), it works on both
+sessionhopper mcp status                  # which profiles share, which MCP servers the store holds (names only)
+```
+
+- Each profile stays on its own Claude account: the account comes only from its token. Claude Code keeps
+  account and MCP logins in one secure-storage object; the shared profiles point it at one folder
+  (`~/.claude-mcp-store`, change with `mcp store <dir>`) through `CLAUDE_SECURESTORAGE_CONFIG_DIR`. That variable
+  is undocumented, so `doctor` checks your `claude` still knows it.
+- `/login` and `/logout` are turned off in those sessions (`/logout` would delete everyone's MCP logins), and
+  `claude auth login|logout` / `setup-token` are refused there. A guard runs before each launch and at session
+  start and end: it removes an account login that got into the store, backs up the MCP part (a private file
+  on Linux, a Keychain item on macOS) and puts it back if the store was deleted or emptied.
+- A profile without a token keeps its own MCP logins, even with sharing on. A token profile loses claude.ai
+  connectors and Remote Control, so keep a profile that needs those on its normal login and out of sharing.
+- `login --token` asks you to sign in in a **private browser window**: a window already signed in to another
+  account makes a token that works but bills that account. It then compares usage and reset times with your
+  other profiles and warns if two look like the same account (Claude Code shows no email for a token login).
+
 ## How it works (and what it never does)
 
 - `sessionhopper` starts the **official, unmodified `claude`** with the profile's configuration folder
@@ -289,7 +333,11 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   with your own (`sessionhopper config prompt`). Moving needs every profile to share one `projects/` folder, where Claude Code
   keeps conversations. Profiles added by the app do; `doctor` checks.
 - **It never reads, copies or sends** your Claude login or Claude Code's Keychain items. Login always
-  happens in Claude Code's own flow. The only secrets it handles are ones you give it with `sessionhopper
+  happens in Claude Code's own flow. The one exception is opt-in [shared MCP logins](#shared-mcp-logins-opt-in):
+  there it reads and rewrites the shared store (on macOS a Claude Code Keychain item), removes an account
+  login that landed in it, and copies the MCP logins to a local backup; nothing is sent anywhere.
+  `login --token` takes the token you paste, deletes the throwaway Keychain item Claude Code may leave, and
+  sends one tiny request per Claude profile to check the token and the account. The only secrets it handles are ones you give it with `sessionhopper
   profiles key`: an API key (OpenRouter, Anthropic or a gateway), or on a server a `claude setup-token` for a profile. Each is kept in
   its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
   To show which account a profile is, it reads the login email Claude Code keeps in the profile's
@@ -300,7 +348,7 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   exception is the update check, and only with your permission: the app asks once (on its second launch)
   whether to check automatically, and with your yes downloads the release feed from GitHub once a day,
   sending nothing about you. (The optional skill install runs Claude Code's own `claude plugin install`,
-  which downloads it from GitHub.)
+  which downloads it from GitHub.) Alerts you send to ntfy go to the server and topic you set, and only there.
   To refresh usage it runs `claude`: one tiny `claude -p` on Haiku per profile, a request to Anthropic on that account that uses a little of its usage and can start an idle account's 5-hour window. It runs by itself for a profile not seen for 6 hours, or when you click Refresh / run `sessionhopper refresh`.
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
   when a conversation continues elsewhere.
@@ -311,7 +359,7 @@ change at any time. If you run it for a bot or service, check Anthropic's terms 
 
 ## Privacy
 
-No analytics, and no network access of its own besides the opt-in update check (a usage refresh runs `claude`, see above). State lives in `~/Library/Application Support/AgentsSessionHopper/`
+No analytics, and no network access of its own besides the opt-in update check and the ntfy alerts you set up (a usage refresh runs `claude`, see above). State lives in `~/Library/Application Support/AgentsSessionHopper/`
 (Linux: `~/.local/state/agents-session-hopper/`)
 (profile list, last-known usage percentages, the switch log). Preferences are in the defaults domain
 `com.padina.agents-session-hopper`. Optional `install-hooks` edits a profile's `settings.json` only when

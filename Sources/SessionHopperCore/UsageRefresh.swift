@@ -39,7 +39,7 @@ public enum UsageRefresh {
                                     stop: stop, cwd: scratch)
             watchdog.cancel()
             let now = FileIO.now()
-            if let l = a.limits { try? LimitStore.write(l, profile: p.name, env.paths) }
+            if let l = a.limits { try? LimitStore.write(l, profile: p.name, env.paths); Alerts.usage(p.name, env: env) }
             // Only Claude Code's own "rejected" event marks a profile full: failure text alone could stamp an old sample as new.
             if a.rejected != nil { OneShot.markFull(p, OneShot.classify(a, now: now), attempt: a, paths: env.paths, now: now) }
             if a.limits == nil, a.rejected == nil {

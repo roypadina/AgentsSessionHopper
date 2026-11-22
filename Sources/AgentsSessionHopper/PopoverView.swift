@@ -23,7 +23,7 @@ struct PopoverView: View {
                     .keyboardShortcut(",")
                     .help("Settings")
                     .accessibilityLabel("Settings")
-                MoreMenu()
+                MoreMenu(model: model)
             }
 
             ForEach(model.snapshot.needsAttention) { SuggestionCard(model: model, session: $0) }
@@ -47,8 +47,11 @@ struct PopoverView: View {
 
 /// The right-click menu's items, for people who never right-click (MBX-12). The gear next to it is Settings.
 struct MoreMenu: View {
+    @ObservedObject var model: AppModel
+
     var body: some View {
         Menu {
+            MoveAllMenu(model: model)
             Button("Show Hand-off Log") { StatusMenu.shared.switchLog() }
             Divider()
             Button("Request a feature") { NSWorkspace.shared.open(StatusMenu.requestFeature) }
@@ -124,23 +127,41 @@ struct ProfileRow: View {
         var text = "Ready"
         if let pct = l.percent(now: now) {
             let resets = l.blocking(now: now)?.window.resetsAt.map(ProfileLimits.clock)
-            if pct >= c.hardThreshold {
-                text = l.freeAt(under: c.hardThreshold, now: now).map { "Full · free again \(ProfileLimits.clock($0))" } ?? "Full"
+            if pct >= c.hard(profile.name) {
+                text = l.freeAt(under: c.hard(profile.name), now: now).map { "Full · free again \(ProfileLimits.clock($0))" } ?? "Full"
             } else if active,
                       // Past the suggest threshold the session already stayed (held, asked, or no room), so the next event is full.
-                      case let to = pct < c.suggestThreshold ? Policy(config: c, limits: model.snapshot.limits, now: now).pick(c.profiles, excluding: profile.name) : nil,
+                      case let to = pct < c.suggest(profile.name) ? Policy(config: c, limits: model.snapshot.limits, now: now).pick(c.profiles, excluding: profile.name) : nil,
                       // No profile to switch to: it runs on until the hard threshold.
-                      let at = l.reaches(to == nil ? c.hardThreshold : c.suggestThreshold, now: now) {
+                      let at = l.reaches(to == nil ? c.hard(profile.name) : c.suggest(profile.name), now: now) {
                 text = "At this pace: " + (to.map { "switch to \($0.displayName)" } ?? "full")
                     + (at <= now ? " soon" : " ≈ \(ProfileLimits.clock(at))")
             } else if active {
                 text = resets.map { "Lasts until the reset at \($0)" } ?? "Has room"
-            } else if pct >= c.suggestThreshold {
+            } else if pct >= c.suggest(profile.name) {
                 text = "Near its limit" + (resets.map { " · resets \($0)" } ?? "")
             }
         }
         if now - l.sampledAt >= ProfileLimits.staleAfter { text += " · seen \(ProfileLimits.age(now - l.sampledAt)) ago" }
         return text
+    }
+}
+
+/// Moves every live session to one profile at its turn end. Also in the right-click menu (MNU-2).
+struct MoveAllMenu: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        let sessions = model.snapshot.sessions
+        Menu("Move All Sessions To") {
+            ForEach(model.config.profiles) { p in
+                let n = sessions.filter { $0.record.profile != p.name }.count
+                Button("\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.moveAll(to: p.name) }
+                    .disabled(n == 0)
+            }
+        }
+        .disabled(sessions.isEmpty)
+        .help(sessions.isEmpty ? "No sessions running" : "Each session moves when its current turn ends")
     }
 }
 

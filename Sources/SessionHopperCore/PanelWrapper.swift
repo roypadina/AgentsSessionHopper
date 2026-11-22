@@ -164,7 +164,7 @@ final class PanelSession: @unchecked Sendable {
 
         if type == "rate_limit_event", let info = obj?["rate_limit_info"] as? [String: Any] {
             let p = current
-            if !p.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: p.name, env.paths) }
+            if !p.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: p.name, env.paths); Alerts.usage(p.name, env: env) }
             if info["status"] as? String == "rejected" { held.append(line); return false }
         }
         if !held.isEmpty, type != "result" { held.append(line); return false }
@@ -354,10 +354,11 @@ final class PanelSession: @unchecked Sendable {
     }
 
     private func log(type: String, from: String?, to: String?, trigger: String) {
-        EventLog.append(HopperEvent(type: type, session: session, cwd: FileManager.default.currentDirectoryPath, from: from, to: to,
-                                    trigger: trigger, source: "vscode",
-                                    profiles: type == "switch" ? EventLog.samples(HopperConfig.load(env.paths), env.paths, now: FileIO.now()) : nil),
-                        env.paths)
+        let e = HopperEvent(type: type, session: session, cwd: FileManager.default.currentDirectoryPath, from: from, to: to,
+                            trigger: trigger, source: "vscode",
+                            profiles: type == "switch" ? EventLog.samples(HopperConfig.load(env.paths), env.paths, now: FileIO.now()) : nil)
+        EventLog.append(e, env.paths)
+        Alerts.event(e, env: env)
     }
 }
 

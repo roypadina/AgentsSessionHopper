@@ -52,7 +52,21 @@ public enum Transcripts {
         for all in [false, true] {
             if let hit = list(cwd: cwd, projects: projects, live: live, limit: .max, allDirs: all).first(where: { $0.title == name }) { return hit.id }
         }
-        return nil
+        return idPrefix(name, projects: projects)
+    }
+
+    /// The one session whose id starts with `prefix` (`--resume 3f2a9c`, like a short git hash). nil: none or several.
+    static func idPrefix(_ prefix: String, projects: URL) -> String? {
+        let p = prefix.lowercased()
+        guard p.count >= 4, p.allSatisfy({ $0.isHexDigit || $0 == "-" }) else { return nil }
+        let fm = FileManager.default
+        var hits = Set<String>()
+        for dir in (try? fm.contentsOfDirectory(atPath: projects.path)) ?? [] {
+            for f in (try? fm.contentsOfDirectory(atPath: projects.appendingPathComponent(dir).path)) ?? [] where f.hasSuffix(".jsonl") && f.hasPrefix(p) {
+                hits.insert(String(f.dropLast(6)))
+            }
+        }
+        return hits.count == 1 ? hits.first : nil
     }
 
     private static let titlePattern = try! NSRegularExpression(pattern: #""(customTitle|aiTitle)":"((?:[^"\\]|\\.)*)""#)

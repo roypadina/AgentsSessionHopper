@@ -83,6 +83,9 @@ public struct StatePaths: Sendable {
     public var holdAll: URL { root.appendingPathComponent("hold-all") }
     public var sessionsDir: URL { root.appendingPathComponent("sessions", isDirectory: true) }
     public var profilesDir: URL { root.appendingPathComponent("profiles", isDirectory: true) }
+    /// Alerts that fired, one JSON object per line (`AlertRecord`), and what they remember (`Alerts.Memory`).
+    public var alerts: URL { root.appendingPathComponent("alerts.jsonl") }
+    public var alertMemory: URL { root.appendingPathComponent("alerts-memory.json") }
     public var backupsDir: URL { root.appendingPathComponent("backups", isDirectory: true) }
 
     public func limits(_ profile: String) -> URL { profilesDir.appendingPathComponent("\(profile).limits.json") }

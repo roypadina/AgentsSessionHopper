@@ -82,7 +82,7 @@ final class ScreenshotRenderTests: XCTestCase {
         try render(WelcomeView(onSetUp: {}, onDone: {}).background(Color(nsColor: .windowBackgroundColor)), name: "welcome.png", dir: dir)
         try render(OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "onboarding.png", dir: dir)
         try render(PopoverView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "popover.png", dir: dir)
-        for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.profiles, "settings-profiles.png"),
+        for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.alerts, "settings-alerts.png"), (.profiles, "settings-profiles.png"),
                           (.commandLine, "settings-command-line.png"), (.log, "settings-log.png"), (.about, "settings-about.png")] {
             try render(SettingsView(model: model, nav: { let n = SettingsNav(); n.tab = tab; return n }()).background(Color(nsColor: .windowBackgroundColor)), name: name, dir: dir)
         }

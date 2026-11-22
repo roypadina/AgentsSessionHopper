@@ -12,8 +12,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     private weak var model: AppModel?
     private var posted = Set<String>()
-    /// Park events already in the log when the app started are not news.
-    private var seenParks: Set<String>?
+    /// Alerts already in the log when the app started are not news.
+    private var seenAlerts: Set<String>?
     private let center: UNUserNotificationCenter?
 
     init(model: AppModel) {
@@ -35,18 +35,18 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     /// Called on every refresh; posts only what it has not posted before.
     func update(_ snapshot: HopperSnapshot) {
-        let parks = snapshot.events.filter { $0.type == "park" }
-        let fresh = seenParks.map { seen in parks.filter { !seen.contains($0.id) } } ?? []
-        seenParks = (seenParks ?? []).union(parks.map(\.id))
-        guard let center, enabled else { return }
-        // One per park: the session waits for a reset or stopped, so nothing runs into paid usage.
-        for e in fresh {
+        // Alerts the engine decided on (`Alerts`: per profile and kind, one per event however many sessions moved).
+        let alerts = model.map { Alerts.read($0.env.paths, last: 50) } ?? []
+        let fresh = seenAlerts.map { seen in alerts.filter { !seen.contains($0.id) } } ?? []
+        seenAlerts = (seenAlerts ?? []).union(alerts.map(\.id))
+        guard let center else { return }
+        for r in fresh where r.mac {
             let content = UNMutableNotificationContent()
-            content.title = e.to == nil ? "Session stopped: no profile has room" : "Session waits for a usage reset"
-            content.body = (e.cwd.map { model?.tilde($0) ?? $0 } ?? "") + ": "
-                + (e.detail ?? "nothing runs into paid usage. Continue later: sessionhopper --resume \(e.session ?? "")")
-            center.add(UNNotificationRequest(identifier: e.id, content: content, trigger: nil))
+            content.title = r.title
+            content.body = r.body
+            center.add(UNNotificationRequest(identifier: r.id, content: content, trigger: nil))
         }
+        guard enabled else { return }
         for s in snapshot.needsAttention {
             guard let sug = s.suggestion else { continue }
             let key = "\(s.record.session)|\(sug.from)|\(sug.reason)"
