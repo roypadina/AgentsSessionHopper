@@ -258,21 +258,42 @@ public enum Alerts {
         try? p.run()
     }
 
-    /// Posts `r` to the configured ntfy topic. Returns the HTTP status (nil = no answer).
+    /// An optional second topic, as a full URL (`https://ntfy.sh/<topic>`), used only when the first post fails.
+    /// Stored like the token: a public topic name is a secret.
+    public static let fallbackEntry = Profile(name: ".ntfy-fallback", dir: "", exportConfigDir: false)
+
+    /// Posts `r` to the configured ntfy topic, then to the fallback topic if that failed (no answer or not 2xx).
+    /// Each attempt is one line in `ntfy.log` in the state dir. Returns the first post's HTTP status (nil = no answer).
     public static func sendNtfy(_ r: AlertRecord, env: HopperEnvironment) -> Int? {
         let s = HopperConfig.load(env.paths).alerts
-        guard s.ntfyOn, let server = s.ntfyServer, let url = URL(string: server) else { return nil }
+        guard s.ntfyOn, let server = s.ntfyServer.flatMap(URL.init(string:)), let topic = s.ntfyTopic else { return nil }
         let host = ProcessInfo.processInfo.hostName.split(separator: ".").first.map(String.init) ?? "host"
         let payload: [String: Any] = [
-            "topic": s.ntfyTopic ?? "", "title": r.title, "priority": AlertKind(rawValue: r.kind)?.priority ?? 3,
+            "title": r.title, "priority": AlertKind(rawValue: r.kind)?.priority ?? 3,
             "tags": ["agents-session-hopper", r.kind],
-            "message": "\(r.body)\n\nsender: agents-session-hopper@\(host)\nflow: \(r.kind)\nevent: \(r.id)"
+            "message": "\(r.body)\n\nsender: agents-session-hopper@\(host)\nflow: \(r.kind)\nevent: \(r.id)\nlog: \(env.tilde(env.paths.root.path))/ntfy.log"
         ]
-        var req = URLRequest(url: url, timeoutInterval: 15)
+        let token = try? Gateway.key(tokenEntry, env: env)
+        let status = post(payload, server: server, topic: topic, token: token)
+        log(r, topic: topic, status: status, env: env)
+        if !(status.map { (200..<300).contains($0) } ?? false),
+           let fb = (try? Gateway.key(fallbackEntry, env: env)).flatMap(URL.init(string:)), let fbTopic = fb.pathComponents.dropFirst().first,
+           let fbServer = URL(string: fb.absoluteString.replacingOccurrences(of: fb.path, with: "")) {
+            // The token belongs to the first server only.
+            let fbStatus = post(payload, server: fbServer, topic: fbTopic, token: fbServer.host == server.host ? token : nil)
+            log(r, topic: fbServer.host == "ntfy.sh" ? "fallback (hidden)" : fbTopic, status: fbStatus, env: env)
+        }
+        return status
+    }
+
+    static func post(_ payload: [String: Any], server: URL, topic: String, token: String?) -> Int? {
+        var body = payload
+        body["topic"] = topic
+        var req = URLRequest(url: server, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = try? Gateway.key(tokenEntry, env: env) { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        if let token { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         let done = DispatchSemaphore(value: 0)
         nonisolated(unsafe) var status: Int?
         URLSession.shared.dataTask(with: req) { _, resp, _ in
@@ -281,6 +302,12 @@ public enum Alerts {
         }.resume()
         _ = done.wait(timeout: .now() + 20)
         return status
+    }
+
+    /// `<time> ntfy event=<id> topic=<topic> http=<status|error>`.
+    static func log(_ r: AlertRecord, topic: String, status: Int?, env: HopperEnvironment) {
+        FileIO.appendLine("\(FileIO.isoNow()) ntfy event=\(r.id) topic=\(topic) http=\(status.map(String.init) ?? "error")",
+                          to: env.paths.root.appendingPathComponent("ntfy.log"))
     }
 
     /// ntfy topics: letters, digits, - and _ (max 64).

@@ -72,7 +72,7 @@ public enum Gateway {
     @discardableResult
     public static func storeKey(_ key: String, for p: Profile, env: HopperEnvironment) throws -> String {
         let k = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !k.isEmpty, k.count <= 512, k.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.".contains($0)) }) else {
+        guard !k.isEmpty, k.count <= 512, k.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || "-_.:/".contains($0)) }) else {
             throw HopperError("that does not look like an API key or token (letters, digits, - _ . only)")
         }
         #if os(macOS)

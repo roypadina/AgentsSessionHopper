@@ -78,6 +78,7 @@ let usage = """
                               [ntfy on|off] [active-only on|off]  (active-only: usage alerts only while a session
                               here runs on that profile). Many sessions moving at once give one alert.
       sessionhopper alerts ntfy <server url> <topic> | ntfy off | ntfy token < file   where ntfy alerts go
+      sessionhopper alerts ntfy fallback < file   a second topic URL, used only when the first post fails
       sessionhopper alerts test | alerts log [-n 20]
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
@@ -531,6 +532,13 @@ func alertsCommand(_ a: [String]) -> Int32 {
         if ntfy == true, !config.alerts.ntfyOn { say("ntfy is not set up yet: sessionhopper alerts ntfy <server url> <topic>") }
     case "ntfy":
         if a.first == "off" { config.alerts.ntfyServer = nil; config.alerts.ntfyTopic = nil; save(); break }
+        if a.first == "fallback" {
+            if isatty(0) == 1 { say("paste the fallback topic URL (https://ntfy.sh/<topic>), then Ctrl-D") }
+            let url = String(decoding: readStdin(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard Gateway.validURL(url), let t = URL(string: url)?.pathComponents.dropFirst().first, Alerts.validTopic(t) else { die("that is not a topic URL like https://ntfy.sh/<topic>") }
+            do { out("ntfy fallback stored in \(try Gateway.storeKey(url, for: Alerts.fallbackEntry, env: env))") } catch { die("\(error)") }
+            return 0
+        }
         if a.first == "token" {
             if isatty(0) == 1 { say("paste the ntfy access token, then Ctrl-D") }
             do { out("ntfy token stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: Alerts.tokenEntry, env: env))") } catch { die("\(error)") }
