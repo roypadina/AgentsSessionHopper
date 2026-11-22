@@ -29,6 +29,8 @@ public enum HookHandler {
     /// Returns what to print on stdout (nil = nothing).
     public static func handle(input: Data, env: HopperEnvironment, installedProfile: String?) -> String? {
         guard let ev = FileIO.jsonObject(input), let event = ev["hook_event_name"] as? String else { return nil }
+        // A `/logout` or `/login` that got through anyway: put the shared MCP store right before the next turn.
+        if event == "SessionStart" || event == "Stop" { McpShare.guardIfShared(env) }
 
         guard let poolID = env.currentSessionID else {
             // Unsupervised session on a profile with installed hooks: log limit stops, nothing else.

@@ -5,6 +5,16 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Shared MCP logins (opt-in): `sessionhopper mcp share on <profile...>` lets profiles that run on a setup-token share one MCP login store, so each MCP server (Atlassian, Slack, Notion, …) is logged in once for all of them while each profile stays on its own Claude account. `/login` and `/logout` are off in those sessions; a guard keeps the store free of account logins and restores the MCP logins after a logout. `mcp status` and `doctor` show what is shared (names only). Linux and macOS.
+- `sessionhopper login <profile> --token`: makes a `claude setup-token` in a throwaway folder, takes a paste that spans several lines, checks the token works before storing it, and warns when it looks like another profile's account.
+- `--resume` accepts a unique start of a session id.
+
+### Fixed
+- `sessionhopper profiles key` joins a setup-token the terminal wrapped over several lines instead of rejecting it.
+
 ## [1.15.1] - 2026-11-22
 
 ### Fixed

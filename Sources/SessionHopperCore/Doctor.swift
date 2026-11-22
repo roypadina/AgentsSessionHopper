@@ -81,6 +81,17 @@ public enum Doctor {
             if HookInstaller.isInstalled(p) { add(.info, "\(p.name): hooks installed (sessions started without sessionhopper report usage too)") }
         }
 
+        // Shared MCP logins rest on an undocumented Claude Code variable: check this claude still has it.
+        if config.profiles.contains(where: { $0.mcpShare == true }) {
+            McpShare.statusLines(config, env: env).forEach { add(.info, "MCP share: " + $0) }
+            if let claudePath {
+                let real = URL(fileURLWithPath: claudePath).resolvingSymlinksInPath().path
+                let knows = Shell.run("/usr/bin/env", ["grep", "-q", "-a", "-F", McpShare.envVar, real], timeout: 60).status == 0
+                add(knows ? .ok : .warn, knows ? "MCP share: \(env.tilde(real)) still reads \(McpShare.envVar)"
+                    : "MCP share: \(env.tilde(real)) does not mention \(McpShare.envVar) (a wrapper script, or a Claude Code update dropped it): shared profiles may each use their own MCP logins again")
+            }
+        }
+
         // An exported key overrides every profile's login: usage bills the key and the status line carries no `rate_limits`.
         // (CLAUDE_CODE_OAUTH_TOKEN is not one: it goes to the first Claude profile only, see `Gateway.applyClaudeToken`.)
         let keys = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"].filter { !(env.vars[$0] ?? "").isEmpty }

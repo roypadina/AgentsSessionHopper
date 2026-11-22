@@ -66,6 +66,11 @@ let usage = """
       sessionhopper profiles key <name> < file    store that profile's secret: its API key, or for a Claude
                                               profile on a server a `claude setup-token` (Keychain on macOS, private file on Linux)
       sessionhopper login <profile>             run `claude auth login` for that profile
+      sessionhopper login <profile> --token     make a `claude setup-token` for it in a throwaway folder, paste it
+                                              (several lines are fine), check it works and is not another profile's account
+      sessionhopper mcp share on|off <profile...>  share one MCP login store (Atlassian, Slack, … logged in once) between
+                                              profiles that run on a setup-token; /login and /logout are off there
+      sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
@@ -83,6 +88,7 @@ let usage = """
 
     Not affiliated with Anthropic. It starts the unmodified `claude`, never reads your Claude login, and makes
     no network requests of its own (`refresh` runs `claude`, one small request per profile). A key or setup-token you store with `profiles key` is handed only to that profile's `claude`.
+    With `mcp share` on, it also keeps the shared MCP store free of account logins and backs up its MCP logins (key names only shown).
     """
 
 // MARK: - Subcommands
@@ -311,7 +317,11 @@ func profilesCommand(_ a: [String]) -> Int32 {
     case "key":
         guard let name = a.first, let p = config.profile(named: name) else { die("usage: sessionhopper profiles key <profile> < file   (API key, or a Claude setup-token)") }
         if isatty(0) == 1 { say("paste the key, then Ctrl-D") }
-        do { out("\(name): key stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: p, env: env))") } catch { die("\(error)") }
+        do {
+            // A Claude profile's secret is a setup-token, which a terminal wraps over several lines.
+            let raw = String(decoding: readStdin(), as: UTF8.self)
+            out("\(name): key stored in \(try Gateway.storeKey(p.isGateway ? raw : try SetupToken.parse(raw), for: p, env: env))")
+        } catch { die("\(error)") }
     case "priority":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), let n = Int(a[1]) ?? (a[1] == "default" ? 0 : nil) else {
             die("usage: sessionhopper profiles priority <name> <n>|default   (lower is preferred; Claude 1, API keys 10 by default)")
@@ -382,8 +392,119 @@ func runLogin(_ p: Profile) -> Int32 {
 }
 
 func loginCommand(_ a: [String]) -> Int32 {
-    guard let name = a.first, let p = HopperConfig.load(env.paths).profile(named: name) else { die("usage: sessionhopper login <profile>") }
+    var a = a
+    let token = has("--token", in: &a)
+    guard let name = a.first, let p = HopperConfig.load(env.paths).profile(named: name) else { die("usage: sessionhopper login <profile> [--token]") }
+    if p.isGateway { die("\(name) runs on an API key: sessionhopper profiles key \(name) < keyfile") }
+    if token { return tokenLogin(p) }
+    if p.mcpShare == true { die("\(name) shares MCP logins, so it runs on a setup-token: sessionhopper login \(name) --token") }
     return runLogin(p)
+}
+
+/// Terminal state while a pasted token is read with echo off; put back on Ctrl-C too.
+nonisolated(unsafe) var savedTerminal: termios?
+
+/// Every line typed until an empty one, not echoed.
+func readHiddenLines() -> String {
+    var tty = termios()
+    if isatty(0) == 1, tcgetattr(0, &tty) == 0 {
+        savedTerminal = tty
+        var quiet = tty
+        quiet.c_lflag &= ~tcflag_t(ECHO)
+        tcsetattr(0, TCSAFLUSH, &quiet)
+        signal(SIGINT) { _ in if var t = savedTerminal { tcsetattr(0, TCSAFLUSH, &t) }; _exit(130) }
+    }
+    defer {
+        if var t = savedTerminal { tcsetattr(0, TCSAFLUSH, &t); savedTerminal = nil; signal(SIGINT, SIG_DFL); print("") }
+    }
+    var text = ""
+    while let line = readLine(), !line.trimmingCharacters(in: .whitespaces).isEmpty { text += line }
+    return text
+}
+
+/// `login <profile> --token`: a setup-token made in a throwaway folder (no profile's login is touched), checked with
+/// one tiny request before it replaces the stored one, then compared with the other profiles' usage.
+func tokenLogin(_ p: Profile) -> Int32 {
+    guard let claude = Claude.locate(env) else { die("claude not found on PATH") }
+    let config = HopperConfig.load(env.paths)
+    let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("ash-login-\(UUID().uuidString)")
+    do { try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) } catch { die("\(error)") }
+    defer {
+        try? FileManager.default.removeItem(at: tmp)
+        #if os(macOS)
+        McpShare.forgetThrowaway(tmp.path, env: env)
+        #endif
+    }
+    let who = Profiles.email(of: p, home: env.home) ?? "the account for \(p.displayName)"
+    out("=== Profile \(p.displayName): sign in as \(who) ===")
+    out("1. Open the link below in a PRIVATE browser window and sign in as \(who).")
+    out("   (A window already signed in to another account makes a token that works but bills that account.)")
+    out("2. Copy the token it prints at the end (starts with \(SetupToken.prefix)).")
+    var e = env.vars
+    for k in ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "DISABLE_LOGIN_COMMAND", "DISABLE_LOGOUT_COMMAND"] { e[k] = nil }
+    e["CLAUDE_CONFIG_DIR"] = tmp.path
+    e[McpShare.envVar] = tmp.path
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: claude)
+    proc.arguments = ["setup-token"]
+    proc.environment = e
+    do { try proc.run() } catch { die("cannot start claude: \(error)") }
+    proc.waitUntilExit()
+    guard proc.terminationStatus == 0 else { die("claude setup-token failed (exit \(proc.terminationStatus)). Nothing stored.") }
+
+    out("Paste the token (hidden). It may span several lines; then press Enter on an empty line.")
+    let token: String
+    do { token = try SetupToken.parse(readHiddenLines()) } catch { die("\(error)") }
+
+    out("Checking the token works (one tiny request)...")
+    let file = tmp.appendingPathComponent("token")
+    do { try Gateway.writePrivate(Data(token.utf8), to: file) } catch { die("\(error)") }
+    var trial = p
+    trial.keyFile = file.path
+    let stop = Terminator()
+    let check = UsageRefresh.run([trial], env: env, stop: stop)
+    guard check.ok else { die("Claude rejected the token (\(check.lines.joined(separator: "; "))). Nothing stored; run this again.") }
+    do { out("Stored in \(try Gateway.storeKey(token, for: p, env: env)).") } catch { die("\(error)") }
+
+    let others = config.profiles.filter { !$0.isGateway && $0.name != p.name }
+    if !others.isEmpty {
+        out("Checking it is not another profile's account (one tiny request each)...")
+        UsageRefresh.run(others, env: env, stop: stop)
+        if let mine = LimitStore.read(p.name, env.paths) {
+            let twins = others.filter { o in LimitStore.read(o.name, env.paths).map { SetupToken.sameAccount(mine, $0) } ?? false }
+            if !twins.isEmpty {
+                say("WARNING: \(p.displayName) has the same usage and reset times as \(twins.map(\.displayName).joined(separator: ", ")): it is probably the SAME Claude account. Sign out in the browser (or use a private window) and run: sessionhopper login \(p.name) --token")
+                return 2
+            }
+        }
+    }
+    out("OK: \(p.displayName) runs on its token." + (p.mcpShare == true ? " It shares MCP logins with the other shared profiles."
+        : " To share MCP logins with other token profiles: sessionhopper mcp share on \(p.name)"))
+    return 0
+}
+
+/// `mcp share on|off <profile...>`, `mcp status`, `mcp store <dir>|default`.
+func mcpCommand(_ a: [String]) -> Int32 {
+    var config = HopperConfig.load(env.paths)
+    func save() { do { try config.save(env.paths) } catch { die("\(error)") } }
+    switch a.first ?? "status" {
+    case "share":
+        guard a.count >= 3, ["on", "off"].contains(a[1]) else { die("usage: sessionhopper mcp share on|off <profile...>") }
+        for name in a.dropFirst(2) {
+            guard let i = config.profiles.firstIndex(where: { $0.name == name }) else { die("No profile named \(name). See: sessionhopper profiles list") }
+            if config.profiles[i].isGateway { die("\(name) runs on an API key; only Claude profiles use MCP logins") }
+            config.profiles[i].mcpShare = a[1] == "on" ? true : nil
+        }
+        save()
+    case "store":
+        guard a.count == 2 else { die("usage: sessionhopper mcp store <dir>|default") }
+        config.mcpStore = a[1] == "default" ? nil : a[1]
+        save()
+    case "status": break
+    default: die("usage: sessionhopper mcp [status|share on|off <profile...>|store <dir>|default]")
+    }
+    McpShare.statusLines(config, env: env).forEach(out)
+    return 0
 }
 
 func configCommand(_ a: [String]) -> Int32 {
@@ -535,6 +656,10 @@ let passthroughFlags: Set<String> = [
 /// (subcommands, `-p`, `--version`, and any `claude` started inside a session) runs the real `claude`.
 func shimCommand(_ a: [String]) -> Int32 {
     let direct = env.currentSessionID != nil || a.first.map(passthroughCommands.contains) == true || a.contains(where: passthroughFlags.contains)
+    // In a session on the shared MCP store, a login would land in that store and a logout would delete everyone's MCP logins.
+    if McpShare.inSharedSession(env), a.first == "setup-token" || (a.first == "auth" && a.count > 1 && ["login", "logout"].contains(a[1])) {
+        die("claude \(a.prefix(2).joined(separator: " ")) is blocked in a session that shares MCP logins. Log a profile in with: sessionhopper login <profile> --token")
+    }
     guard direct else { return launch(a) }
     guard let claude = Claude.locate(env) else { die("claude not found on PATH") }
     let me = URL(fileURLWithPath: env.selfPath).resolvingSymlinksInPath().path
@@ -605,7 +730,7 @@ func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.vers
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand, "run": runCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "refresh": refreshCommand, "sessions": sessionsCommand,
-    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand,
+    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },

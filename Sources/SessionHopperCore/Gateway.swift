@@ -145,10 +145,12 @@ public enum Gateway {
     /// run every profile on one account. A profile's own stored token (`profiles key`, a `claude setup-token`)
     /// wins; else the caller's token is kept only for the first Claude profile and removed for the others, which
     /// then use their own login. Never passed to a gateway profile.
-    public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment) {
+    /// `share`: then point an opted-in token profile at the shared MCP login store (`McpShare.apply`).
+    public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment, share: Bool = true) {
         if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; return }
-        if let t = try? key(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = t; return }
-        if !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+        if let t = try? key(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = t }
+        else if !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+        if share { McpShare.apply(&e, p, env: env) }
     }
 
     /// The caller's `CLAUDE_CODE_OAUTH_TOKEN` belongs to the first Claude (non-gateway) profile.
@@ -174,7 +176,7 @@ public enum Gateway {
     }
 
     /// Created 0600 in a 0700 folder, then renamed into place: never readable by others, not even briefly.
-    static func writePrivate(_ data: Data, to url: URL) throws {
+    public static func writePrivate(_ data: Data, to url: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         let tmp = url.path + ".tmp-\(getpid())"

@@ -25,6 +25,9 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var priority: Int?
     /// Display name only; `name` stays the id that aliases, `-P` and scripts use. nil/empty = show `name`.
     public var label: String?
+    /// Opt-in: share one MCP login store with the other opted-in profiles (`McpShare`). Takes effect only while
+    /// the profile runs on a setup-token.
+    public var mcpShare: Bool?
 
     public var id: String { name }
     public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
@@ -32,7 +35,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var isGateway: Bool { Gateway.kinds.contains(kind ?? "") }
 
     public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
-                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil) {
+                models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil, mcpShare: Bool? = nil) {
         self.name = name
         self.dir = dir
         self.exportConfigDir = exportConfigDir
@@ -43,6 +46,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
         self.resets = resets
         self.priority = priority
         self.label = label
+        self.mcpShare = mcpShare
     }
 }
 
@@ -72,10 +76,12 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     /// A shell command run (not waited for) on every move, limit stop and park, with `SESSIONHOPPER_EVENT`,
     /// `_FROM`, `_TO`, `_REASON`, `_DETAIL` and `_SESSION` set. nil = none.
     public var onSwitch: String?
+    /// The shared MCP login store (`McpShare`). nil = `~/.claude-mcp-store`.
+    public var mcpStore: String?
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -91,6 +97,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         continuePrompt = try c.decodeIfPresent(String.self, forKey: .continuePrompt)
         gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
         onSwitch = try c.decodeIfPresent(String.self, forKey: .onSwitch)
+        mcpStore = try c.decodeIfPresent(String.self, forKey: .mcpStore)
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {
