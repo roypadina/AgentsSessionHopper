@@ -9,9 +9,9 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
     case switched = "switch"
     /// No profile has room: a session waits for a reset or stopped.
     case noRoom = "no-room"
-    /// A profile passed the suggest threshold (`HopperConfig.suggestThreshold`).
+    /// A profile passed its suggest threshold (`HopperConfig.suggest`).
     case usageWarning = "usage-warning"
-    /// A profile passed the park threshold (`HopperConfig.hardThreshold`).
+    /// A profile passed its park threshold (`HopperConfig.hard`).
     case usageCritical = "usage-critical"
 
     public var label: String {
@@ -119,9 +119,10 @@ public enum Alerts {
         switch e.type {
         case "switch", "run":
             // A move the user asked for is not news.
-            guard let from = e.from, let to = e.to, from != to, !userSources.contains(e.source ?? "") else { return }
+            guard let from = e.from, let to = e.to, from != to, !userSources.contains(e.source ?? ""),
+                  !["confirm", "now"].contains(e.trigger ?? "") else { return }
             let limits = LimitStore.read(from, env.paths)
-            let until = blockedUntil(limits, threshold: config.suggestThreshold, now: now) ?? now + cooldown
+            let until = blockedUntil(limits, threshold: config.suggest(from), now: now) ?? now + cooldown
             let why: String
             switch e.trigger ?? "" {
             case "limit_stop", "limit": why = "hit its usage limit"
@@ -136,7 +137,7 @@ public enum Alerts {
         case "park":
             let from = e.from ?? AlertSettings.everyProfile
             let until = config.profiles.filter { !$0.isGateway }
-                .compactMap { blockedUntil(LimitStore.read($0.name, env.paths), threshold: config.hardThreshold, now: now) }.min() ?? now + cooldown
+                .compactMap { blockedUntil(LimitStore.read($0.name, env.paths), threshold: config.hard($0.name), now: now) }.min() ?? now + cooldown
             fire(.noRoom, profile: from, key: "no-room", config: config, env: env, now: now, active: true,
                  title: "No profile has room",
                  body: (e.detail.map { "A session is \($0)." } ?? "A session stopped: every profile is full.") + " More of these stay quiet until \(ProfileLimits.clock(until)).") { old in
@@ -153,17 +154,22 @@ public enum Alerts {
         guard let p = config.profile(named: profile), !p.isGateway, let l = LimitStore.read(profile, env.paths) else { return }
         let active = Sessions.live(env.paths).contains { $0.record.profile == profile }
         let windows: [(String, String, LimitWindow?)] = [("5h", "5-hour", l.fiveHour), ("7d", "weekly", l.sevenDay)]
-        for (kind, threshold) in [(AlertKind.usageCritical, config.hardThreshold), (.usageWarning, config.suggestThreshold)] {
+        for (kind, threshold) in [(AlertKind.usageCritical, config.hard(profile)), (.usageWarning, config.suggest(profile))] {
             for (short, name, w) in windows {
                 guard let w, w.isLive(now: now), w.usedPercentage >= threshold else { continue }
-                let reset = w.resetsAt ?? 0
-                let seen: (Memory?) -> Bool = { m in m?.window.map { abs($0 - reset) < windowTolerance } ?? false }
+                let reset = w.resetsAt
+                // No reset time: quiet for `cooldown` instead of forever.
+                let seen: (Memory?) -> Bool = { m in
+                    guard let m else { return false }
+                    if let reset { return m.window.map { abs($0 - reset) < windowTolerance } ?? false }
+                    return (m.until ?? 0) > now
+                }
                 // A critical alert for this window already said more than the warning would.
                 if kind == .usageWarning, seen(memory(env.paths)["\(AlertKind.usageCritical.rawValue)|\(profile)|\(short)"]) { continue }
                 fire(kind, profile: profile, key: "\(kind.rawValue)|\(profile)|\(short)", config: config, env: env, now: now, active: active,
                      title: "\(config.display(profile)): \(Int(w.usedPercentage.rounded()))% of its \(name) limit",
                      body: "\(config.display(profile)) passed \(Int(threshold))% of its \(name) usage" + (w.resetsAt.map { ", resets \(ProfileLimits.clock($0))" } ?? "") + ".") { old in
-                    seen(old) ? nil : Memory(window: reset)
+                    seen(old) ? nil : reset.map { Memory(window: $0) } ?? Memory(until: now + cooldown)
                 }
             }
         }
@@ -275,15 +281,26 @@ public enum Alerts {
         ]
         let token = try? Gateway.key(tokenEntry, env: env)
         let status = post(payload, server: server, topic: topic, token: token)
-        log(r, topic: topic, status: status, env: env)
+        // Topic names stay out of the log: on ntfy.sh the name is the only lock.
+        log(r, topic: "primary", status: status, env: env)
         if !(status.map { (200..<300).contains($0) } ?? false),
-           let fb = (try? Gateway.key(fallbackEntry, env: env)).flatMap(URL.init(string:)), let fbTopic = fb.pathComponents.dropFirst().first,
-           let fbServer = URL(string: fb.absoluteString.replacingOccurrences(of: fb.path, with: "")) {
+           let (fbServer, fbTopic) = (try? Gateway.key(fallbackEntry, env: env)).flatMap(splitTopicURL) {
             // The token belongs to the first server only.
             let fbStatus = post(payload, server: fbServer, topic: fbTopic, token: fbServer.host == server.host ? token : nil)
-            log(r, topic: fbServer.host == "ntfy.sh" ? "fallback (hidden)" : fbTopic, status: fbStatus, env: env)
+            log(r, topic: "fallback", status: fbStatus, env: env)
         }
         return status
+    }
+
+    /// `https://host[:port][/path]/<topic>` → the server root it posts to (with any path before the topic) and the topic.
+    public static func splitTopicURL(_ s: String) -> (URL, String)? {
+        guard var c = URLComponents(string: s.trimmingCharacters(in: .whitespacesAndNewlines)), c.host?.isEmpty == false else { return nil }
+        var parts = c.path.split(separator: "/").map(String.init)
+        guard let topic = parts.popLast(), validTopic(topic) else { return nil }
+        c.path = parts.isEmpty ? "" : "/" + parts.joined(separator: "/")
+        c.query = nil
+        c.fragment = nil
+        return c.url.map { ($0, topic) }
     }
 
     static func post(_ payload: [String: Any], server: URL, topic: String, token: String?) -> Int? {

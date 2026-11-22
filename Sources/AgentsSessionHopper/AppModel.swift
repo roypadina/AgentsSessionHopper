@@ -282,7 +282,7 @@ final class AppModel: ObservableObject {
 
     func severity(_ profile: String) -> Severity {
         guard let p = snapshot.percent(profile) else { return .unknown }
-        return p >= config.hardThreshold ? .full : p >= config.suggestThreshold ? .near : .ok
+        return p >= config.hard(profile) ? .full : p >= config.suggest(profile) ? .near : .ok
     }
 
     func tilde(_ path: String) -> String { env.tilde(path) }

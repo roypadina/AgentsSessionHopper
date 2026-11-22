@@ -18,10 +18,18 @@ A move you asked for yourself (menu, notification, `switch`) is not an alert.
   so it works on Linux servers too.
 
 ```bash
-sessionhopper alerts ntfy https://ntfy.sh my-topic     # or your own server
+sessionhopper alerts ntfy https://ntfy.sh < topic.txt  # the topic on stdin (or as a 2nd argument); or your own server
 sessionhopper alerts ntfy token < token.txt            # optional access token (Keychain / private file)
+sessionhopper alerts ntfy fallback < url.txt           # optional 2nd topic URL, used only when a post fails
 sessionhopper alerts test                              # a test alert on every channel set up
+sessionhopper alerts ntfy off                          # stop, and forget the token and fallback
 ```
+
+The token and the fallback URL are kept in the Keychain (macOS) or a private file (Linux). The topic itself
+sits in plain `config.json` in the state folder: on ntfy.sh, where the topic name is the only lock, keep that
+folder private. Each push holds the alert text (profile names, usage percent), this machine's short host name
+and the path of its send log; anyone who knows a public topic can read them. Every send attempt is one line
+in `ntfy.log` in the state folder (`topic=primary` or `topic=fallback`, never the topic name).
 
 In the app: Settings → Alerts. It applies as you type; clear the topic to turn ntfy off.
 

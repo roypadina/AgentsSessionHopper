@@ -112,9 +112,9 @@ extension SettingsView.Tab {
     /// Chosen from each pane's rows; re-pick when rows change.
     var height: CGFloat {
         switch self {
-        case .general: 600
-        case .handOff: 800
-        case .alerts: 800
+        case .general: 680
+        case .handOff: 900
+        case .alerts: 900
         case .profiles: 460
         case .commandLine: 470
         case .log: 480
@@ -155,6 +155,20 @@ private struct HandOffSettings: View {
                 Text("Past this, a session you have not moved ends at its next turn end, so it does not run into paid extra usage. It is never moved for you; resume it later or on another profile.").formFooter()
             }
             Section {
+                ForEach(model.config.profiles.filter { !$0.isGateway }) { p in
+                    Toggle("\(p.displayName): own thresholds", isOn: ownThresholds(p.name))
+                        .toggleStyle(.switch).controlSize(.mini)
+                    if p.suggestThreshold != nil || p.hardThreshold != nil {
+                        PercentStepper(title: "Suggest a move at", value: profileValue(p.name, \.suggestThreshold, global: model.config.suggestThreshold), range: 50...95)
+                            .padding(.leading, 16)
+                        PercentStepper(title: "Park at", value: profileValue(p.name, \.hardThreshold, global: model.config.hardThreshold), range: 80...100)
+                            .padding(.leading, 16)
+                    }
+                }
+            } header: { Text("Per Profile") } footer: {
+                Text("A profile with its own thresholds is measured against them: when to suggest or make a move away from it, when to park it, and when it counts as having room. The others use the values above.").formFooter()
+            }
+            Section {
                 Toggle("Hold every session", isOn: Binding(get: { model.holdAll }, set: { model.setHoldAll($0) }))
             }
             ContinuePromptSection(model: model)
@@ -165,6 +179,23 @@ private struct HandOffSettings: View {
 
     private func binding<T>(_ key: WritableKeyPath<HopperConfig, T>) -> Binding<T> {
         Binding(get: { model.config[keyPath: key] }, set: { v in model.update { $0[keyPath: key] = v } })
+    }
+
+    /// On: start from the global values; off: back to them.
+    private func ownThresholds(_ name: String) -> Binding<Bool> {
+        Binding(get: { model.config.profile(named: name).map { $0.suggestThreshold != nil || $0.hardThreshold != nil } ?? false },
+                set: { on in model.update { c in
+                    guard let i = c.profiles.firstIndex(where: { $0.name == name }) else { return }
+                    c.profiles[i].suggestThreshold = on ? c.suggestThreshold : nil
+                    c.profiles[i].hardThreshold = on ? c.hardThreshold : nil
+                } })
+    }
+
+    private func profileValue(_ name: String, _ key: WritableKeyPath<Profile, Double?>, global: Double) -> Binding<Double> {
+        Binding(get: { model.config.profile(named: name)?[keyPath: key] ?? global },
+                set: { v in model.update { c in
+                    if let i = c.profiles.firstIndex(where: { $0.name == name }) { c.profiles[i][keyPath: key] = v }
+                } })
     }
 }
 
@@ -609,7 +640,9 @@ private struct AlertsSettings: View {
     private func apply() {
         let t = topic.trimmingCharacters(in: .whitespaces)
         if t.isEmpty { if model.config.alerts.ntfyOn { model.update { $0.alerts.ntfyTopic = nil } }; return }
-        let url = server.trimmingCharacters(in: .whitespaces)
+        // An empty server means the one the field shows: ntfy.sh.
+        let typed = server.trimmingCharacters(in: .whitespaces)
+        let url = typed.isEmpty ? "https://ntfy.sh" : typed
         guard Gateway.validURL(url), Alerts.validTopic(t) else { return }
         let root = url.hasSuffix("/") ? String(url.dropLast()) : url
         guard model.config.alerts.ntfyServer != root || model.config.alerts.ntfyTopic != t else { return }

@@ -21,6 +21,7 @@ sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewi
                                           and the live-session list (messaging across accounts)
 sessionhopper profiles label <name> <text>|--clear  display name shown in the app, `status` and `profiles list`
                                           (the name used by aliases and -P never changes)
+sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park thresholds
 sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
@@ -39,7 +40,9 @@ sessionhopper mcp status | mcp store <dir>|default  which profiles share, what t
 sessionhopper alerts [status]             which alerts go where: Mac notification and/or ntfy, per profile
 sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
                         [ntfy on|off] [active-only on|off]
-sessionhopper alerts ntfy <server url> <topic> | ntfy off | ntfy token < file
+sessionhopper alerts ntfy <server url> [<topic>] | ntfy off | ntfy token < file | ntfy fallback < file
+                                          topic on stdin keeps a public one out of shell history; off also forgets
+                                          the token and fallback; each send is a line in ntfy.log in the state folder
 sessionhopper alerts test | alerts log [-n 20]
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file

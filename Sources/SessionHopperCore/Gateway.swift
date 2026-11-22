@@ -88,6 +88,17 @@ public enum Gateway {
         return env.tilde(url.path)
     }
 
+    /// Removes what `storeKey` stored for `p` (Keychain item or key file). Missing is fine.
+    public static func deleteKey(_ p: Profile, env: HopperEnvironment) {
+        #if os(macOS)
+        if p.keyFile == nil {
+            _ = Shell.run("/usr/bin/security", ["delete-generic-password", "-s", keychainService, "-a", p.name], timeout: 15)
+            return
+        }
+        #endif
+        try? FileManager.default.removeItem(atPath: p.keyFile.map(expand) ?? defaultKeyFile(p, env: env).path)
+    }
+
     /// Variables that send this `claude` to the gateway. Set even when the caller's environment has them.
     public static func environment(_ p: Profile, key: String) -> [String: String] {
         // In interactive mode Claude Code asks once whether to use ANTHROPIC_API_KEY; the answer is remembered.

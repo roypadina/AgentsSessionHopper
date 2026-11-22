@@ -351,7 +351,7 @@ public final class Supervisor {
                                     detail: next.map { "waiting for a reset, continues on \($0.profile.name) at \(ProfileLimits.clock($0.at))" },
                                     profiles: EventLog.samples(config, env.paths, now: policy.now)))
         if let from, request?.trigger == "park" {
-            say("parked: \(from.name) reached \(Int(config.hardThreshold))% and \"park before paid usage\" is on")
+            say("parked: \(from.name) reached \(Int(config.hard(from.name)))% and \"park before paid usage\" is on")
         } else if from != nil {
             say("parked: no other profile has room")
         } else {

@@ -354,10 +354,11 @@ final class PanelSession: @unchecked Sendable {
     }
 
     private func log(type: String, from: String?, to: String?, trigger: String) {
-        EventLog.append(HopperEvent(type: type, session: session, cwd: FileManager.default.currentDirectoryPath, from: from, to: to,
-                                    trigger: trigger, source: "vscode",
-                                    profiles: type == "switch" ? EventLog.samples(HopperConfig.load(env.paths), env.paths, now: FileIO.now()) : nil),
-                        env.paths)
+        let e = HopperEvent(type: type, session: session, cwd: FileManager.default.currentDirectoryPath, from: from, to: to,
+                            trigger: trigger, source: "vscode",
+                            profiles: type == "switch" ? EventLog.samples(HopperConfig.load(env.paths), env.paths, now: FileIO.now()) : nil)
+        EventLog.append(e, env.paths)
+        Alerts.event(e, env: env)
     }
 }
 

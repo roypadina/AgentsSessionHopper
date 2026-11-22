@@ -28,6 +28,9 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     /// Opt-in: share one MCP login store with the other opted-in profiles (`McpShare`). Takes effect only while
     /// the profile runs on a setup-token.
     public var mcpShare: Bool?
+    /// This profile's own suggest / park thresholds (percent). nil = the global ones (`HopperConfig`).
+    public var suggestThreshold: Double?
+    public var hardThreshold: Double?
 
     public var id: String { name }
     public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
@@ -111,11 +114,18 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         guard suggestThreshold > 0, suggestThreshold < hardThreshold, hardThreshold <= 100 else {
             throw HopperError("thresholds must satisfy 0 < suggest (\(Int(suggestThreshold))) < hard (\(Int(hardThreshold))) <= 100")
         }
+        for p in profiles where p.suggestThreshold != nil || p.hardThreshold != nil {
+            let s = suggest(p.name), h = hard(p.name)
+            guard s > 0, s < h, h <= 100 else { throw HopperError("\(p.name): thresholds must satisfy 0 < suggest (\(Int(s))) < park (\(Int(h))) <= 100") }
+        }
         guard Self.gatewayUses.contains(gatewayUse) else { throw HopperError("gateway use is one of: \(Self.gatewayUses.joined(separator: ", "))") }
         try FileIO.encode(self, to: paths.config)
     }
 
     public func profile(named name: String) -> Profile? { profiles.first { $0.name == name } }
+    /// The suggest / park threshold for profile `name`: its own, else the global one.
+    public func suggest(_ name: String) -> Double { profile(named: name)?.suggestThreshold ?? suggestThreshold }
+    public func hard(_ name: String) -> Double { profile(named: name)?.hardThreshold ?? hardThreshold }
     /// The label of profile `name` if set, else `name` itself (also for unknown names, e.g. old log entries).
     public func display(_ name: String) -> String { profile(named: name)?.displayName ?? name }
     /// True when `label` would read like another profile ("Move to X" must stay unambiguous).

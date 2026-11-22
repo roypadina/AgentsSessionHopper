@@ -110,6 +110,30 @@ final class AlertsTests: XCTestCase {
         XCTAssertEqual(Alerts.read(env.paths).map(\.kind), ["usage-critical"])
     }
 
+    func testFallbackTopicURLSplits() {
+        XCTAssertEqual(Alerts.splitTopicURL("https://ntfy.example.com/ntfy").map { [$0.0.absoluteString, $0.1] }, ["https://ntfy.example.com", "ntfy"])
+        XCTAssertEqual(Alerts.splitTopicURL("https://host:8443/push/my-topic").map { [$0.0.absoluteString, $0.1] }, ["https://host:8443/push", "my-topic"])
+        XCTAssertNil(Alerts.splitTopicURL("https://ntfy.sh/"))
+    }
+
+    func testUsageWithoutAResetTimeComesBackAfterTheCooldown() throws {
+        let (_, env) = setup { $0.alerts.set(AlertSettings.everyProfile, .usageCritical, mac: true, activeOnly: false) }
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: nil), sevenDay: nil, sampledAt: now), profile: "a", env.paths)
+        Alerts.usage("a", env: env, now: now)
+        Alerts.usage("a", env: env, now: now + 60)
+        XCTAssertEqual(Alerts.read(env.paths).count, 1)
+        Alerts.usage("a", env: env, now: now + 3700)
+        XCTAssertEqual(Alerts.read(env.paths).count, 2)
+    }
+
+    func testPanelMoveTheUserAskedForIsNotAnAlert() {
+        let (_, env) = setup { $0.alerts.set(AlertSettings.everyProfile, .switched, mac: true) }
+        Alerts.event(move("a", "b", source: "vscode", trigger: "now"), env: env, now: now)
+        XCTAssertTrue(Alerts.read(env.paths).isEmpty)
+        Alerts.event(move("a", "b", source: "vscode", trigger: "limit_stop"), env: env, now: now)
+        XCTAssertEqual(Alerts.read(env.paths).count, 1)
+    }
+
     func testTopicValidation() {
         XCTAssertTrue(Alerts.validTopic("my-alerts_1"))
         XCTAssertFalse(Alerts.validTopic("a/b"))

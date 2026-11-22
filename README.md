@@ -55,6 +55,9 @@ brew install --cask roypadina/tap/agents-session-hopper
   next turn end instead of running into paid extra usage, then waits for the usage window to reset and
   carries on by itself (or tells you how to resume it when no reset time is known).
 - **Move without asking** — optional, off by default, explained in Settings.
+- **Thresholds per profile** (Settings → Hand-off → Per Profile, or `sessionhopper profiles thresholds <name> <suggest> <park>`):
+  leave a work account early and run a spare one to the edge. Each profile is measured against its own pair,
+  both when sessions leave it and when it counts as having room.
 - **Move all sessions at once** to one profile (⋯ menu or right-click → Move All Sessions To, or
   `sessionhopper switch <profile> --all`): each session moves when its current turn ends.
 - **Alerts on your Mac and your phone** (Settings → Alerts, or `sessionhopper alerts`): when sessions

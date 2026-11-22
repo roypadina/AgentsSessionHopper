@@ -58,6 +58,8 @@ let usage = """
       sessionhopper profiles label <name> <text>|--clear  display name shown in the app and lists; the name itself never changes
       sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewind and setup to the first profile
                                               and the live-session list (messaging across accounts)
+      sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park
+                                              thresholds instead of the global ones (config suggest / park-at)
       sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10): equal priorities
                                               don't trade places before a limit; a freed-up better one is moved back to
       sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
@@ -77,7 +79,8 @@ let usage = """
       sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
                               [ntfy on|off] [active-only on|off]  (active-only: usage alerts only while a session
                               here runs on that profile). Many sessions moving at once give one alert.
-      sessionhopper alerts ntfy <server url> <topic> | ntfy off | ntfy token < file   where ntfy alerts go
+      sessionhopper alerts ntfy <server url> [<topic>] | ntfy off | ntfy token < file   where ntfy alerts go (topic on
+                                              stdin keeps a public one out of shell history; off also forgets token + fallback)
       sessionhopper alerts ntfy fallback < file   a second topic URL, used only when the first post fails
       sessionhopper alerts test | alerts log [-n 20]
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
@@ -132,7 +135,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         let five = l?.fiveHour.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
         let week = l?.sevenDay.flatMap { $0.isLive(now: s.now) ? $0.usedPercentage : nil }
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
-        if let p = s.percent(p.name), p >= s.config.suggestThreshold { note += ", near limit" }
+        if let pct = s.percent(p.name), pct >= s.config.suggest(p.name) { note += ", near limit" }
         let n = s.sessions(on: p.name).count
         out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) \(pad(p.isGateway ? Gateway.kindName(p) : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(s.emails[p.name].map { "  \($0)" } ?? "")")
     }
@@ -342,6 +345,15 @@ func profilesCommand(_ a: [String]) -> Int32 {
             let raw = String(decoding: readStdin(), as: UTF8.self)
             out("\(name): key stored in \(try Gateway.storeKey(p.isGateway ? raw : try SetupToken.parse(raw), for: p, env: env))")
         } catch { die("\(error)") }
+    case "thresholds":
+        guard let i = config.profiles.firstIndex(where: { $0.name == a.first }),
+              a.count == 2 && a[1] == "default" || a.count == 3 && Double(a[1]) != nil && Double(a[2]) != nil else {
+            die("usage: sessionhopper profiles thresholds <name> <suggest %> <park %> | default   (default = the global ones)")
+        }
+        config.profiles[i].suggestThreshold = a.count == 3 ? Double(a[1]) : nil
+        config.profiles[i].hardThreshold = a.count == 3 ? Double(a[2]) : nil
+        save()
+        out("\(a[0]): suggest at \(Int(config.suggest(a[0])))%, park at \(Int(config.hard(a[0])))%" + (a.count == 2 ? " (the global ones)" : ""))
     case "priority":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), let n = Int(a[1]) ?? (a[1] == "default" ? 0 : nil) else {
             die("usage: sessionhopper profiles priority <name> <n>|default   (lower is preferred; Claude 1, API keys 10 by default)")
@@ -531,11 +543,19 @@ func alertsCommand(_ a: [String]) -> Int32 {
         save()
         if ntfy == true, !config.alerts.ntfyOn { say("ntfy is not set up yet: sessionhopper alerts ntfy <server url> <topic>") }
     case "ntfy":
-        if a.first == "off" { config.alerts.ntfyServer = nil; config.alerts.ntfyTopic = nil; save(); break }
+        if a.first == "off" {
+            // The token and the fallback topic go too: a public topic name is a secret.
+            config.alerts.ntfyServer = nil
+            config.alerts.ntfyTopic = nil
+            save()
+            Gateway.deleteKey(Alerts.tokenEntry, env: env)
+            Gateway.deleteKey(Alerts.fallbackEntry, env: env)
+            break
+        }
         if a.first == "fallback" {
             if isatty(0) == 1 { say("paste the fallback topic URL (https://ntfy.sh/<topic>), then Ctrl-D") }
             let url = String(decoding: readStdin(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-            guard Gateway.validURL(url), let t = URL(string: url)?.pathComponents.dropFirst().first, Alerts.validTopic(t) else { die("that is not a topic URL like https://ntfy.sh/<topic>") }
+            guard Gateway.validURL(url), Alerts.splitTopicURL(url) != nil else { die("that is not a topic URL like https://ntfy.sh/<topic>") }
             do { out("ntfy fallback stored in \(try Gateway.storeKey(url, for: Alerts.fallbackEntry, env: env))") } catch { die("\(error)") }
             return 0
         }
@@ -544,8 +564,10 @@ func alertsCommand(_ a: [String]) -> Int32 {
             do { out("ntfy token stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: Alerts.tokenEntry, env: env))") } catch { die("\(error)") }
             return 0
         }
+        // The topic may come on stdin, so a public one stays out of `ps` and shell history.
+        if a.count == 1, isatty(0) == 0 { a.append(String(decoding: readStdin(), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)) }
         guard a.count == 2, Gateway.validURL(a[0]), Alerts.validTopic(a[1]) else {
-            die("usage: sessionhopper alerts ntfy <server url, e.g. https://ntfy.sh> <topic> | off | token < file")
+            die("usage: sessionhopper alerts ntfy <server url, e.g. https://ntfy.sh> <topic> (or the topic on stdin) | off | token < file | fallback < file")
         }
         config.alerts.ntfyServer = a[0].hasSuffix("/") ? String(a[0].dropLast()) : a[0]
         config.alerts.ntfyTopic = a[1]
@@ -634,6 +656,9 @@ func configCommand(_ a: [String]) -> Int32 {
     }
     out("suggest at:          \(Int(c.suggestThreshold))%")
     out("park at:             \(Int(c.hardThreshold))%  (park before paid usage: \(c.parkBeforePaid ? "on" : "off"))")
+    for p in c.profiles where p.suggestThreshold != nil || p.hardThreshold != nil {
+        out("  \(pad(p.name, 16)) own: suggest \(Int(c.suggest(p.name)))%, park \(Int(c.hard(p.name)))%")
+    }
     out("move without asking: \(c.autoMove ? "on" : "off")")
     out("move/park at once past park threshold: \(c.moveNowAtHard ? "on" : "off")")
     out("all full, wait for a reset: \(c.waitForReset ? "on" : "off")")

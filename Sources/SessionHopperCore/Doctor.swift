@@ -133,6 +133,8 @@ public enum Doctor {
             ? "\(shell.rawValue): `claude` runs through sessionhopper"
             : "\(shell.rawValue): no AgentsSessionHopper alias, so plain `claude` is supervised only if your own setup routes it. Start sessions with `sessionhopper`, or run: sessionhopper shell install")
         if config.suggestThreshold >= config.hardThreshold { add(.fail, "suggest threshold must be below the park threshold") }
+        let own = config.profiles.filter { $0.suggestThreshold != nil || $0.hardThreshold != nil }
+        if !own.isEmpty { add(.info, "own thresholds: " + own.map { "\($0.name) suggest \(Int(config.suggest($0.name)))%, park \(Int(config.hard($0.name)))%" }.joined(separator: "; ")) }
         return out
     }
 

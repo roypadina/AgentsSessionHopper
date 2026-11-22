@@ -21,7 +21,9 @@ accounts.
   copies the MCP logins to a local backup (a private file on Linux, a Keychain item on macOS); nothing is
   sent anywhere. `login --token` takes the token you paste and sends one tiny request per Claude profile
   to check it.
-- [Alerts](Alerts) you send to ntfy go only to the server and topic you set.
+- [Alerts](Alerts) you send to ntfy go only to the server and topic you set (and the fallback topic, if
+  you set one). A push holds the alert text (profile names, usage percent), this machine's short host name
+  and the path of its send log.
 - To show which account a profile is, it reads the login email Claude Code keeps in the profile's
   `.claude.json` (`~/.claude.json` for the default profile, `oauthAccount.emailAddress`). That is not a
   credential. It only displays it (menu-bar panel, Settings, `sessionhopper status` and `profiles list`)

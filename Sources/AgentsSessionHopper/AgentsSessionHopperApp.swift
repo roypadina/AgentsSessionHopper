@@ -65,7 +65,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         let s = model.snapshot
-        let full = (s.worstLivePercent ?? 0) >= model.config.hardThreshold
+        let full = Set(s.sessions.map(\.record.profile)).contains { (s.percent($0) ?? 0) >= model.config.hard($0) }
         let label = spoken(s, full: full)
         HStack(spacing: 3) {
             if !s.needsAttention.isEmpty {

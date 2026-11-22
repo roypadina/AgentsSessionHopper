@@ -161,3 +161,33 @@ final class PolicyTests: XCTestCase {
         XCTAssertNil(Picker.choose(count: rows.count, row: { rows[$0] }, read: { input.isEmpty ? nil : input.removeFirst() }, write: { _ in }), "only rows on screen")
     }
 }
+
+final class ProfileThresholdTests: XCTestCase {
+    func policy(_ l: [String: ProfileLimits], _ change: (inout HopperConfig) -> Void) -> Policy {
+        var cfg = HopperConfig()
+        cfg.profiles = [profile("a"), profile("b"), profile("c")]
+        change(&cfg)
+        return Policy(config: cfg, limits: l, now: 1000)
+    }
+
+    func testOwnSuggestThresholdMovesEarlier() {
+        let l = ["a": limits(75), "b": limits(10), "c": limits(10)]
+        XCTAssertEqual(policy(l) { _ in }.evaluate(current: profile("a"), order: [profile("a"), profile("b"), profile("c")], held: false), .none)
+        let p = policy(l) { $0.profiles[0].suggestThreshold = 70; $0.profiles[0].hardThreshold = 90 }
+        XCTAssertEqual(p.evaluate(current: p.config.profiles[0], order: p.config.profiles, held: false), .suggest(to: "b", percent: 75))
+    }
+
+    func testTargetIsMeasuredAgainstItsOwnThreshold() {
+        // b is at 60%: room under the global 85, but not under its own 50, so the move goes to c.
+        let p = policy(["a": limits(90), "b": limits(60), "c": limits(10)]) { $0.profiles[1].suggestThreshold = 50; $0.profiles[1].hardThreshold = 55 }
+        XCTAssertEqual(p.evaluate(current: p.config.profiles[0], order: p.config.profiles, held: false), .suggest(to: "c", percent: 90))
+    }
+
+    func testOwnThresholdsMustBeOrdered() {
+        var c = HopperConfig()
+        c.profiles = [profile("a")]
+        c.profiles[0].suggestThreshold = 95
+        c.profiles[0].hardThreshold = 90
+        XCTAssertThrowsError(try c.save(StatePaths(root: FileManager.default.temporaryDirectory.appendingPathComponent("x-\(UUID())"))))
+    }
+}
