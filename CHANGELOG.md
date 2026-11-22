@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profiles for any Anthropic-compatible gateway (`--gateway <url>`, or Other gateway in the app), for example LiteLLM in front of an OpenAI key (#43).
 - "Your credit balance is too low" (Anthropic) and `insufficient_quota` (OpenAI behind a gateway) count as an out-of-credit key, like OpenRouter's 402.
 
+### Changed
+- The Ko-fi card no longer follows a move onto a pay-per-use profile and never shows while a session runs on one. Its title now says since when hops are counted, and the receipt row reads "App price".
+
 ## [1.14.0] - 2026-11-19
 
 ### Changed

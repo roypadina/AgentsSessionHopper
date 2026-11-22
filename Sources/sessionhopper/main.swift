@@ -340,6 +340,7 @@ func addGateway(_ name: String, _ kind: String, _ a: inout [String], _ config: i
         die("add your Claude profiles first (sessionhopper profiles import); the API-key profile goes last")
     }
     let url = take("--gateway", from: &a)
+    if kind != Gateway.custom, url != nil { die("--gateway is its own kind: use it without --openrouter or --anthropic") }
     if kind == Gateway.custom, !(url.map(Gateway.validURL) ?? false) { die("--gateway takes the gateway's http(s) URL, e.g. --gateway http://localhost:4000") }
     var models: [String: String] = [:]
     while let m = take("--model", from: &a) {

@@ -80,6 +80,23 @@ final class SupportPromptTests: XCTestCase {
         XCTAssertEqual(c.update(snapshot([old, hop], [live("s1", on: "b")], at: t0 + 34)).hops, 0, "counted once")
     }
 
+    func testHopOntoAPayPerUseProfileCountsButDoesNotArm() {
+        var c = HopCounter()
+        var config = HopperConfig()
+        config.profiles = [Profile(name: "a", dir: "/p/a", exportConfigDir: false),
+                           Profile(name: "api", dir: "/p/a", exportConfigDir: false, kind: Gateway.anthropic)]
+        func snap(_ ev: [HopperEvent], _ ss: [LiveSession] = [], at t: Double) -> HopperSnapshot {
+            HopperSnapshot(config: config, limits: [:], sessions: ss, events: ev, now: t)
+        }
+        _ = c.update(snap([], at: t0))
+        let hop = event("switch", "s1", at: t0, from: "a", to: "api")
+        let run = event("run", "r1", at: t0, from: "a", to: "api", trigger: "ok")
+        let r = c.update(snap([hop, run], [live("s1", on: "api")], at: t0 + 31))
+        XCTAssertEqual(r.hops, 2)
+        XCTAssertEqual(r.arms, 0, "no tip ask next to a fresh bill")
+        XCTAssertFalse(snap([], [live("s1", on: "api")], at: t0 + 31).isCalm, "a session on a paid key is not calm")
+    }
+
     func testFailedOrUnprovenHopsDoNotCount() {
         var c = HopCounter()
         _ = c.update(snapshot([], at: t0))

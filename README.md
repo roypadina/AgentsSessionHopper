@@ -207,6 +207,8 @@ In the app: **Settings → Profiles → + → Anthropic API key** or **Other gat
 - **Anthropic API key:** in an interactive session Claude Code asks once whether to use the key; answer
   **Yes**. Declining makes that profile fall back to the folder's Claude login (change it later in
   `/config` → "Use custom API key"). `claude -p` and `sessionhopper run` always use the key.
+- **Other gateway:** its key must be letters, digits, `-`, `_` and `.` only (API keys always are); a
+  self-chosen gateway key with other characters is refused.
 - **OpenAI (or another non-Anthropic) key:** Claude Code speaks only the Anthropic Messages API, so an
   OpenAI key needs something in between. Either add an OpenRouter profile and map the aliases to OpenAI
   models (`--model opus=openai/gpt-5`), or run a translating gateway such as
