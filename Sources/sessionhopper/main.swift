@@ -365,7 +365,7 @@ func runCommand(_ a: [String]) -> Int32 {
     let only = has("--only", in: &a)
     let prefer = (take("-P", from: &a) ?? take("--profile", from: &a)).map { $0.split(separator: ",").map(String.init) } ?? []
     if a.first == "--" { a.removeFirst() }
-    let input = isatty(0) == 1 ? Data() : readStdin()
+    let input = isatty(0) == 1 ? InputFeed(Data()) : InputFeed(reading: .standardInput)
     return OneShot.run(env: env, prefer: prefer, only: only, args: a, stdin: input, say: say)
 }
 

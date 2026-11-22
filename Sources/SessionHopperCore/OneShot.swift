@@ -183,8 +183,8 @@ public enum OneShot {
         }
     }
 
-    /// Runs the turn. `stdin` is the whole prompt input, replayed on each attempt.
-    public static func run(env: HopperEnvironment, prefer: [String], only: Bool, args callerArgs: [String], stdin: Data,
+    /// Runs the turn. `stdin` streams the caller's input to each attempt, from its start.
+    public static func run(env: HopperEnvironment, prefer: [String], only: Bool, args callerArgs: [String], stdin: InputFeed,
                            say: (String) -> Void) -> Int32 {
         let config = HopperConfig.load(env.paths)
         guard !config.profiles.isEmpty else { say("no profiles yet. Run: sessionhopper profiles import"); return 1 }
@@ -256,7 +256,7 @@ public enum OneShot {
     }
 
     /// One `claude` run: stdin in, stdout parsed line by line, stderr shown and kept for classification.
-    static func attempt(_ claude: String, args: [String], env: [String: String], stdin: Data, passThrough: Bool, stop: Terminator,
+    static func attempt(_ claude: String, args: [String], env: [String: String], stdin: InputFeed, passThrough: Bool, stop: Terminator,
                         cwd: URL? = nil) -> Attempt {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: claude)
@@ -284,10 +284,9 @@ public enum OneShot {
         stop.child = proc
         let group = DispatchGroup()
         let errBox = LockedData()
-        DispatchQueue.global().async(group: group) {
-            try? inPipe.fileHandleForWriting.write(contentsOf: stdin)
-            try? inPipe.fileHandleForWriting.close()
-        }
+        let turn = stdin.turn
+        group.enter()
+        Thread.detachNewThread { stdin.copy(to: inPipe.fileHandleForWriting, turn: turn); group.leave() }
         DispatchQueue.global().async(group: group) {
             while case let d = errPipe.fileHandleForReading.availableData, !d.isEmpty {
                 FileHandle.standardError.write(d)
@@ -302,10 +301,15 @@ public enum OneShot {
                 let line = String(decoding: pending[pending.startIndex..<nl], as: UTF8.self)
                 pending.removeSubrange(pending.startIndex...nl)
                 a.read(line: line, now: FileIO.now())
+                // A stream-json claude waits for more input after a failed turn: end its input so it exits and the retry starts.
+                if a.resultLine == line {
+                    switch classify(a, now: FileIO.now()) { case .limit, .credits, .login: stdin.cut(); default: break }
+                }
             }
         }
         if !pending.isEmpty { a.read(line: String(decoding: pending, as: UTF8.self), now: FileIO.now()) }
         proc.waitUntilExit()
+        stdin.cut()
         group.wait()
         stop.child = nil
         a.exit = proc.terminationReason == .uncaughtSignal ? 128 + proc.terminationStatus : proc.terminationStatus
@@ -347,6 +351,62 @@ public final class Terminator: @unchecked Sendable {
         lock.unlock()
         if let c, c.isRunning { kill(c.processIdentifier, sig) }
     }
+}
+
+/// The caller's stdin for `run`: passed to each `claude` as it arrives, and kept, so a retry on the next profile
+/// gets the same input. Never read to the end first: a stream-json caller keeps stdin open after its message.
+public final class InputFeed: @unchecked Sendable {
+    private let cond = NSCondition()
+    private var seen = Data()
+    private var ended = false
+    /// Bumped by `cut()`: ends the copy to the current `claude`.
+    private var cuts = 0
+
+    /// Input that is complete already.
+    public init(_ data: Data) {
+        seen = data
+        ended = true
+    }
+
+    /// Reads `source` on its own thread until it ends.
+    public init(reading source: FileHandle) {
+        Thread.detachNewThread { [self] in
+            while case let d = source.availableData, !d.isEmpty { cond.sync { seen.append(d); cond.broadcast() } }
+            cond.sync { ended = true; cond.broadcast() }
+        }
+    }
+
+    /// Taken before a `claude` starts; `copy` for it stops at the next `cut()`.
+    var turn: Int { cond.sync { cuts } }
+
+    /// Writes all input so far to `h`, then the rest as it arrives; closes `h` at the end of the input or at `cut()`.
+    /// Call it on a thread of its own (on Linux it blocks SIGPIPE for that thread).
+    func copy(to h: FileHandle, turn: Int) {
+        // Input can arrive after claude has ended: that write must fail, not end this process. Not a process-wide
+        // SIG_IGN, which Linux children (claude, its tools) would inherit. Linux sends it to the writing thread.
+        #if os(Linux)
+        var pipeSignal = sigset_t()
+        sigemptyset(&pipeSignal)
+        sigaddset(&pipeSignal, SIGPIPE)
+        pthread_sigmask(SIG_BLOCK, &pipeSignal, nil)
+        #else
+        _ = fcntl(h.fileDescriptor, F_SETNOSIGPIPE, 1)
+        #endif
+        var sent = 0
+        while true {
+            let (chunk, done): (Data, Bool) = cond.sync {
+                while sent == seen.count, !ended, cuts == turn { cond.wait() }
+                return cuts == turn ? (seen.subdata(in: sent..<seen.count), ended) : (Data(), true)
+            }
+            sent += chunk.count
+            if !chunk.isEmpty, (try? h.write(contentsOf: chunk)) == nil { break }
+            if done { break }
+        }
+        try? h.close()
+    }
+
+    /// Closes the current `claude`'s stdin; later input is kept for the next one.
+    func cut() { cond.sync { cuts += 1; cond.broadcast() } }
 }
 
 final class LockedData: @unchecked Sendable {

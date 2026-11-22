@@ -243,6 +243,9 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
 
 - Everything after `--` goes to `claude` unchanged. Output is what `claude` would print for your
   `--output-format` (text, json or stream-json); the exit code is `claude`'s.
+- stdin goes to `claude` as it arrives, so a `--input-format stream-json` caller may keep the pipe open.
+  One turn per call: a retry sends everything written to stdin since the start, so send one user message
+  per `run`.
 - Usage comes from `claude`'s own `rate_limit_event` output (it runs with `--output-format
   stream-json` and translates back), so `status` shows real numbers without a status line.
 - A retry of a `--session-id` turn continues the same conversation with `--resume`. Every profile must

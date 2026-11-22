@@ -127,6 +127,67 @@ final class RunTests: XCTestCase {
         XCTAssertEqual(try h.run(["run", "--", "-p"]).stdout, "answer from default\n")
     }
 
+    // MARK: a stream-json caller that keeps stdin open (it writes its message, then waits, pipe open, for the result)
+
+    let streamArgs = ["run", "--", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose"]
+    let hello = #"{"type":"user","message":{"role":"user","content":"hi"}}"#
+
+    /// Plays `claude --input-format stream-json`: answers the first line, then reads on until its stdin ends.
+    func streamScenario() throws {
+        try h.scenario(#"""
+            who=default; [ -n "$CLAUDE_CONFIG_DIR" ] && who=work
+            IFS= read -r line; echo "$line" >> "$T/got-$who"
+            case "$(cat "$T/behave-$who" 2>/dev/null || echo ok)" in
+              ok) echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"answer from $who\"}";;
+              limit) echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour","resetsAt":4102444800}}'
+                  echo '{"type":"result","subtype":"success","is_error":true,"result":"You have hit your session limit"}';;
+            esac
+            while IFS= read -r line; do echo "$line" >> "$T/got-$who"; done
+            exit 0
+            """#)
+    }
+
+    func waitFor(_ file: String, _ text: String) -> Bool {
+        let deadline = Date().addingTimeInterval(5)
+        while h.read(file) != text && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        return h.read(file) == text
+    }
+
+    func testStreamJSONCallerKeepingStdinOpenIsServedAtOnce() throws {
+        try streamScenario()
+        let input = Pipe()
+        var served = false
+        let r = try h.run(streamArgs, input: input, onStart: { _ in
+            try? input.fileHandleForWriting.write(contentsOf: Data((self.hello + "\n").utf8))
+            served = self.waitFor("got-default", self.hello + "\n")
+            try? input.fileHandleForWriting.close()
+        })
+        XCTAssertTrue(served, "claude gets the message while the caller still holds stdin open (run used to read stdin to the end first)")
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertTrue(r.stdout.contains("answer from default"), r.stdout)
+    }
+
+    func testLimitRetryReplaysTheStreamAndKeepsItFlowing() throws {
+        try streamScenario()
+        try h.write("limit", "behave-default")
+        let input = Pipe()
+        let later = #"{"type":"control_request","request_id":"r2","request":{"subtype":"set_model","model":"haiku"}}"#
+        var replayed = false, flowing = false
+        let r = try h.run(streamArgs, input: input, onStart: { _ in
+            try? input.fileHandleForWriting.write(contentsOf: Data((self.hello + "\n").utf8))
+            replayed = self.waitFor("got-work", self.hello + "\n")
+            try? input.fileHandleForWriting.write(contentsOf: Data((later + "\n").utf8))
+            flowing = self.waitFor("got-work", self.hello + "\n" + later + "\n")
+            try? input.fileHandleForWriting.close()
+        })
+        XCTAssertTrue(replayed, "the next profile gets the same turn while the caller's stdin is still open")
+        XCTAssertTrue(flowing, "input that arrives after the retry goes to the new claude")
+        XCTAssertEqual(h.read("got-default"), hello + "\n", "the failed claude's stdin was closed, so it ended")
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertTrue(r.stdout.contains("answer from work"), r.stdout)
+        XCTAssertEqual(h.events().map(\.type).suffix(2), ["limit", "run"])
+    }
+
     func testGatewayWithoutKeyIsSkipped() throws {
         XCTAssertEqual(try h.run(["profiles", "add", "gw", "--openrouter", "--key-file", h.t.appendingPathComponent("missing.key").path]).code, 0)
         try h.write("limit", "behave-default")
