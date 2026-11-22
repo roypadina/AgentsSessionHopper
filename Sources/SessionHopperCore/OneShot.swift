@@ -115,7 +115,7 @@ public enum OneShot {
     }
 
     static let limitPhrases = ["usage limit", "session limit", "weekly limit", "rate limit", "limit reached", "hit your limit"]
-    static let creditPhrases = ["402", "requires more credits", "insufficient credits"]
+    static let creditPhrases = ["402", "requires more credits", "insufficient credits", "credit balance is too low", "insufficient_quota"]
     static let loginPhrases = ["not logged in", "please run /login", "oauth access token is invalid", "failed to authenticate", "authentication_error",
                                "invalid bearer token", "invalid api key", "401"]
 

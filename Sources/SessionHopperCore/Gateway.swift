@@ -1,12 +1,34 @@
 import Foundation
 
-/// Gateway profiles: the same unmodified `claude`, pointed at an Anthropic-compatible gateway (OpenRouter)
-/// with the user's own API key, through Claude Code's documented variables
+/// API-key profiles: the same unmodified `claude`, billed to the user's own key: OpenRouter, the Anthropic API
+/// itself, or any Anthropic-compatible gateway (LiteLLM in front of OpenAI, …), through Claude Code's documented variables
 /// (https://code.claude.com/docs/en/llm-gateway). Billed per use, so the policy reaches for one only when
 /// no subscription profile has room. The key is the user's gateway key, never a Claude login.
 public enum Gateway {
     public static let openRouter = "openrouter"
     public static let openRouterURL = "https://openrouter.ai/api"
+    /// A Claude Console API key, sent as `X-Api-Key` straight to the Anthropic API.
+    public static let anthropic = "anthropic"
+    public static let anthropicURL = "https://api.anthropic.com"
+    /// Any other Anthropic-compatible endpoint (`baseURL` required), bearer token. Claude Code speaks only the
+    /// Anthropic Messages format, so an OpenAI key needs a translating gateway (LiteLLM) or OpenRouter.
+    public static let custom = "gateway"
+    public static let kinds = [openRouter, anthropic, custom]
+
+    /// For lists and messages: "OpenRouter", "Anthropic API", "gateway llm.example.com".
+    public static func kindName(_ p: Profile) -> String {
+        switch p.kind {
+        case anthropic: return "Anthropic API"
+        case custom: return "gateway " + (p.baseURL.flatMap { URL(string: $0)?.host } ?? p.baseURL ?? "?")
+        default: return "OpenRouter"
+        }
+    }
+
+    /// An http(s) URL with a host, for `--gateway`.
+    public static func validURL(_ s: String) -> Bool {
+        guard let u = URL(string: s), let scheme = u.scheme?.lowercased(), u.host?.isEmpty == false else { return false }
+        return scheme == "https" || scheme == "http"
+    }
     /// macOS Keychain service; the account is the profile name.
     public static let keychainService = "agents-session-hopper"
 
@@ -68,7 +90,12 @@ public enum Gateway {
 
     /// Variables that send this `claude` to the gateway. Set even when the caller's environment has them.
     public static func environment(_ p: Profile, key: String) -> [String: String] {
-        var e = [
+        // In interactive mode Claude Code asks once whether to use ANTHROPIC_API_KEY; the answer is remembered.
+        var e = p.kind == anthropic ? [
+            "ANTHROPIC_BASE_URL": anthropicURL,
+            "ANTHROPIC_API_KEY": key,
+            "ANTHROPIC_AUTH_TOKEN": ""
+        ] : [
             "ANTHROPIC_BASE_URL": p.baseURL ?? openRouterURL,
             "ANTHROPIC_AUTH_TOKEN": key,
             "ANTHROPIC_API_KEY": "",

@@ -13,7 +13,7 @@ accounts.
 
 - It never reads, copies or sends your Claude login, `.credentials.json` or Claude Code's Keychain
   items. The only secrets it handles are ones you give it with `sessionhopper profiles key`: an
-  OpenRouter API key, or on a server a `claude setup-token` for a profile. Each is kept in its own
+  API key (OpenRouter, Anthropic or a gateway), or on a server a `claude setup-token` for a profile. Each is kept in its own
   Keychain item (macOS) or a private file (Linux), and handed only to the `claude` it launches for that
   profile.
 - To show which account a profile is, it reads the login email Claude Code keeps in the profile's

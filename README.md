@@ -187,6 +187,31 @@ sessionhopper doctor
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 
+## An Anthropic API key, or any other gateway
+
+The same pay-per-use rules (priority 10, `config gateway`, out-of-credit = full until `--resets`) apply to
+two more kinds of key profile:
+
+```sh
+# A Claude Console API key, straight to the Anthropic API (sent as ANTHROPIC_API_KEY)
+sessionhopper profiles add api --anthropic
+sessionhopper profiles key api < ~/Downloads/anthropic-key.txt
+
+# Any Anthropic-compatible gateway: LiteLLM, a company proxy, a provider's Anthropic endpoint
+sessionhopper profiles add llm --gateway http://localhost:4000 --model opus=gpt-5 --model sonnet=gpt-5-mini
+sessionhopper profiles key llm < ~/Downloads/gateway-key.txt
+```
+
+In the app: **Settings → Profiles → + → Anthropic API key** or **Other gateway**.
+
+- **Anthropic API key:** in an interactive session Claude Code asks once whether to use the key; answer
+  **Yes**. Declining makes that profile fall back to the folder's Claude login (change it later in
+  `/config` → "Use custom API key"). `claude -p` and `sessionhopper run` always use the key.
+- **OpenAI (or another non-Anthropic) key:** Claude Code speaks only the Anthropic Messages API, so an
+  OpenAI key needs something in between. Either add an OpenRouter profile and map the aliases to OpenAI
+  models (`--model opus=openai/gpt-5`), or run a translating gateway such as
+  [LiteLLM](https://docs.litellm.ai) with your OpenAI key and add it with `--gateway <its URL>`.
+
 ## The VS Code extension
 
 Set the official Claude Code extension's **Claude Process Wrapper** to `sessionhopper` (VS Code settings
@@ -260,7 +285,7 @@ with `LoadCredential=openrouter:/path/to/key` (the credential name is the profil
   keeps conversations. Profiles added by the app do; `doctor` checks.
 - **It never reads, copies or sends** your Claude login or Claude Code's Keychain items. Login always
   happens in Claude Code's own flow. The only secrets it handles are ones you give it with `sessionhopper
-  profiles key`: an OpenRouter key, or on a server a `claude setup-token` for a profile. Each is kept in
+  profiles key`: an API key (OpenRouter, Anthropic or a gateway), or on a server a `claude setup-token` for a profile. Each is kept in
   its own Keychain item (macOS) or a private file (Linux) and handed only to that profile's `claude`.
   To show which account a profile is, it reads the login email Claude Code keeps in the profile's
   `.claude.json` (`~/.claude.json` for the default profile, `oauthAccount.emailAddress`). That is not a

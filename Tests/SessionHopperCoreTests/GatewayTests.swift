@@ -30,6 +30,31 @@ final class GatewayTests: XCTestCase {
         XCTAssertNil(e["ANTHROPIC_DEFAULT_SONNET_MODEL"])
     }
 
+    func testAnthropicKeyGoesStraightToTheAnthropicAPI() {
+        let p = Profile(name: "api", dir: "/p/base", exportConfigDir: false, kind: Gateway.anthropic)
+        XCTAssertTrue(p.isGateway)
+        let e = Gateway.environment(p, key: "sk-ant-api03-x")
+        XCTAssertEqual(e["ANTHROPIC_BASE_URL"], "https://api.anthropic.com")
+        XCTAssertEqual(e["ANTHROPIC_API_KEY"], "sk-ant-api03-x")
+        XCTAssertEqual(e["ANTHROPIC_AUTH_TOKEN"], "", "a caller's bearer token would outrank the key")
+        XCTAssertNil(e["CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY"])
+        XCTAssertEqual(Gateway.kindName(p), "Anthropic API")
+    }
+
+    func testCustomGatewayUsesItsURL() {
+        let p = Profile(name: "llm", dir: "/p/base", exportConfigDir: false, kind: Gateway.custom,
+                        models: ["opus": "gpt-5"], baseURL: "http://localhost:4000")
+        XCTAssertTrue(p.isGateway)
+        let e = Gateway.environment(p, key: "sk-litellm")
+        XCTAssertEqual(e["ANTHROPIC_BASE_URL"], "http://localhost:4000")
+        XCTAssertEqual(e["ANTHROPIC_AUTH_TOKEN"], "sk-litellm")
+        XCTAssertEqual(e["ANTHROPIC_DEFAULT_OPUS_MODEL"], "gpt-5")
+        XCTAssertEqual(Gateway.kindName(p), "gateway localhost")
+        XCTAssertTrue(Gateway.validURL("https://llm.example.com/anthropic"))
+        XCTAssertFalse(Gateway.validURL("localhost:4000"))
+        XCTAssertFalse(Gateway.validURL("ftp://x"))
+    }
+
     func testModelAliasIsRewritten() {
         let p = gateway(models: ["opus": "anthropic/claude-opus-5"])
         XCTAssertEqual(Gateway.modelArgs(["-p", "--model", "opus"], p), ["-p", "--model", "anthropic/claude-opus-5"])

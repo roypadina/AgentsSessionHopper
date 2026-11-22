@@ -5,6 +5,13 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Anthropic API key profiles (`sessionhopper profiles add <name> --anthropic`, or Settings → Profiles → + → Anthropic API key): the same `claude`, billed to a Claude Console API key, used like an OpenRouter profile when no Claude account has room (#43).
+- Profiles for any Anthropic-compatible gateway (`--gateway <url>`, or Other gateway in the app), for example LiteLLM in front of an OpenAI key (#43).
+- "Your credit balance is too low" (Anthropic) and `insufficient_quota` (OpenAI behind a gateway) count as an out-of-credit key, like OpenRouter's 402.
+
 ## [1.14.0] - 2026-11-19
 
 ### Changed
