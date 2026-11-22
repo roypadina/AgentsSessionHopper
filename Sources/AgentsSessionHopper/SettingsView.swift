@@ -583,7 +583,8 @@ private struct AlertsSettings: View {
         .onAppear {
             server = s.ntfyServer ?? ""
             topic = s.ntfyTopic ?? ""
-            hasToken = (try? Gateway.key(Alerts.tokenEntry, env: model.env)) != nil
+            // Screenshot renders run with a temp state dir: never ask the real Keychain there.
+            hasToken = ProcessInfo.processInfo.environment["RENDER_SCREENSHOTS"] == nil && (try? Gateway.key(Alerts.tokenEntry, env: model.env)) != nil
         }
     }
 
@@ -591,13 +592,14 @@ private struct AlertsSettings: View {
         let e = model.config.alerts.effective(name, kind)
         func bind(_ get: Bool, _ set: @escaping (Bool) -> Void) -> Binding<Bool> { Binding(get: { get }, set: set) }
         return LabeledContent(kind.label) {
+            // Mac and ntfy last, so their boxes line up down the pane.
             HStack(spacing: 14) {
-                Toggle("Mac", isOn: bind(e.mac) { v in model.update { $0.alerts.set(name, kind, mac: v) } })
-                Toggle("ntfy", isOn: bind(e.ntfy) { v in model.update { $0.alerts.set(name, kind, ntfy: v) } })
-                    .disabled(!ntfyOn)
                 if kind == .usageWarning || kind == .usageCritical {
                     Toggle("Only with a session here", isOn: bind(e.activeOnly) { v in model.update { $0.alerts.set(name, kind, activeOnly: v) } })
                 }
+                Toggle("Mac", isOn: bind(e.mac) { v in model.update { $0.alerts.set(name, kind, mac: v) } })
+                Toggle("ntfy", isOn: bind(e.ntfy) { v in model.update { $0.alerts.set(name, kind, ntfy: v) } })
+                    .disabled(!ntfyOn)
             }
             .toggleStyle(.checkbox)
         }

@@ -81,6 +81,10 @@ brew install --cask roypadina/tap/agents-session-hopper
 <img src="docs/screenshots/settings-handoff.png" alt="Settings, Hand-off tab: suggest threshold, move without asking (off), park before paid usage at 97%" width="520">
 </div>
 
+<div align="center">
+<img src="docs/screenshots/settings-alerts.png" alt="Settings, Alerts tab: ntfy server and topic, then per profile which alerts go to the Mac and to ntfy" width="520">
+</div>
+
 ## Requirements
 
 macOS 14 Sonoma or later · Apple Silicon and Intel (universal binary) ·
