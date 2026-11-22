@@ -66,17 +66,21 @@ struct HopCounter {
     private var seen: Set<String>?  // event ids already looked at; everything in the log at launch is not news
     private var pending: [HopperEvent] = []
 
-    /// Hops confirmed by this snapshot, and whether something went wrong (a park, a limit stop, a failed `run`).
-    mutating func update(_ s: HopperSnapshot) -> (hops: Int, trouble: Bool) {
+    /// Hops confirmed by this snapshot, how many of them may arm the card (not onto a pay-per-use profile: no tip ask
+    /// next to a fresh bill), and whether something went wrong (a park, a limit stop, a failed `run`).
+    mutating func update(_ s: HopperSnapshot) -> (hops: Int, arms: Int, trouble: Bool) {
         let fresh = seen.map { seen in s.events.filter { !seen.contains($0.id) } } ?? []
         seen = (seen ?? []).union(s.events.map(\.id))
-        var hops = 0, trouble = false
+        var hops = 0, arms = 0, trouble = false
+        let paid = { (e: HopperEvent) in e.to.flatMap(s.config.profile(named:))?.isGateway == true }
         for e in fresh {
             if e.type != "suggest" { pending.removeAll { $0.session == e.session } }
             switch e.type {
             case "switch" where e.to != nil: pending.append(e)
             case "run" where e.trigger == "error": trouble = true
-            case "run" where e.from != nil: hops += 1; trouble = false  // the limit stop before a retry that worked
+            case "run" where e.from != nil:  // the limit stop before a retry that worked
+                hops += 1; trouble = false
+                if !paid(e) { arms += 1 }
             case "park", "limit": trouble = true
             default: break
             }
@@ -86,19 +90,23 @@ struct HopCounter {
             guard let t = iso.date(from: e.ts)?.timeIntervalSince1970 else { return true }
             guard s.now - t >= 30 else { return false }
             if s.sessions.contains(where: { ($0.record.resume == e.session || $0.record.session == e.session)
-                && $0.record.profile == e.to && $0.waitingUntil == nil && $0.record.child > 0 && kill($0.record.child, 0) == 0 }) { hops += 1 }
+                && $0.record.profile == e.to && $0.waitingUntil == nil && $0.record.child > 0 && kill($0.record.child, 0) == 0 }) {
+                hops += 1
+                if !paid(e) { arms += 1 }
+            }
             return true
         }
-        return (hops, trouble)
+        return (hops, arms, trouble)
     }
 }
 
 extension HopperSnapshot {
     /// Nothing needs the user: no suggestion, pending move or parked session, the profiles in use under the suggest
-    /// threshold and not on pace to reach it within the hour, and at least one profile with room. The Ko-fi card
-    /// never shows next to a limit.
+    /// threshold and not on pace to reach it within the hour, at least one profile with room, and no session on a
+    /// pay-per-use profile. The Ko-fi card never shows next to a limit or a running bill.
     var isCalm: Bool {
         sessions.allSatisfy { $0.pending == nil && $0.waitingUntil == nil && ($0.suggestion?.dismissed ?? true) }
+            && sessions.allSatisfy { config.profile(named: $0.record.profile)?.isGateway != true }
             && (worstLivePercent ?? 0) < config.suggestThreshold
             && sessions.allSatisfy { s in limits[s.record.profile]?.reaches(config.suggestThreshold, now: now).map { $0 > now + 3600 } ?? true }
             && config.profiles.contains { (percent($0.name) ?? 0) < config.hardThreshold }
@@ -172,11 +180,10 @@ final class SupportPrompt {
 
     /// Every snapshot: count confirmed hops; a park, limit stop or failed run disarms and closes an open card.
     private func update(_ s: HopperSnapshot) {
-        let (n, trouble) = counter.update(s)
-        if n > 0 {
-            UserDefaults.standard.set(hops + n, forKey: Self.hopsKey)
-            armedAt = Date()
-        }
+        let (n, arms, trouble) = counter.update(s)
+        if n > 0 { UserDefaults.standard.set(hops + n, forKey: Self.hopsKey) }
+        if arms > 0 { armedAt = Date() }
+        if n > arms { armedAt = nil }  // a move onto a pay-per-use profile: no tip ask next to a fresh bill
         if trouble {
             armedAt = nil
             makeWay()
@@ -459,7 +466,7 @@ struct SupportPromptView: View {
 
     private static let width: CGFloat = 340
     private static let radius: CGFloat = 18
-    private var title: String { "\(hops.formatted()) hops. Conversations kept going. 🎯" }
+    private var title: String { "\(hops.formatted()) hops since \(since.formatted(.dateTime.day().month())). Conversations kept going. 🎯" }
 
     var body: some View {
         card
@@ -524,7 +531,7 @@ struct SupportPromptView: View {
                 .padding(.bottom, 6)
             if hops > 0 { row("Hops since \(since.formatted(.dateTime.day().month()))", hops.formatted()) }
             if profiles > 0 { row("Profiles in rotation", profiles.formatted()) }
-            row("Price paid", "$0.00")
+            row("App price", "$0.00")
             Divider().overlay(faded.opacity(0.5)).padding(.vertical, 3)
             HStack { Text("TIP?"); Spacer(); Text("☕ optional") }
                 .font(.system(size: 11.5, weight: .bold, design: .monospaced))

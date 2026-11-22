@@ -250,7 +250,7 @@ private struct ProfilesSettings: View {
                     .disabled(model.checkingLogins)
             }
             .padding(.top, 6)
-            Text("The list order is also the fallback order: drag to reorder. Lower priority numbers are preferred: Claude accounts default to 1, OpenRouter to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
+            Text("The list order is also the fallback order: drag to reorder. Lower priority numbers are preferred: Claude accounts default to 1, API-key profiles to 10. Profiles of equal priority are used in list order and don't trade places before one reaches its limit; a session moves back to a better priority as soon as one has room. Moving needs every profile to share one projects/ folder; profiles added here do.")
                 .formFooter().fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
             if let err = model.lastError { Text(err).foregroundStyle(.red).padding(.top, 6) }
@@ -289,7 +289,7 @@ private struct ProfileSettingsRow: View {
                 if let email = model.snapshot.emails[p.name] {
                     Text(email).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
-                Text("\(p.name) · " + (p.isGateway ? "OpenRouter · pay per use" : model.tilde(p.dir)))
+                Text("\(p.name) · " + (p.isGateway ? "\(Gateway.kindName(p)) · pay per use" : model.tilde(p.dir)))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
             Spacer()
@@ -375,9 +375,12 @@ struct LoginBadge: View {
 }
 
 /// New profile: a Claude account (a folder next to ~/.claude with history shared; login runs in Claude Code's own
-/// flow) or an OpenRouter key (pay per use, key in the Keychain).
+/// flow) or an API key: OpenRouter, Anthropic API or another gateway (pay per use, key in the Keychain).
 struct AddProfileSheet: View {
-    enum Kind: Hashable { case claude, openRouter }
+    enum Kind: Hashable {
+        case claude, openRouter, anthropic, gateway
+        var id: String { self == .anthropic ? Gateway.anthropic : self == .gateway ? Gateway.custom : Gateway.openRouter }
+    }
     @ObservedObject var model: AppModel
     @Binding var isPresented: Bool
     @State private var kind: Kind
@@ -389,12 +392,13 @@ struct AddProfileSheet: View {
     @State private var sonnet = "anthropic/claude-sonnet-5"
     @State private var haiku = "anthropic/claude-haiku-4.5"
     @State private var resets = "daily"
+    @State private var url = ""
 
     init(model: AppModel, isPresented: Binding<Bool>, kind: Kind = .claude) {
         self.model = model
         _isPresented = isPresented
         _kind = State(initialValue: kind)
-        _name = State(initialValue: kind == .openRouter ? "openrouter" : "")
+        _name = State(initialValue: kind == .claude ? "" : kind.id)
     }
 
     var body: some View {
@@ -404,11 +408,16 @@ struct AddProfileSheet: View {
                 Picker("Kind", selection: $kind) {
                     Text("Claude account").tag(Kind.claude)
                     Text("OpenRouter key (pay per use)").tag(Kind.openRouter)
+                    Text("Anthropic API key (pay per use)").tag(Kind.anthropic)
+                    Text("Other gateway, e.g. LiteLLM for an OpenAI key (pay per use)").tag(Kind.gateway)
                 }
                 .pickerStyle(.radioGroup).labelsHidden()
-                .onChange(of: kind) { _, k in if k == .openRouter, name.isEmpty { name = "openrouter" } }
+                .onChange(of: kind) { old, k in
+                    if k != .claude, name.isEmpty || name == old.id { name = k.id }
+                    (opus, sonnet, haiku) = k == .openRouter ? ("anthropic/claude-opus-5", "anthropic/claude-sonnet-5", "anthropic/claude-haiku-4.5") : ("", "", "")
+                }
             }
-            if kind == .openRouter, created == nil {
+            if kind != .claude, created == nil {
                 openRouterForm
             } else if let p = created {
                 Text("Created \(model.tilde(p.dir)). Now log it in with the Claude account you want here. Login happens in Claude Code's own flow; this app never sees it.")
@@ -444,30 +453,36 @@ struct AddProfileSheet: View {
     @ViewBuilder private var openRouterForm: some View {
         Form {
             TextField("Name", text: $name)
-            SecureField("API key", text: $key, prompt: Text("sk-or-v1-…"))
+            if kind == .gateway { TextField("Gateway URL", text: $url, prompt: Text("http://localhost:4000")) }
+            SecureField("API key", text: $key, prompt: Text(kind == .openRouter ? "sk-or-v1-…" : kind == .anthropic ? "sk-ant-api03-…" : "gateway key"))
             Picker("Credit resets", selection: $resets) {
                 Text("Daily").tag("daily"); Text("Weekly").tag("weekly"); Text("Monthly").tag("monthly")
             }
-            Section {
-                TextField("Opus", text: $opus)
-                TextField("Sonnet", text: $sonnet)
-                TextField("Haiku", text: $haiku)
-            } header: { Text("Model names on OpenRouter") }
+            if kind != .anthropic {
+                Section {
+                    TextField("Opus", text: $opus)
+                    TextField("Sonnet", text: $sonnet)
+                    TextField("Haiku", text: $haiku)
+                } header: { Text(kind == .openRouter ? "Model names on OpenRouter" : "Model names on the gateway (empty = Claude's own)") }
+            }
         }
-        .formStyle(.grouped).frame(height: 300)
+        .formStyle(.grouped).frame(height: kind == .gateway ? 340 : 300)
         Text("Used only when no Claude profile has room (priority 10). The key is stored in your Keychain and handed only to Claude Code runs on this profile.")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         if let err = model.lastError { Text(err).font(.caption).foregroundStyle(.red) }
         HStack {
-            Link("Get a key", destination: URL(string: "https://openrouter.ai/keys")!)
+            if kind != .gateway {
+                Link("Get a key", destination: URL(string: kind == .anthropic ? "https://platform.claude.com/settings/keys" : "https://openrouter.ai/keys")!)
+            }
             Spacer()
             Button("Cancel") { isPresented = false }.keyboardShortcut(.cancelAction)
             Button("Add") {
                 let models = ["opus": opus, "sonnet": sonnet, "haiku": haiku].filter { !$0.value.trimmingCharacters(in: .whitespaces).isEmpty }
-                if model.addGateway(name: name, key: key, models: models, resets: resets) { isPresented = false }
+                if model.addGateway(name: name, kind: kind.id, baseURL: url, key: key, models: kind == .anthropic ? [:] : models, resets: resets) { isPresented = false }
             }
             .keyboardShortcut(.defaultAction)
-            .disabled(!Profiles.isValidName(name) || key.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(!Profiles.isValidName(name) || key.trimmingCharacters(in: .whitespaces).isEmpty
+                      || (kind == .gateway && !Gateway.validURL(url.trimmingCharacters(in: .whitespaces))))
         }
     }
 }

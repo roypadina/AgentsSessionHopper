@@ -11,13 +11,13 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     /// default path, makes Claude Code look for a differently named login and asks you to log in again.
     /// Turn it on if you always launch that profile with the variable set.
     public var exportConfigDir: Bool
-    /// nil or "claude": a Claude login. "openrouter": the same `claude`, billed to an OpenRouter key (see `Gateway`).
+    /// nil or "claude": a Claude login. "openrouter" | "anthropic" | "gateway": the same `claude`, billed to an API key (see `Gateway`).
     public var kind: String?
     /// Gateway profiles: where the API key is read from, instead of the platform default (see `Gateway.key`).
     public var keyFile: String?
     /// Gateway profiles: Claude Code model alias (opus, sonnet, haiku, fable) → the gateway's model name.
     public var models: [String: String]?
-    /// Gateway profiles: Anthropic-compatible endpoint. Default `Gateway.openRouterURL`.
+    /// Gateway profiles: Anthropic-compatible endpoint. Default `Gateway.openRouterURL`; required for kind "gateway".
     public var baseURL: String?
     /// Gateway profiles: when a spent key has credit again: daily | weekly | monthly (UTC). Default daily.
     public var resets: String?
@@ -29,7 +29,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     public var id: String { name }
     public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
     /// Billed per use (an API key), not a subscription: used only when no subscription profile has room.
-    public var isGateway: Bool { kind == Gateway.openRouter }
+    public var isGateway: Bool { Gateway.kinds.contains(kind ?? "") }
 
     public init(name: String, dir: String, exportConfigDir: Bool, kind: String? = nil, keyFile: String? = nil,
                 models: [String: String]? = nil, baseURL: String? = nil, resets: String? = nil, priority: Int? = nil, label: String? = nil) {

@@ -19,11 +19,14 @@ sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewi
                                           and the live-session list (messaging across accounts)
 sessionhopper profiles label <name> <text>|--clear  display name shown in the app, `status` and `profiles list`
                                           (the name used by aliases and -P never changes)
-sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, OpenRouter 10); equal priorities
+sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
                                           [--resets daily|weekly|monthly]  pay-per-use fallback on your OpenRouter key
-sessionhopper profiles key <name> < file  store that profile's secret: an OpenRouter API key, or for a Claude profile on a
+sessionhopper profiles add <name> --anthropic [--key-file F] [--resets ...]  billed to a Claude Console API key
+sessionhopper profiles add <name> --gateway <url> [--model opus=<name> ...] [--key-file F] [--resets ...]
+                                          any Anthropic-compatible gateway (e.g. LiteLLM in front of an OpenAI key)
+sessionhopper profiles key <name> < file  store that profile's secret: its API key, or for a Claude profile on a
                                           server a `claude setup-token` (Keychain on macOS, private file on Linux)
 sessionhopper login <profile>             run `claude auth login` for that profile
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
@@ -31,7 +34,7 @@ sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--forc
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
 sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper skill in every profile
 sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
-                      |gateway last|order|manual|on-switch "<command>"|off]  when OpenRouter profiles are used
+                      |gateway last|order|manual|on-switch "<command>"|off]  when API-key profiles are used
                       (default: last); a command run on every move, limit stop and park
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
