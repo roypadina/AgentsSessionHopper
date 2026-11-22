@@ -14,8 +14,11 @@ and the report disclosed, with credit unless you prefer otherwise.
 
 ## Scope
 
-AgentsSessionHopper runs entirely on-device and makes no network connections. It never reads,
-stores or sends Claude logins, tokens or Keychain items. Relevant areas: the `sessionhopper`
+AgentsSessionHopper runs on-device. Its own network connections are the opt-in update check and the
+ntfy alerts you set up. It never reads or sends your Claude login. It stores only the secrets you give it
+(API keys, setup-tokens, an ntfy token) in the Keychain or a private file. The exception is opt-in shared
+MCP logins, where it reads and rewrites the shared Claude Code credential store and keeps a local backup
+of its MCP logins. Relevant areas: the `sessionhopper`
 supervisor (process launch, signals, relaunch), the `hook` and `statusline` commands that
 Claude Code runs, `install-hooks` / `uninstall-hooks` (edits to a profile's `settings.json`),
 and the files under `~/Library/Application Support/AgentsSessionHopper/`.

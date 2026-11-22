@@ -531,7 +531,7 @@ private struct GeneralSettings: View {
             Section {
                 LabeledContent("Profiles, logins and shell") { Button("Run Setup Again…") { OnboardingWindow.show(model: model) } }
             } header: { Text("Setup") } footer: {
-                Text("AgentsSessionHopper makes no network requests of its own and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.").formFooter()
+                Text("AgentsSessionHopper makes no network requests of its own (besides ntfy alerts you set up) and never reads your Claude login. Usage comes from what Claude Code shows its own status line; a profile not seen for 6 hours (or every profile, on Refresh) is checked with one tiny `claude -p` on Haiku, a small request on that account.").formFooter()
             }
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }

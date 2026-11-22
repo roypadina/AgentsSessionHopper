@@ -3,12 +3,14 @@
 ```
 sessionhopper [claude args...]            start a session on the first profile with room
 sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
-sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker;
+                                          a unique start of an id works too, 4+ characters)
 sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run (bots, services): the
                                           prompt on stdin; a limit failure retries the turn on the next profile
 sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
 sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
 sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
+sessionhopper switch <profile> --all [--now]  move every live session there (at turn end unless --now)
 sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
 sessionhopper status [--json]             profiles (with login email), last-known usage, live sessions
 sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
@@ -34,6 +36,11 @@ sessionhopper login <profile> --token     make a `claude setup-token` for it in 
 sessionhopper mcp share on|off <profile...>  share one MCP login store between profiles that run on a
                                           setup-token; /login and /logout are off there (see Shared MCP logins)
 sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
+sessionhopper alerts [status]             which alerts go where: Mac notification and/or ntfy, per profile
+sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
+                        [ntfy on|off] [active-only on|off]
+sessionhopper alerts ntfy <server url> <topic> | ntfy off | ntfy token < file
+sessionhopper alerts test | alerts log [-n 20]
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains

@@ -8,6 +8,7 @@
 - [Using with cmux and IDEs](Using-with-cmux-and-IDEs)
 - [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter)
 - [Shared MCP logins](Shared-MCP-logins)
+- [Alerts](Alerts)
 - [Privacy and terms](Privacy-and-terms)
 - [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)

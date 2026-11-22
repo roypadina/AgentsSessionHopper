@@ -10,10 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Shared MCP logins (opt-in): `sessionhopper mcp share on <profile...>` lets profiles that run on a setup-token share one MCP login store, so each MCP server (Atlassian, Slack, Notion, …) is logged in once for all of them while each profile stays on its own Claude account. `/login` and `/logout` are off in those sessions; a guard keeps the store free of account logins and restores the MCP logins after a logout. `mcp status` and `doctor` show what is shared (names only). Linux and macOS.
 - `sessionhopper login <profile> --token`: makes a `claude setup-token` in a throwaway folder, takes a paste that spans several lines, checks the token works before storing it, and warns when it looks like another profile's account.
-- `--resume` accepts a unique start of a session id.
+- Alerts on your Mac and through ntfy (Settings → Alerts, `sessionhopper alerts`): sessions moved off a profile (and where to), no profile has room, usage warning and usage critical. Each kind is on or off per profile and per channel; usage alerts can wait for a session here on that profile. Many sessions moving at once give one alert, and a profile stays quiet until it frees up. The old per-park notification is now the "No profile has room" alert (on by default).
+- Move All Sessions To: every live session moves to one profile at its turn end (⋯ menu, right-click menu, `sessionhopper switch <profile> --all`).
+- Settings → General → Menu Bar: show the fullest profile in use, every profile in use, the profiles you pick, or nothing next to the icon.
+- `--resume` accepts a unique start of a session id (4 or more characters).
 
 ### Fixed
-- `sessionhopper profiles key` joins a setup-token the terminal wrapped over several lines instead of rejecting it.
+- `sessionhopper profiles key` joins a setup-token the terminal wrapped over several lines instead of rejecting it, and for a Claude profile checks that it is a setup-token.
+- A `sessionhopper` started inside another profile's token session no longer hands that profile's token to the first profile.
 
 ## [1.15.1] - 2026-11-22
 
