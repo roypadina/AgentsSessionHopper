@@ -29,6 +29,11 @@ sessionhopper profiles add <name> --gateway <url> [--model opus=<name> ...] [--k
 sessionhopper profiles key <name> < file  store that profile's secret: its API key, or for a Claude profile on a
                                           server a `claude setup-token` (Keychain on macOS, private file on Linux)
 sessionhopper login <profile>             run `claude auth login` for that profile
+sessionhopper login <profile> --token     make a `claude setup-token` for it in a throwaway folder, paste it
+                                          (several lines are fine), check it works and is not another profile's account
+sessionhopper mcp share on|off <profile...>  share one MCP login store between profiles that run on a
+                                          setup-token; /login and /logout are off there (see Shared MCP logins)
+sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
 sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh] [--force]
                                           one marked `alias claude=… shim` line in your shell's startup file
 sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains

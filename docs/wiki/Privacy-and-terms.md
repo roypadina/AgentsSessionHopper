@@ -16,6 +16,9 @@ accounts.
   API key (OpenRouter, Anthropic or a gateway), or on a server a `claude setup-token` for a profile. Each is kept in its own
   Keychain item (macOS) or a private file (Linux), and handed only to the `claude` it launches for that
   profile.
+- The one exception is opt-in [shared MCP logins](Shared-MCP-logins): there it checks the shared
+  store's key names, removes an account login that landed in it, and keeps a local backup of the MCP
+  logins only (a private file on Linux, a Keychain item on macOS).
 - To show which account a profile is, it reads the login email Claude Code keeps in the profile's
   `.claude.json` (`~/.claude.json` for the default profile, `oauthAccount.emailAddress`). That is not a
   credential. It only displays it (menu-bar panel, Settings, `sessionhopper status` and `profiles list`)

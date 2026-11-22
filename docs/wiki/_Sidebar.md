@@ -7,6 +7,7 @@
 - [CLI reference](CLI-reference)
 - [Using with cmux and IDEs](Using-with-cmux-and-IDEs)
 - [Servers, bots and OpenRouter](Servers-bots-and-OpenRouter)
+- [Shared MCP logins](Shared-MCP-logins)
 - [Privacy and terms](Privacy-and-terms)
 - [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)
