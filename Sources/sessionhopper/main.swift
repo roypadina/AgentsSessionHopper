@@ -48,6 +48,7 @@ let usage = """
       sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
       sessionhopper switch [profile] [--now]    move this session at turn end (--session <id> from outside)
       sessionhopper switch --cancel             drop this session's pending move (--session <id> from outside)
+      sessionhopper switch <profile> --all [--now]  move every live session there (at turn end unless --now)
       sessionhopper hold on|off [--all]         never park or auto-move this session (or every session)
       sessionhopper status [--json]             profiles, last-known usage, live sessions
       sessionhopper refresh [profile...] [--stale]  fresh usage now: one tiny haiku `claude -p` per profile
@@ -213,6 +214,17 @@ func sessionArg(_ a: inout [String]) -> String {
 
 func switchCommand(_ a: [String]) -> Int32 {
     var a = a
+    if has("--all", in: &a) {
+        guard let to = a.first, HopperConfig.load(env.paths).profile(named: to) != nil else { die("usage: sessionhopper switch <profile> --all") }
+        let now = has("--now", in: &a)
+        let moving = Sessions.live(env.paths).filter { $0.record.profile != to }
+        do {
+            for s in moving { _ = try Control.requestMove(session: s.record.session, to: to, now: now, source: "cli", env: env) }
+        } catch { die("\(error)") }
+        out(moving.isEmpty ? "No session to move: every live session is on \(to) already."
+            : "\(moving.count) session(s) move to \(to) " + (now ? "now." : "when their turn ends."))
+        return 0
+    }
     let id = sessionArg(&a)
     if has("--cancel", in: &a) {
         let short = (Sessions.find(id, env.paths)?.record.session ?? id).prefix(8)

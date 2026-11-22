@@ -66,7 +66,10 @@ struct Hotkey: Codable, Equatable {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         // One shortcut only, so any press of ours means "open".
         InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
-            MainActor.assumeIsolated { StatusMenu.togglePopover() }
+            MainActor.assumeIsolated {
+                StatusMenu.log.notice("hotkey: pressed")
+                StatusMenu.togglePopover()
+            }
             return noErr
         }, 1, &spec, nil, &handler)
     }

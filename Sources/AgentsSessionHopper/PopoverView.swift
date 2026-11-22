@@ -23,7 +23,7 @@ struct PopoverView: View {
                     .keyboardShortcut(",")
                     .help("Settings")
                     .accessibilityLabel("Settings")
-                MoreMenu()
+                MoreMenu(model: model)
             }
 
             ForEach(model.snapshot.needsAttention) { SuggestionCard(model: model, session: $0) }
@@ -47,8 +47,11 @@ struct PopoverView: View {
 
 /// The right-click menu's items, for people who never right-click (MBX-12). The gear next to it is Settings.
 struct MoreMenu: View {
+    @ObservedObject var model: AppModel
+
     var body: some View {
         Menu {
+            MoveAllMenu(model: model)
             Button("Show Hand-off Log") { StatusMenu.shared.switchLog() }
             Divider()
             Button("Request a feature") { NSWorkspace.shared.open(StatusMenu.requestFeature) }
@@ -141,6 +144,24 @@ struct ProfileRow: View {
         }
         if now - l.sampledAt >= ProfileLimits.staleAfter { text += " · seen \(ProfileLimits.age(now - l.sampledAt)) ago" }
         return text
+    }
+}
+
+/// Moves every live session to one profile at its turn end. Also in the right-click menu (MNU-2).
+struct MoveAllMenu: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        let sessions = model.snapshot.sessions
+        Menu("Move All Sessions To") {
+            ForEach(model.config.profiles) { p in
+                let n = sessions.filter { $0.record.profile != p.name }.count
+                Button("\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.moveAll(to: p.name) }
+                    .disabled(n == 0)
+            }
+        }
+        .disabled(sessions.isEmpty)
+        .help(sessions.isEmpty ? "No sessions running" : "Each session moves when its current turn ends")
     }
 }
 

@@ -41,8 +41,27 @@ struct AgentsSessionHopperApp: App {
 /// Template glyph; a badge when a session needs you, a warning past the park threshold.
 struct MenuBarLabel: View {
     static let showPercentKey = "showPercentInMenuBar"
+    /// What the percentage next to the icon covers (`Mode`); the chosen profiles are `chosenKey`, comma-separated.
+    static let modeKey = "menuBarPercentMode"
+    static let chosenKey = "menuBarProfiles"
+    enum Mode: String, CaseIterable {
+        case fullest, eachActive, chosen, off
+        var title: String {
+            switch self {
+            case .fullest: return "Fullest profile in use"
+            case .eachActive: return "Each profile in use"
+            case .chosen: return "Profiles I choose"
+            case .off: return "Nothing"
+            }
+        }
+    }
     @ObservedObject var model: AppModel
     @AppStorage(showPercentKey) private var showPercent = true
+    @AppStorage(modeKey) private var modeRaw = ""
+    @AppStorage(chosenKey) private var chosen = ""
+
+    /// Before 1.16 only an on/off switch existed: off stays off.
+    private var mode: Mode { Mode(rawValue: modeRaw) ?? (showPercent ? .fullest : .off) }
 
     var body: some View {
         let s = model.snapshot
@@ -56,16 +75,40 @@ struct MenuBarLabel: View {
             } else {
                 Image(nsImage: Self.glyph)
             }
-            if showPercent, let p = s.worstLivePercent { Text(percentText(p)).monospacedDigit() }
+            switch mode {
+            case .fullest: if let p = s.worstLivePercent { Text(percentText(p)).monospacedDigit() }
+            case .eachActive, .chosen: if !items(s).isEmpty { Text(items(s).map { "\($0.short) \(percentText($0.pct))" }.joined(separator: " ")).monospacedDigit() }
+            case .off: EmptyView()
+            }
         }
         .accessibilityLabel(label)
         .help(label)
     }
 
+    /// The profiles shown in `eachActive` / `chosen` mode, in profile order, each with the shortest name start that is
+    /// unique among them (a label set with `profiles label` keeps it short).
+    private func items(_ s: HopperSnapshot) -> [(name: String, short: String, pct: Double?)] {
+        let active = Set(s.sessions.map(\.record.profile))
+        let picked = Set(chosen.split(separator: ",").map(String.init))
+        let shown = model.config.profiles.filter { mode == .chosen ? picked.contains($0.name) : active.contains($0.name) }
+        let names = shown.map(\.displayName)
+        return shown.enumerated().map { i, p in (p.displayName, Self.shortName(names[i], among: names), s.percent(p.name)) }
+    }
+
+    /// 1–6 characters: the shortest start of `name` no other name in `names` begins with.
+    static func shortName(_ name: String, among names: [String]) -> String {
+        for n in 1...6 where !names.contains(where: { $0 != name && $0.lowercased().hasPrefix(name.prefix(n).lowercased()) }) {
+            return String(name.prefix(n))
+        }
+        return String(name.prefix(6))
+    }
+
     /// One string for VoiceOver and the tooltip: the percent and the full state are not drawn text a label could inherit.
     private func spoken(_ s: HopperSnapshot, full: Bool) -> String {
         var text = "AgentsSessionHopper"
-        if let p = s.worstLivePercent { text += ", fullest profile \(Int(p.rounded())) percent" }
+        if mode == .eachActive || mode == .chosen {
+            text += items(s).map { ", \($0.name) \($0.pct.map { "\(Int($0.rounded())) percent" } ?? "unknown")" }.joined()
+        } else if let p = s.worstLivePercent { text += ", fullest profile \(Int(p.rounded())) percent" }
         if !s.needsAttention.isEmpty { text += ", a session needs you" }
         if full { text += ", a profile is full" }
         return text

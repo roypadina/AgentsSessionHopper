@@ -112,7 +112,7 @@ extension SettingsView.Tab {
     /// Chosen from each pane's rows; re-pick when rows change.
     var height: CGFloat {
         switch self {
-        case .general: 460
+        case .general: 600
         case .handOff: 800
         case .alerts: 800
         case .profiles: 460
@@ -493,13 +493,39 @@ private struct GeneralSettings: View {
     @ObservedObject var model: AppModel
     @AppStorage(Notifier.enabledKey) private var notifications = true
     @AppStorage(MenuBarLabel.showPercentKey) private var showPercent = true
+    @AppStorage(MenuBarLabel.modeKey) private var modeRaw = ""
+    @AppStorage(MenuBarLabel.chosenKey) private var chosen = ""
+
+    private var mode: Binding<MenuBarLabel.Mode> {
+        Binding(get: { MenuBarLabel.Mode(rawValue: modeRaw) ?? (showPercent ? .fullest : .off) }, set: { modeRaw = $0.rawValue })
+    }
+    private func picked(_ name: String) -> Binding<Bool> {
+        Binding(get: { chosen.split(separator: ",").contains { $0 == name } },
+                set: { on in
+                    var names = chosen.split(separator: ",").map(String.init).filter { $0 != name }
+                    if on { names.append(name) }
+                    chosen = names.joined(separator: ",")
+                })
+    }
 
     var body: some View {
         Form {
             Section {
                 LaunchAtLoginToggle()
                 Toggle("Notify me when a session should move", isOn: $notifications)
-                Toggle("Show usage % next to the menu-bar icon", isOn: $showPercent)
+            }
+            Section {
+                Picker("Usage next to the icon", selection: mode) {
+                    ForEach(MenuBarLabel.Mode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.radioGroup)
+                if mode.wrappedValue == .chosen {
+                    ForEach(model.config.profiles) { p in
+                        Toggle(p.displayName, isOn: picked(p.name)).toggleStyle(.switch).controlSize(.mini)
+                    }
+                }
+            } header: { Text("Menu Bar") } footer: {
+                Text("\"In use\" means a session runs on it now. Each profile shows the shortest start of its name that tells it apart; give a profile a short label in Profiles to choose it.").formFooter()
             }
             Section("Keyboard Shortcut") { HotkeyRecorder() }
             Section {
@@ -520,24 +546,26 @@ private struct AlertsSettings: View {
     @State private var topic = ""
     @State private var token = ""
     @State private var note: String?
+    @State private var hasToken = false
 
     var body: some View {
         let s = model.config.alerts
         Form {
             Section {
                 TextField("Server", text: $server, prompt: Text("https://ntfy.sh"))
-                TextField("Topic", text: $topic)
-                SecureField("Access token (optional)", text: $token)
-                HStack {
-                    Button("Save") { save() }
-                        .disabled(!Gateway.validURL(server) || !Alerts.validTopic(topic))
-                    Button("Turn Off") { model.update { $0.alerts.ntfyServer = nil; $0.alerts.ntfyTopic = nil }; note = "ntfy is off" }
-                        .disabled(!s.ntfyOn)
-                    Button("Send Test Alert") { test() }
-                    if let note { Text(note).foregroundStyle(.secondary) }
+                    .onChange(of: server) { _, _ in apply() }
+                TextField("Topic", text: $topic, prompt: Text("none: ntfy off"))
+                    .onChange(of: topic) { _, _ in apply() }
+                SecureField("Access token", text: $token, prompt: Text(hasToken ? "stored in the Keychain" : "optional"))
+                    .onSubmit(storeToken)
+                LabeledContent("Test") {
+                    HStack {
+                        if let note { Text(note).foregroundStyle(.secondary) }
+                        Button("Send Test Alert") { test() }
+                    }
                 }
             } header: { Text("ntfy") } footer: {
-                Text("Alerts can also go to your phone through ntfy (ntfy.sh or your own server): the only requests the app sends besides the update check, and only once you set a topic. The token is kept in the Keychain.").formFooter()
+                Text("Alerts can also go to your phone through ntfy (ntfy.sh or your own server): the only requests the app sends besides the update check, and only while a topic is set. Clear the topic to turn ntfy off. Press Return to store the token in the Keychain.").formFooter()
             }
             ForEach([AlertSettings.everyProfile] + model.config.profiles.filter { !$0.isGateway }.map(\.name), id: \.self) { name in
                 Section {
@@ -546,13 +574,17 @@ private struct AlertsSettings: View {
                     Text(name == AlertSettings.everyProfile ? "All Profiles" : model.config.display(name))
                 } footer: {
                     if name == AlertSettings.everyProfile {
-                        Text("Changing a box here sets it for every profile; a profile's own box overrides it. Many sessions moving off one profile at once give one alert, then it stays quiet until that profile frees up. \"Only with a session here\": usage alerts only while a session on this Mac runs on that profile.").formFooter()
+                        Text("Changing a box here sets it for every profile; a profile's own box overrides it. ntfy boxes are off until a topic is set above. Many sessions moving off one profile at once give one alert, then it stays quiet until that profile frees up. \"Only with a session here\": usage alerts only while a session on this Mac runs on that profile.").formFooter()
                     }
                 }
             }
         }
         .formStyle(.grouped)
-        .onAppear { server = s.ntfyServer ?? ""; topic = s.ntfyTopic ?? "" }
+        .onAppear {
+            server = s.ntfyServer ?? ""
+            topic = s.ntfyTopic ?? ""
+            hasToken = (try? Gateway.key(Alerts.tokenEntry, env: model.env)) != nil
+        }
     }
 
     private func row(_ name: String, _ kind: AlertKind, ntfyOn: Bool) -> some View {
@@ -571,10 +603,20 @@ private struct AlertsSettings: View {
         }
     }
 
-    private func save() {
-        model.update { $0.alerts.ntfyServer = server.hasSuffix("/") ? String(server.dropLast()) : server; $0.alerts.ntfyTopic = topic }
-        guard !token.isEmpty else { note = "Saved"; return }
-        do { _ = try Gateway.storeKey(token, for: Alerts.tokenEntry, env: model.env); token = ""; note = "Saved, token in the Keychain" }
+    /// Applies as you type (SET-4): an empty topic turns ntfy off; a half-typed URL or topic is not saved yet.
+    private func apply() {
+        let t = topic.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty { if model.config.alerts.ntfyOn { model.update { $0.alerts.ntfyTopic = nil } }; return }
+        let url = server.trimmingCharacters(in: .whitespaces)
+        guard Gateway.validURL(url), Alerts.validTopic(t) else { return }
+        let root = url.hasSuffix("/") ? String(url.dropLast()) : url
+        guard model.config.alerts.ntfyServer != root || model.config.alerts.ntfyTopic != t else { return }
+        model.update { $0.alerts.ntfyServer = root; $0.alerts.ntfyTopic = t }
+    }
+
+    private func storeToken() {
+        guard !token.isEmpty else { return }
+        do { _ = try Gateway.storeKey(token, for: Alerts.tokenEntry, env: model.env); token = ""; hasToken = true; note = "Token stored" }
         catch { note = "\(error)" }
     }
 
