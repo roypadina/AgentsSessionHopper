@@ -183,6 +183,7 @@ final class SupportPrompt {
         let (n, arms, trouble) = counter.update(s)
         if n > 0 { UserDefaults.standard.set(hops + n, forKey: Self.hopsKey) }
         if arms > 0 { armedAt = Date() }
+        if n > arms { armedAt = nil }  // a move onto a pay-per-use profile: no tip ask next to a fresh bill
         if trouble {
             armedAt = nil
             makeWay()

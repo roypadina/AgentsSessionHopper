@@ -466,7 +466,7 @@ struct AddProfileSheet: View {
                 } header: { Text(kind == .openRouter ? "Model names on OpenRouter" : "Model names on the gateway (empty = Claude's own)") }
             }
         }
-        .formStyle(.grouped).frame(height: 300)
+        .formStyle(.grouped).frame(height: kind == .gateway ? 340 : 300)
         Text("Used only when no Claude profile has room (priority 10). The key is stored in your Keychain and handed only to Claude Code runs on this profile.")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         if let err = model.lastError { Text(err).font(.caption).foregroundStyle(.red) }
