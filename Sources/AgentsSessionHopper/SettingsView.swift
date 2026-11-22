@@ -32,7 +32,7 @@ final class SettingsNav: ObservableObject {
 /// Classic preferences toolbar: icon + label per tab, selected one highlighted, window title follows the tab.
 @MainActor final class SettingsToolbar: NSObject, NSToolbarDelegate {
     private static let tabs: [(SettingsView.Tab, String, String)] = [
-        (.general, "General", "gearshape"), (.handOff, "Hand-off", "arrow.triangle.swap"),
+        (.general, "General", "gearshape"), (.handOff, "Hand-off", "arrow.triangle.swap"), (.alerts, "Alerts", "bell"),
         (.profiles, "Profiles", "person.2"), (.commandLine, "Command line", "terminal"),
         (.log, "Log", "list.bullet.rectangle"), (.about, "About", "info.circle"),
     ]
@@ -87,7 +87,7 @@ struct SettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var nav: SettingsNav
 
-    enum Tab: Hashable { case general, handOff, profiles, commandLine, log, about }
+    enum Tab: Hashable { case general, handOff, alerts, profiles, commandLine, log, about }
     /// Set by the status-item menu; SettingsToolbar applies it (window already open → notification, else on show).
     static var pendingTab: Tab?
     static let selectTab = Notification.Name("SettingsView.selectTab")
@@ -97,6 +97,7 @@ struct SettingsView: View {
             switch nav.tab {
             case .general: GeneralSettings(model: model)
             case .handOff: HandOffSettings(model: model)
+            case .alerts: AlertsSettings(model: model)
             case .profiles: ProfilesSettings(model: model)
             case .commandLine: CommandLineSettings(model: model)
             case .log: LogSettings(model: model)
@@ -113,6 +114,7 @@ extension SettingsView.Tab {
         switch self {
         case .general: 460
         case .handOff: 800
+        case .alerts: 800
         case .profiles: 460
         case .commandLine: 470
         case .log: 480
@@ -508,6 +510,83 @@ private struct GeneralSettings: View {
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Which alerts go where: a Mac notification and/or ntfy, per profile and kind (`AlertSettings`).
+private struct AlertsSettings: View {
+    @ObservedObject var model: AppModel
+    @State private var server = ""
+    @State private var topic = ""
+    @State private var token = ""
+    @State private var note: String?
+
+    var body: some View {
+        let s = model.config.alerts
+        Form {
+            Section {
+                TextField("Server", text: $server, prompt: Text("https://ntfy.sh"))
+                TextField("Topic", text: $topic)
+                SecureField("Access token (optional)", text: $token)
+                HStack {
+                    Button("Save") { save() }
+                        .disabled(!Gateway.validURL(server) || !Alerts.validTopic(topic))
+                    Button("Turn Off") { model.update { $0.alerts.ntfyServer = nil; $0.alerts.ntfyTopic = nil }; note = "ntfy is off" }
+                        .disabled(!s.ntfyOn)
+                    Button("Send Test Alert") { test() }
+                    if let note { Text(note).foregroundStyle(.secondary) }
+                }
+            } header: { Text("ntfy") } footer: {
+                Text("Alerts can also go to your phone through ntfy (ntfy.sh or your own server): the only requests the app sends besides the update check, and only once you set a topic. The token is kept in the Keychain.").formFooter()
+            }
+            ForEach([AlertSettings.everyProfile] + model.config.profiles.filter { !$0.isGateway }.map(\.name), id: \.self) { name in
+                Section {
+                    ForEach(AlertKind.allCases, id: \.self) { kind in row(name, kind, ntfyOn: s.ntfyOn) }
+                } header: {
+                    Text(name == AlertSettings.everyProfile ? "All Profiles" : model.config.display(name))
+                } footer: {
+                    if name == AlertSettings.everyProfile {
+                        Text("Changing a box here sets it for every profile; a profile's own box overrides it. Many sessions moving off one profile at once give one alert, then it stays quiet until that profile frees up. \"Only with a session here\": usage alerts only while a session on this Mac runs on that profile.").formFooter()
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { server = s.ntfyServer ?? ""; topic = s.ntfyTopic ?? "" }
+    }
+
+    private func row(_ name: String, _ kind: AlertKind, ntfyOn: Bool) -> some View {
+        let e = model.config.alerts.effective(name, kind)
+        func bind(_ get: Bool, _ set: @escaping (Bool) -> Void) -> Binding<Bool> { Binding(get: { get }, set: set) }
+        return LabeledContent(kind.label) {
+            HStack(spacing: 14) {
+                Toggle("Mac", isOn: bind(e.mac) { v in model.update { $0.alerts.set(name, kind, mac: v) } })
+                Toggle("ntfy", isOn: bind(e.ntfy) { v in model.update { $0.alerts.set(name, kind, ntfy: v) } })
+                    .disabled(!ntfyOn)
+                if kind == .usageWarning || kind == .usageCritical {
+                    Toggle("Only with a session here", isOn: bind(e.activeOnly) { v in model.update { $0.alerts.set(name, kind, activeOnly: v) } })
+                }
+            }
+            .toggleStyle(.checkbox)
+        }
+    }
+
+    private func save() {
+        model.update { $0.alerts.ntfyServer = server.hasSuffix("/") ? String(server.dropLast()) : server; $0.alerts.ntfyTopic = topic }
+        guard !token.isEmpty else { note = "Saved"; return }
+        do { _ = try Gateway.storeKey(token, for: Alerts.tokenEntry, env: model.env); token = ""; note = "Saved, token in the Keychain" }
+        catch { note = "\(error)" }
+    }
+
+    private func test() {
+        let env = model.env
+        let r = Alerts.test(env: env)
+        guard r.ntfy else { note = "Mac notification sent; ntfy is not set up"; return }
+        note = "Sending…"
+        Task.detached {
+            let status = Alerts.sendNtfy(r, env: env)
+            await MainActor.run { note = status.map { (200..<300).contains($0) ? "ntfy: sent" : "ntfy: refused (HTTP \($0))" } ?? "ntfy: no answer" }
+        }
     }
 }
 

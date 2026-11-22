@@ -80,7 +80,16 @@ public enum McpShare {
 
     // MARK: - Store guard
 
-    enum Contents { case missing, invalid, object([String: Any]) }
+    enum Contents {
+        case missing, invalid, object([String: Any])
+        var isMissing: Bool { if case .missing = self { return true }; return false }
+        var data: Data? { if case .object(let o) = self { return try? McpShare.json(o) }; return nil }
+    }
+
+    static func sameJSON(_ a: Data?, _ b: Data?) -> Bool {
+        guard let x = FileIO.jsonObject(a), let y = FileIO.jsonObject(b) else { return a == b }
+        return NSDictionary(dictionary: x).isEqual(to: y)
+    }
 
     struct Outcome {
         /// New store contents to write, nil = unchanged.
@@ -108,12 +117,17 @@ public enum McpShare {
             changed = true
             out.notes.append("removed an account login from the shared MCP store")
         }
+        let saved = backup?[mcpKey] as? [String: Any] ?? [:]
         if let mcp = obj[mcpKey] as? [String: Any], !mcp.isEmpty {
-            if !NSDictionary(dictionary: backup?[mcpKey] as? [String: Any] ?? [:]).isEqual(to: mcp) { out.backup = [mcpKey: mcp] }
-        } else if let saved = backup?[mcpKey] as? [String: Any], !saved.isEmpty {
+            if !NSDictionary(dictionary: saved).isEqual(to: mcp) { out.backup = [mcpKey: mcp] }
+        } else if !saved.isEmpty, current.isMissing || changed {
+            // Deleted (`/logout`) or rewritten by a login: put the MCP logins back.
             obj[mcpKey] = saved
             changed = true
             out.notes.append("restored MCP logins from the backup")
+        } else if !saved.isEmpty {
+            // The user logged out of the last MCP server themselves: forget it, don't bring it back.
+            out.backup = [mcpKey: [String: Any]()]
         }
         if changed { out.store = obj }
         return out
@@ -135,8 +149,10 @@ public enum McpShare {
             usleep(100_000)
         }
         let b = backend(dir, env: env)
-        let out = plan(try b.read(), backup: b.readBackup())
-        if let s = out.store { try b.write(s) }
+        let before = try b.read()
+        let out = plan(before, backup: b.readBackup())
+        // Claude Code doesn't take our lock: if it wrote meanwhile (an MCP token refresh), leave its write; the next run retries.
+        if let s = out.store, sameJSON(try b.read().data, before.data) { try b.write(s) }
         if let k = out.backup { try b.writeBackup(k) }
         return out.notes
     }
@@ -249,11 +265,19 @@ struct KeychainStore: StoreBackend {
         return d
     }
 
-    /// `security -i` reads the command from stdin, so the secret is never on a command line (`ps`).
+    /// `security -i` reads the command from stdin, so the secret is never on a command line (`ps`). It cuts a line
+    /// at about 4 KB, so a longer one goes on argv for the moment it runs, as Claude Code does. Read back after.
     static func add(account: String, service: String, data: Data) throws {
         let hex = data.map { String(format: "%02x", $0) }.joined()
-        let r = Shell.run("/usr/bin/security", ["-i"], stdin: Data("add-generic-password -U -a \"\(account)\" -s \"\(service)\" -X \"\(hex)\"\n".utf8), timeout: 15)
+        let line = "add-generic-password -U -a \"\(account)\" -s \"\(service)\" -X \"\(hex)\"\n"
+        let r = line.utf8.count < 4000
+            ? Shell.run("/usr/bin/security", ["-i"], stdin: Data(line.utf8), timeout: 15)
+            : Shell.run("/usr/bin/security", ["add-generic-password", "-U", "-a", account, "-s", service, "-X", hex], timeout: 15)
         guard r.status == 0 else { throw HopperError("could not write the Keychain item \(service) (security exit \(r.status))") }
+        let back = Shell.run("/usr/bin/security", ["find-generic-password", "-a", account, "-w", "-s", service], timeout: 15)
+        guard back.status == 0, McpShare.sameJSON(decode(back.stdout), data) else {
+            throw HopperError("the Keychain item \(service) did not read back as written")
+        }
     }
 
     /// Removes the item Claude Code may leave for a throwaway folder (`login --token`).

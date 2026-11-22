@@ -78,10 +78,12 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public var onSwitch: String?
     /// The shared MCP login store (`McpShare`). nil = `~/.claude-mcp-store`.
     public var mcpStore: String?
+    /// Which alerts go where, per profile (`Alerts`).
+    public var alerts = AlertSettings()
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore, alerts }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -98,6 +100,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         gatewayUse = try c.decodeIfPresent(String.self, forKey: .gatewayUse) ?? d.gatewayUse
         onSwitch = try c.decodeIfPresent(String.self, forKey: .onSwitch)
         mcpStore = try c.decodeIfPresent(String.self, forKey: .mcpStore)
+        alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? d.alerts
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {

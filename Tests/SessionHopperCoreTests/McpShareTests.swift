@@ -33,6 +33,27 @@ final class McpShareTests: XCTestCase {
         XCTAssertEqual(McpShare.servers(out.store ?? [:]), ["atlassian", "context7"])
     }
 
+    func testLoggingOutOfTheLastMcpServerIsNotUndone() {
+        let out = McpShare.plan(.object(["mcpOAuth": [String: Any]()]), backup: mcp)
+        XCTAssertNil(out.store, "not restored")
+        XCTAssertEqual(McpShare.servers(out.backup ?? ["x": 1]), [], "the backup is emptied")
+    }
+
+    func testAnotherProfilesTokenIsNotInherited() throws {
+        let box = Sandbox()
+        var c = HopperConfig()
+        c.profiles = [Profile(name: "first", dir: "/p/first", exportConfigDir: false), Profile(name: "second", dir: "/p/second", exportConfigDir: true)]
+        let env = fileEnv(box, ["CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat01-second", Gateway.tokenOwner: "second"])
+        try c.save(env.paths)
+        var e = env.vars
+        Gateway.applyClaudeToken(&e, c.profiles[0], env: env)
+        XCTAssertNil(e["CLAUDE_CODE_OAUTH_TOKEN"], "started from inside second's session: first must not run on second's account")
+        var plain = env.vars
+        plain[Gateway.tokenOwner] = nil
+        Gateway.applyClaudeToken(&plain, c.profiles[0], env: env)
+        XCTAssertEqual(plain["CLAUDE_CODE_OAUTH_TOKEN"], "sk-ant-oat01-second", "a caller's own token still goes to the first profile")
+    }
+
     func testInvalidJsonAndEmptyStoreAreLeftAlone() {
         XCTAssertNil(McpShare.plan(.invalid, backup: mcp).store)
         let empty = McpShare.plan(.missing, backup: nil)

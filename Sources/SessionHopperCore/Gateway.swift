@@ -147,11 +147,22 @@ public enum Gateway {
     /// then use their own login. Never passed to a gateway profile.
     /// `share`: then point an opted-in token profile at the shared MCP login store (`McpShare.apply`).
     public static func applyClaudeToken(_ e: inout [String: String], _ p: Profile, env: HopperEnvironment, share: Bool = true) {
-        if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; return }
-        if let t = try? key(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = t }
-        else if !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+        if p.isGateway { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil; e[tokenOwner] = nil; return }
+        if let t = try? key(p, env: env) {
+            e["CLAUDE_CODE_OAUTH_TOKEN"] = t
+            e[tokenOwner] = p.name
+        } else {
+            // A token inherited from another profile's session (a `run` started by a tool in it) is that profile's
+            // account, not the caller's: never hand it on.
+            let inherited = e[tokenOwner].map { $0 != p.name } ?? false
+            if inherited || !ownsEnvToken(p, env: env) { e["CLAUDE_CODE_OAUTH_TOKEN"] = nil }
+            e[tokenOwner] = nil
+        }
         if share { McpShare.apply(&e, p, env: env) }
     }
+
+    /// Set next to a stored token we pass on: names the profile it belongs to.
+    public static let tokenOwner = "SESSIONHOPPER_TOKEN_PROFILE"
 
     /// The caller's `CLAUDE_CODE_OAUTH_TOKEN` belongs to the first Claude (non-gateway) profile.
     public static func ownsEnvToken(_ p: Profile, env: HopperEnvironment) -> Bool {

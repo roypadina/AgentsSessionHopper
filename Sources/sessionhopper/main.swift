@@ -41,7 +41,8 @@ let usage = """
 
       sessionhopper [claude args...]            start a session on the first profile with room
       sessionhopper -P work [claude args...]    start on "work" (others stay fallbacks); --only work = strict
-      sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker)
+      sessionhopper --resume <id|name> | -c     adopt an existing session (bare --resume: numbered picker;
+                                              a unique start of an id works too, 4+ characters)
       sessionhopper run [-P a,b] [--only] -- <claude -p args>  one non-interactive run (bots, services): the
                                               prompt on stdin; a limit failure retries the turn on the next profile
       sessionhopper sessions [n|all] [--all-dirs]  resumable sessions here (or everywhere), with names
@@ -71,6 +72,12 @@ let usage = """
       sessionhopper mcp share on|off <profile...>  share one MCP login store (Atlassian, Slack, … logged in once) between
                                               profiles that run on a setup-token; /login and /logout are off there
       sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
+      sessionhopper alerts [status]               which alerts go where: Mac notification and/or ntfy, per profile
+      sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
+                              [ntfy on|off] [active-only on|off]  (active-only: usage alerts only while a session
+                              here runs on that profile). Many sessions moving at once give one alert.
+      sessionhopper alerts ntfy <server url> <topic> | ntfy off | ntfy token < file   where ntfy alerts go
+      sessionhopper alerts test | alerts log [-n 20]
       sessionhopper shell [install|remove|status] [--shell zsh|bash|fish|tcsh]  make `claude` run through this
       sessionhopper shell link-shim             ~/.local/bin/sessionhopper-shim for cmux / JetBrains
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
@@ -429,12 +436,15 @@ func tokenLogin(_ p: Profile) -> Int32 {
     let config = HopperConfig.load(env.paths)
     let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("ash-login-\(UUID().uuidString)")
     do { try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]) } catch { die("\(error)") }
-    defer {
+    // `die` exits at once, so a `defer` would never run: the pasted token must not stay behind.
+    func cleanup() {
         try? FileManager.default.removeItem(at: tmp)
         #if os(macOS)
         McpShare.forgetThrowaway(tmp.path, env: env)
         #endif
     }
+    func fail(_ s: String) -> Never { cleanup(); die(s) }
+    defer { cleanup() }
     let who = Profiles.email(of: p, home: env.home) ?? "the account for \(p.displayName)"
     out("=== Profile \(p.displayName): sign in as \(who) ===")
     out("1. Open the link below in a PRIVATE browser window and sign in as \(who).")
@@ -448,23 +458,23 @@ func tokenLogin(_ p: Profile) -> Int32 {
     proc.executableURL = URL(fileURLWithPath: claude)
     proc.arguments = ["setup-token"]
     proc.environment = e
-    do { try proc.run() } catch { die("cannot start claude: \(error)") }
+    do { try proc.run() } catch { fail("cannot start claude: \(error)") }
     proc.waitUntilExit()
-    guard proc.terminationStatus == 0 else { die("claude setup-token failed (exit \(proc.terminationStatus)). Nothing stored.") }
+    guard proc.terminationStatus == 0 else { fail("claude setup-token failed (exit \(proc.terminationStatus)). Nothing stored.") }
 
     out("Paste the token (hidden). It may span several lines; then press Enter on an empty line.")
     let token: String
-    do { token = try SetupToken.parse(readHiddenLines()) } catch { die("\(error)") }
+    do { token = try SetupToken.parse(readHiddenLines()) } catch { fail("\(error)") }
 
     out("Checking the token works (one tiny request)...")
     let file = tmp.appendingPathComponent("token")
-    do { try Gateway.writePrivate(Data(token.utf8), to: file) } catch { die("\(error)") }
+    do { try Gateway.writePrivate(Data(token.utf8), to: file) } catch { fail("\(error)") }
     var trial = p
     trial.keyFile = file.path
     let stop = Terminator()
     let check = UsageRefresh.run([trial], env: env, stop: stop)
-    guard check.ok else { die("Claude rejected the token (\(check.lines.joined(separator: "; "))). Nothing stored; run this again.") }
-    do { out("Stored in \(try Gateway.storeKey(token, for: p, env: env)).") } catch { die("\(error)") }
+    guard check.ok else { fail("Claude rejected the token (\(check.lines.joined(separator: "; "))). Nothing stored; run this again.") }
+    do { out("Stored in \(try Gateway.storeKey(token, for: p, env: env)).") } catch { fail("\(error)") }
 
     let others = config.profiles.filter { !$0.isGateway && $0.name != p.name }
     if !others.isEmpty {
@@ -483,6 +493,80 @@ func tokenLogin(_ p: Profile) -> Int32 {
     return 0
 }
 
+/// `alerts [status] | set … | ntfy … | test | log | deliver <id>`.
+func alertsCommand(_ a: [String]) -> Int32 {
+    var a = a
+    var config = HopperConfig.load(env.paths)
+    func save() { do { try config.save(env.paths) } catch { die("\(error)") } }
+    func onOff(_ flag: String) -> Bool? {
+        guard let v = take(flag, from: &a) else { return nil }
+        guard v == "on" || v == "off" else { die("\(flag) takes on or off") }
+        return v == "on"
+    }
+    let sub = a.isEmpty ? "status" : a.removeFirst()
+    switch sub {
+    case "status": break
+    case "set":
+        guard a.count >= 2 else { die("usage: sessionhopper alerts set <profile|all> <kind|all> [mac on|off] [ntfy on|off] [active-only on|off]") }
+        let who = a.removeFirst(), what = a.removeFirst()
+        let profile = who == "all" ? AlertSettings.everyProfile : who
+        if profile != AlertSettings.everyProfile, config.profile(named: profile) == nil { die("No profile named \(who). See: sessionhopper profiles list") }
+        let kinds = what == "all" ? AlertKind.allCases : [AlertKind(rawValue: what) ?? { die("kinds: \(AlertKind.allCases.map(\.rawValue).joined(separator: ", ")), all") }()]
+        let mac = onOff("mac"), ntfy = onOff("ntfy"), active = onOff("active-only")
+        guard mac != nil || ntfy != nil || active != nil, a.isEmpty else { die("say what to change: mac on|off, ntfy on|off, active-only on|off") }
+        for k in kinds { config.alerts.set(profile, k, mac: mac, ntfy: ntfy, activeOnly: active) }
+        save()
+        if ntfy == true, !config.alerts.ntfyOn { say("ntfy is not set up yet: sessionhopper alerts ntfy <server url> <topic>") }
+    case "ntfy":
+        if a.first == "off" { config.alerts.ntfyServer = nil; config.alerts.ntfyTopic = nil; save(); break }
+        if a.first == "token" {
+            if isatty(0) == 1 { say("paste the ntfy access token, then Ctrl-D") }
+            do { out("ntfy token stored in \(try Gateway.storeKey(String(decoding: readStdin(), as: UTF8.self), for: Alerts.tokenEntry, env: env))") } catch { die("\(error)") }
+            return 0
+        }
+        guard a.count == 2, Gateway.validURL(a[0]), Alerts.validTopic(a[1]) else {
+            die("usage: sessionhopper alerts ntfy <server url, e.g. https://ntfy.sh> <topic> | off | token < file")
+        }
+        config.alerts.ntfyServer = a[0].hasSuffix("/") ? String(a[0].dropLast()) : a[0]
+        config.alerts.ntfyTopic = a[1]
+        save()
+    case "test":
+        let r = Alerts.test(env: env)
+        out("Test alert written; the app shows it as a Mac notification.")
+        if r.ntfy {
+            let status = Alerts.sendNtfy(r, env: env)
+            out("ntfy: " + (status.map { (200..<300).contains($0) ? "sent (HTTP \($0))" : "refused (HTTP \($0))" } ?? "no answer"))
+            return status.map { (200..<300).contains($0) } == true ? 0 : 1
+        }
+        out("ntfy: not set up (sessionhopper alerts ntfy <server url> <topic>)")
+        return 0
+    case "log":
+        let n = take("-n", from: &a).flatMap(Int.init) ?? 20
+        for r in Alerts.read(env.paths, last: n) {
+            out("\(r.ts)  \(pad(r.kind, 14)) \(pad(r.profile, 10)) \([r.mac ? "mac" : nil, r.ntfy ? "ntfy" : nil].compactMap { $0 }.joined(separator: "+"))  \(r.title)")
+        }
+        return 0
+    case "deliver":
+        // Started detached by the engine for one alert.
+        guard let id = a.first, let r = Alerts.read(env.paths).last(where: { $0.id == id }), r.ntfy else { return 1 }
+        return Alerts.sendNtfy(r, env: env).map { (200..<300).contains($0) } == true ? 0 : 1
+    default:
+        die("usage: sessionhopper alerts [status|set …|ntfy …|test|log]")
+    }
+    let s = config.alerts
+    out("ntfy: " + (s.ntfyOn ? "\(s.ntfyServer ?? "")/\(s.ntfyTopic ?? "")" + ((try? Gateway.key(Alerts.tokenEntry, env: env)) != nil ? " (with an access token)" : "") : "not set up"))
+    out("\(pad("", 16)) " + AlertKind.allCases.map { pad($0.rawValue, 16) }.joined())
+    for name in [AlertSettings.everyProfile] + config.profiles.filter({ !$0.isGateway }).map(\.name) {
+        let cells = AlertKind.allCases.map { k -> String in
+            let e = s.effective(name, k)
+            let ch = [e.mac ? "mac" : nil, e.ntfy ? "ntfy" : nil].compactMap { $0 }.joined(separator: "+")
+            return pad((ch.isEmpty ? "off" : ch) + (k == .usageWarning || k == .usageCritical ? (e.activeOnly ? " (active)" : "") : ""), 16)
+        }
+        out(pad(name == AlertSettings.everyProfile ? "all (default)" : name, 16) + " " + cells.joined())
+    }
+    return 0
+}
+
 /// `mcp share on|off <profile...>`, `mcp status`, `mcp store <dir>|default`.
 func mcpCommand(_ a: [String]) -> Int32 {
     var config = HopperConfig.load(env.paths)
@@ -498,7 +582,8 @@ func mcpCommand(_ a: [String]) -> Int32 {
         save()
     case "store":
         guard a.count == 2 else { die("usage: sessionhopper mcp store <dir>|default") }
-        config.mcpStore = a[1] == "default" ? nil : a[1]
+        // Absolute, so the store (and its Keychain name) is the same from every folder.
+        config.mcpStore = a[1] == "default" ? nil : URL(fileURLWithPath: (a[1] as NSString).expandingTildeInPath).standardizedFileURL.path
         save()
     case "status": break
     default: die("usage: sessionhopper mcp [status|share on|off <profile...>|store <dir>|default]")
@@ -730,7 +815,7 @@ func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.vers
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand, "run": runCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "refresh": refreshCommand, "sessions": sessionsCommand,
-    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand,
+    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand, "alerts": alertsCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },

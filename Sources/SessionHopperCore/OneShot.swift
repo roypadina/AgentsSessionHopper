@@ -216,13 +216,15 @@ public enum OneShot {
             let childEnv = LaunchPlan.childEnvironment(base: env.vars, profile: p, sessionID: "", env: env, userStatusCommand: nil)
             var a = attempt(claude, args: p.isGateway ? Gateway.modelArgs(args, p) : args, env: childEnv, stdin: stdin,
                             passThrough: format == .streamJSON, stop: stop)
-            if let l = a.limits, !p.isGateway { try? LimitStore.write(l, profile: p.name, env.paths) }
+            if let l = a.limits, !p.isGateway { try? LimitStore.write(l, profile: p.name, env.paths); Alerts.usage(p.name, env: env) }
             let failure = classify(a, now: FileIO.now())
             switch failure {
             case .none, .other:
-                EventLog.append(HopperEvent(type: "run", session: session, cwd: FileManager.default.currentDirectoryPath, from: lastProfile?.name,
+                let served = HopperEvent(type: "run", session: session, cwd: FileManager.default.currentDirectoryPath, from: lastProfile?.name,
                                             to: p.name, trigger: failure == .none ? "ok" : "error", source: "run",
-                                            detail: failure == .none ? nil : (a.resultText ?? a.stderr).prefix(200).description), env.paths)
+                                            detail: failure == .none ? nil : (a.resultText ?? a.stderr).prefix(200).description)
+                EventLog.append(served, env.paths)
+                Alerts.event(served, env: env)
                 emit(a, format)
                 return a.exit
             case .limit, .credits, .login:

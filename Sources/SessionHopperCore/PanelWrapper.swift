@@ -164,7 +164,7 @@ final class PanelSession: @unchecked Sendable {
 
         if type == "rate_limit_event", let info = obj?["rate_limit_info"] as? [String: Any] {
             let p = current
-            if !p.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: p.name, env.paths) }
+            if !p.isGateway, let l = OneShot.limits(info, now: FileIO.now()) { try? LimitStore.write(l, profile: p.name, env.paths); Alerts.usage(p.name, env: env) }
             if info["status"] as? String == "rejected" { held.append(line); return false }
         }
         if !held.isEmpty, type != "result" { held.append(line); return false }

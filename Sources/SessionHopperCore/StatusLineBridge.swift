@@ -12,7 +12,7 @@ public enum StatusLineBridge {
         let json = FileIO.jsonObject(input) ?? [:]
         let now = FileIO.now()
         let limits = ProfileLimits.fromStatusLine(json, now: now)
-        if let profile, let limits { try? LimitStore.write(limits, profile: profile, env.paths) }
+        if let profile, let limits { try? LimitStore.write(limits, profile: profile, env.paths); Alerts.usage(profile, env: env) }
 
         if let command = userCommand(env: env, installedProfile: installedProfile) {
             return Shell.run(command, stdin: input, timeout: chainTimeout).stdout
