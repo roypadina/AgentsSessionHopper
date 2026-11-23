@@ -236,7 +236,7 @@ final class PanelSession: @unchecked Sendable {
             let old = FileIO.decode(Suggestion.self, from: f.suggest)
             // A dismissed suggestion without a target (a cancelled "next with room" move) covers every target.
             if old?.dismissed != true || (old?.to != nil && old?.to != to) {
-                try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
+                try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: policy.paused(cur.name) ? "paused" : "threshold"), to: f.suggest)
             }
         case .park, .none: break
         }

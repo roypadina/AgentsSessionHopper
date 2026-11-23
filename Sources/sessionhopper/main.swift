@@ -729,7 +729,7 @@ func delegateCommand(_ a: [String]) -> Int32 {
     let here = has("--here", in: &a)
     let named = take("-P", from: &a) ?? take("--profile", from: &a)
     // Anything else flag-like before the task is a typo, not task text: claude's own flags go after `--`.
-    if let bad = a.first(where: { $0.hasPrefix("-") }) { die("unknown option \(bad). \(usage)") }
+    if let bad = a.first(where: { $0.hasPrefix("-") && !$0.contains(where: \.isWhitespace) }) { die("unknown option \(bad). \(usage)") }
     let config = HopperConfig.load(env.paths)
     let current = env.vars["SESSIONHOPPER_PROFILE"]
     // Pay-per-use profiles only when named with -P: an agent following session rules must not spend credit unasked.

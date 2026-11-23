@@ -124,7 +124,7 @@ public enum Control {
             guard let s = Sessions.find(id, env.paths) else { throw HopperError("no live session \(id)") }
             url = env.paths.session(s.record.session).hold
             // A hold cancels what the engine queued on its own; a move the user confirmed stays.
-            if on, let p = s.pending, ["park", "auto"].contains(p.trigger) {
+            if on, let p = s.pending, ["park", "auto", "paused"].contains(p.trigger) {
                 FileIO.remove(env.paths.session(s.record.session).pending)
             }
         } else {
