@@ -22,6 +22,9 @@ sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewi
 sessionhopper profiles label <name> <text>|--clear  display name shown in the app, `status` and `profiles list`
                                           (the name used by aliases and -P never changes)
 sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park thresholds
+sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset> | profiles unpause <name>
+                                          a paused profile counts as full: nothing starts or moves there, its sessions
+                                          move off at turn end
 sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10); equal priorities
                                           don't trade places before a limit; a freed-up better one is moved back to
 sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F]
@@ -51,6 +54,10 @@ sessionhopper plugin [install|status] [--profile X]  the agents-session-hopper s
 sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
                       |gateway last|order|manual|on-switch "<command>"|off]  when API-key profiles are used
                       (default: last); a command run on every move, limit stop and park
+sessionhopper config rules [--file F | --reset]   your own instructions, given to every session at its start
+sessionhopper delegate [--model M] [-P a,b] [--here] "<task>" [-- <claude args>]  one self-contained `claude -p` turn on
+                                          another profile with room (skips profiles where that model is spent); prints
+                                          the answer
 sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
 sessionhopper version | --version | -v    this tool's version (does not start claude)
 sessionhopper log [-n 20] [--json]        the switch log

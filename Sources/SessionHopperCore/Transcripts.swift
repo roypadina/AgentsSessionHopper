@@ -69,6 +69,23 @@ public enum Transcripts {
         return hits.count == 1 ? hits.first : nil
     }
 
+    /// `title(of:)` for a live session, for callers that ask every few seconds (the menu-bar app): the transcript's
+    /// path is looked up once, and its tail is read again only when the file changed.
+    static func cachedTitle(_ id: String, projects: URL) -> String? {
+        titleLock.lock()
+        defer { titleLock.unlock() }
+        let url = titleCache[id]?.url ?? find(id, projects: projects)
+        guard let url else { return nil }
+        let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        if let hit = titleCache[id], hit.mtime == mtime { return hit.title }
+        let t = title(of: url)
+        titleCache[id] = (url, mtime, t)
+        return t
+    }
+    private static let titleLock = NSLock()
+    // Guarded by `titleLock`.
+    nonisolated(unsafe) private static var titleCache: [String: (url: URL, mtime: Date, title: String?)] = [:]
+
     private static let titlePattern = try! NSRegularExpression(pattern: #""(customTitle|aiTitle)":"((?:[^"\\]|\\.)*)""#)
 
     /// Titles are re-written through the transcript, so the last 64 KB hold the current one.

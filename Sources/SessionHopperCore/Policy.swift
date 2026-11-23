@@ -24,7 +24,12 @@ public struct Policy: Sendable {
         self.now = now
     }
 
-    public func percent(_ profile: String) -> Double? { limits[profile]?.percent(now: now) }
+    /// A paused profile counts as full (100%): nothing lands there and its sessions move off at turn end.
+    public func percent(_ profile: String) -> Double? {
+        paused(profile) ? 100 : limits[profile]?.percent(now: now)
+    }
+
+    public func paused(_ profile: String) -> Bool { config.profile(named: profile)?.isPaused(now: now) ?? false }
 
     func hasRoom(_ profile: String, under limit: Double) -> Bool { (percent(profile) ?? 0) < limit }
 
@@ -62,6 +67,12 @@ public struct Policy: Sendable {
 
     /// `held`: the user pinned this session to its profile; it is never parked or moved automatically.
     public func evaluate(current: Profile, order: [Profile], held: Bool) -> Decision {
+        // Paused by the user: move off like a full profile, asked or automatic per "move without asking"; park only
+        // when nothing else has room. A held session stays.
+        if !held, paused(current.name) {
+            if let to = pick(order, excluding: current.name) { return config.autoMove ? .autoMove(to: to.name, percent: 100) : .suggest(to: to.name, percent: 100) }
+            return config.parkBeforePaid ? .park(percent: 100) : .none
+        }
         // A profile of better priority has room again: go back up (pay-per-use to Claude, a fallback account to the main ones).
         if let up = levels(order).joined().first(where: { priority($0) < priority(current) && hasRoom($0.name, under: config.suggest($0.name)) }) {
             let pct = percent(current.name) ?? 0
@@ -83,7 +94,8 @@ public struct Policy: Sendable {
 
     /// `moveNowAtHard`: an automatic move or park past the hard threshold happens at once, not at the turn end.
     public func isUrgent(_ d: Decision, current: Profile) -> Bool {
-        guard config.moveNowAtHard, let pct = percent(current.name), pct >= config.hard(current.name) else { return false }
+        // A pause waits for the turn end, like a confirmed move.
+        guard config.moveNowAtHard, !paused(current.name), let pct = percent(current.name), pct >= config.hard(current.name) else { return false }
         switch d {
         case .autoMove, .park: return true
         default: return false
@@ -97,7 +109,13 @@ public struct Policy: Sendable {
 
     /// Every profile is full: the one whose windows reset first, and when. nil = none has a known reset.
     public func nextRoom(_ order: [Profile]) -> (profile: Profile, at: Double)? {
-        order.compactMap { p in limits[p.name]?.freeAt(under: config.hard(p.name), now: now).map { (p, $0) } }
+        order.compactMap { p -> (Profile, Double)? in
+            let free = limits[p.name]?.freeAt(under: config.hard(p.name), now: now) ?? (paused(p.name) ? now : nil)
+            guard let free else { return nil }
+            // shortcut: "forever" has no end to wait for.
+            if let until = config.profile(named: p.name)?.pausedUntil, until > now { return until >= Profile.pausedForever ? nil : (p, max(free, until)) }
+            return (p, free)
+        }
             .min { $0.1 < $1.1 }
     }
 }

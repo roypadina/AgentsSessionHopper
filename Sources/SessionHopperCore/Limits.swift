@@ -130,6 +130,34 @@ public struct ProfileLimits: Codable, Equatable, Sendable {
     }
 }
 
+/// Limits that cover one model only (Claude Code's `seven_day_opus`, `seven_day_sonnet`, …), as learned from a rejected run.
+/// Kept apart from `ProfileLimits`: the status line rewrites that file on every sample and knows nothing of them.
+public enum ModelLimits {
+    static func url(_ profile: String, _ paths: StatePaths) -> URL { paths.profilesDir.appendingPathComponent("\(profile).models.json") }
+
+    /// Model or limit name → epoch time it is free again. Expired entries are dropped.
+    public static func read(_ profile: String, _ paths: StatePaths, now: Double) -> [String: Double] {
+        (FileIO.decode([String: Double].self, from: url(profile, paths)) ?? [:]).filter { $0.value > now }
+    }
+
+    public static func markFull(_ profile: String, keys: [String], until: Double, _ paths: StatePaths, now: Double) {
+        var m = read(profile, paths, now: now)
+        for k in keys where !k.isEmpty { m[k.lowercased()] = until }
+        try? FileIO.encode(m, to: url(profile, paths))
+    }
+
+    /// `model` (as passed to `--model`) is spent on `profile` right now.
+    public static func isFull(_ profile: String, model: String, _ paths: StatePaths, now: Double) -> Bool {
+        read(profile, paths, now: now)[model.lowercased()] != nil
+    }
+
+    /// The key for runs without `--model` (the account's default model).
+    public static let defaultModel = "default"
+
+    /// Claude Code's rate-limit types that cover the whole account; anything else is one model's.
+    static let accountWide: Set<String> = ["five_hour", "seven_day", "overage", "seven_day_overage_included"]
+}
+
 public enum LimitStore {
     public static func read(_ profile: String, _ paths: StatePaths) -> ProfileLimits? {
         // Testing: `SESSIONHOPPER_MOCK_LIMITS=<dir>` with `<dir>/<profile>.limits.json` (same format) overrides

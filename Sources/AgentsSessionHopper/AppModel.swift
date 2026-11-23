@@ -71,6 +71,22 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Every live session on `from` moves to `to` at its turn end.
+    func moveAll(from: String, to: String) {
+        act {
+            for s in snapshot.sessions(on: from) {
+                _ = try Control.requestMove(session: s.record.session, to: to, now: false, source: "menu", env: env)
+            }
+        }
+    }
+
+    /// `spec`: as `Profile.pauseEnd` (`30m`, `forever`, `5h-reset`, …); nil = in use again.
+    func pause(_ name: String, _ spec: String?) {
+        let until = spec.flatMap { Profile.pauseEnd($0, limits: snapshot.limits[name], now: Date().timeIntervalSince1970) }
+        if spec != nil, until == nil { lastError = "\(config.display(name)): no reset time known yet; refresh its usage first"; return }
+        update { c in if let i = c.profiles.firstIndex(where: { $0.name == name }) { c.profiles[i].pausedUntil = until } }
+    }
+
     func cancelMove(_ s: LiveSession) { act { _ = try Control.cancelMove(session: s.record.session, env: env) } }
 
     func notNow(_ s: LiveSession) { Control.dismiss(session: s.record.session, env: env); refresh() }
@@ -278,9 +294,10 @@ final class AppModel: ObservableObject {
 
     // MARK: Presentation helpers
 
-    enum Severity { case unknown, ok, near, full }
+    enum Severity { case unknown, ok, near, full, paused }
 
     func severity(_ profile: String) -> Severity {
+        if config.profile(named: profile)?.isPaused(now: snapshot.now) == true { return .paused }
         guard let p = snapshot.percent(profile) else { return .unknown }
         return p >= config.hard(profile) ? .full : p >= config.suggest(profile) ? .near : .ok
     }
@@ -296,6 +313,7 @@ extension AppModel.Severity {
         case .ok: "checkmark.circle.fill"
         case .near: "exclamationmark.triangle.fill"
         case .full: "xmark.octagon.fill"
+        case .paused: "pause.circle.fill"
         }
     }
 
@@ -305,6 +323,7 @@ extension AppModel.Severity {
         case .ok: "within its limits"
         case .near: "near its limit"
         case .full: "at its limit"
+        case .paused: "paused"
         }
     }
 
@@ -314,6 +333,7 @@ extension AppModel.Severity {
         case .ok: .green
         case .near: .orange
         case .full: .red
+        case .paused: .secondary
         }
     }
 }

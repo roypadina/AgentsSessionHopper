@@ -5,6 +5,18 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-11-23
+
+### Added
+- Pause a profile: for 30 minutes, 1 or 4 hours, until its 5-hour or weekly reset, or until you resume it (right-click a profile row, the ⋯ menu, the right-click menu, or `sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset>` / `profiles unpause <name>`). A paused profile counts as full: nothing starts or moves there, and its sessions move off at their turn end (asked, or by themselves with "Move without asking"); they park only when no other profile has room.
+- Move one profile's sessions in one click: each profile's sessions menu starts with "Move All N To".
+- Session rules (Settings → Hand-off, `sessionhopper config rules --file F`): your own instructions, given to every session at its start.
+- `sessionhopper delegate [--model M] "<task>"`: hands one self-contained `claude -p` task to another of your accounts that still has that model and prints the answer (for example a Fable task while this account's Fable or Opus limit is spent). It counts against that account's own limits. Profiles where that model is spent, and pay-per-use profiles unless named with `-P`, are skipped.
+- Session names (`/rename`, else Claude Code's own title) next to their ids in the sessions menu and in `sessionhopper status`.
+
+### Fixed
+- A limit that covers one model only (Claude Code's `seven_day_opus`, `seven_day_sonnet`, …) no longer marks the whole profile full in `run`; only that model is skipped there until its reset.
+
 ## [1.16.0] - 2026-11-22
 
 ### Added

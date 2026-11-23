@@ -19,6 +19,8 @@ final class RunTests: XCTestCase {
                   echo "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"answer from $who\"}"; exit 0;;
               limit) echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour","resetsAt":4102444800}}'
                   echo '{"type":"result","subtype":"success","is_error":true,"result":"You have hit your session limit"}'; exit 1;;
+              opus) echo '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"seven_day_opus","resetsAt":4102444800}}'
+                  echo '{"type":"result","subtype":"success","is_error":true,"result":"You have hit your Opus limit"}'; exit 1;;
               credits) echo 'API Error: 402 This request requires more credits' >&2
                   echo '{"type":"result","subtype":"success","is_error":true,"result":"API Error: 402 This request requires more credits, or fewer max_tokens"}'; exit 1;;
             esac
@@ -197,8 +199,30 @@ final class RunTests: XCTestCase {
         XCTAssertTrue(r.stderr.contains("gw: no API key"), r.stderr)
         XCTAssertEqual(h.launches.count, 2, "never launched without its key (it would fall back to a Claude login)")
     }
+
+    func testDelegateRunsOnAnotherProfileAndSkipsASpentModel() throws {
+        // Called from a session on `default`: the task goes to `work`.
+        var r = try h.run(["delegate", "--model", "fable", "summarise the repo"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertEqual(r.stdout, "answer from work\n")
+        XCTAssertTrue(h.launches.last?.contains("--model fable") == true)
+        // work's own Opus/Fable limit: marked for the model only, the account keeps room.
+        try h.write("opus", "behave-work")
+        r = try h.run(["delegate", "--model", "fable", "again"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
+        XCTAssertNotEqual(r.code, 0)
+        XCTAssertTrue(ModelLimits.isFull("work", model: "fable", h.env.paths, now: FileIO.now()))
+        XCTAssertNil(LimitStore.read("work", h.env.paths)?.sevenDay, "the account-wide weekly window is not marked")
+        r = try h.run(["delegate", "--model", "fable", "--here", "again"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
+        XCTAssertEqual(r.stdout, "answer from default\n", "--here allows this profile; work is skipped for fable")
+        XCTAssertTrue(r.stderr.contains("fable is spent on work"), r.stderr)
+        r = try h.run(["delegate", "--modle", "fable", "typo"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
+        XCTAssertNotEqual(r.code, 0)
+        XCTAssertTrue(r.stderr.contains("unknown option --modle"), r.stderr)
+    }
+
 }
 
 private func limits(_ five: Double) -> ProfileLimits {
     ProfileLimits(fiveHour: LimitWindow(usedPercentage: five, resetsAt: 4_102_444_800), sevenDay: nil, sampledAt: Date().timeIntervalSince1970)
+
 }

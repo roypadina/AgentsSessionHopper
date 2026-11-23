@@ -140,3 +140,18 @@ final class AlertsTests: XCTestCase {
         XCTAssertFalse(Alerts.validTopic(""))
     }
 }
+
+final class SessionNameTests: XCTestCase {
+    func testSnapshotNamesLiveSessionsFromTheirTranscript() throws {
+        let box = Sandbox()
+        let env = box.env()
+        var c = HopperConfig()
+        c.profiles = [Profile(name: "a", dir: box.home.appendingPathComponent(".claude").path, exportConfigDir: false)]
+        try c.save(env.paths)
+        let id = "aaaaaaaa-0000-4000-8000-000000000001"
+        box.write(#"{"type":"user","message":{"content":"hi"}}"# + "\n" + #"{"type":"custom-title","customTitle":"fix-the-tests"}"# + "\n",
+                  "home/.claude/projects/-x/\(id).jsonl")
+        try FileIO.encode(SessionRecord(session: id, resume: id, pid: getpid(), child: 0, profile: "a", cwd: "/x", started: "t"), to: env.paths.session(id).record)
+        XCTAssertEqual(HopperSnapshot.load(env.paths, home: box.home).names[id], "fix-the-tests")
+    }
+}

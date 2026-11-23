@@ -27,7 +27,10 @@ public enum PanelWrapper {
 
     /// Profiles a panel session may use: gateways only with their key.
     static func usable(_ config: HopperConfig, env: HopperEnvironment, excluding: Set<String> = []) -> [Profile] {
-        config.profiles.filter { !excluding.contains($0.name) && (!$0.isGateway || Claude.isLoggedIn($0, env: env) == true) }
+        // The panel runs the account's default model: a profile where that one is spent waits for its reset.
+        let now = FileIO.now()
+        return config.profiles.filter { !excluding.contains($0.name) && (!$0.isGateway || Claude.isLoggedIn($0, env: env) == true)
+            && !ModelLimits.isFull($0.name, model: ModelLimits.defaultModel, env.paths, now: now) }
     }
 
     /// The profile for this start: by policy (keeping the session's last profile among equals); with every profile
@@ -233,7 +236,7 @@ final class PanelSession: @unchecked Sendable {
             let old = FileIO.decode(Suggestion.self, from: f.suggest)
             // A dismissed suggestion without a target (a cancelled "next with room" move) covers every target.
             if old?.dismissed != true || (old?.to != nil && old?.to != to) {
-                try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
+                try? FileIO.encode(Suggestion(from: cur.name, to: to, percent: pct, reason: policy.paused(cur.name) ? "paused" : "threshold"), to: f.suggest)
             }
         case .park, .none: break
         }

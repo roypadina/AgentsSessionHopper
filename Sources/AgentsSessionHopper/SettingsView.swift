@@ -113,7 +113,7 @@ extension SettingsView.Tab {
     var height: CGFloat {
         switch self {
         case .general: 680
-        case .handOff: 900
+        case .handOff: 1000
         case .alerts: 900
         case .profiles: 460
         case .commandLine: 470
@@ -172,6 +172,7 @@ private struct HandOffSettings: View {
                 Toggle("Hold every session", isOn: Binding(get: { model.holdAll }, set: { model.setHoldAll($0) }))
             }
             ContinuePromptSection(model: model)
+            SessionRulesSection(model: model)
             if let err = model.lastError { Text(err).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
@@ -213,6 +214,32 @@ private struct PercentStepper: View {
                     .accessibilityValue("\(Int(value)) percent")
             }
         }
+    }
+}
+
+/// The user's own instructions for every supervised session (`HopperConfig.sessionRules`). Applies as you type (SET-4).
+private struct SessionRulesSection: View {
+    @ObservedObject var model: AppModel
+    @State private var text = ""
+    static let example = "When you need Fable for a subagent and this account's Fable or Opus limit is spent, run the task on another account instead: `sessionhopper delegate --model fable \"<a self-contained task>\"` (add `-- --permission-mode acceptEdits` if it must edit files) and use its answer."
+
+    var body: some View {
+        Section {
+            TextEditor(text: $text).font(.system(.caption, design: .monospaced)).frame(height: 90)
+                .accessibilityLabel("Session rules")
+                .onChange(of: text) { _, new in
+                    let v = new.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : new
+                    if v != model.config.sessionRules { model.update { $0.sessionRules = v } }
+                }
+            HStack {
+                Spacer()
+                Button("Insert Example") { text = text.isEmpty ? Self.example : text + "\n" + Self.example }
+                Button("Clear") { text = "" }.disabled(text.isEmpty)
+            }
+        } header: { Text("Session Rules") } footer: {
+            Text("Your own instructions, given to every session started or resumed through AgentsSessionHopper. `sessionhopper delegate` hands one self-contained task to another of your accounts that still has that model and prints the answer; it counts against that account's own limits, and a spent account stays spent until its reset.").formFooter()
+        }
+        .onAppear { text = model.config.sessionRules ?? "" }
     }
 }
 

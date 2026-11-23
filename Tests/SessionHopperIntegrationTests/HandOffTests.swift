@@ -326,7 +326,8 @@ final class HandOffTests: XCTestCase {
     }
 
     func testFullAtLaunchWaitsForTheResetThenStarts() throws {
-        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: FileIO.now() + 1), sevenDay: nil, sampledAt: 0),
+        // 3 s: a slow CI runner (Linux) took over 1 s to start the supervisor, and the window had reset before it looked.
+        try LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 99, resetsAt: FileIO.now() + 3), sevenDay: nil, sampledAt: 0),
                              profile: "default", h.env.paths)
         try h.scenario("exit 0")
         let r = try h.run(["--only", "default"], extraEnv: ["SESSIONHOPPER_RESET_SLACK": "0"])
