@@ -149,7 +149,7 @@ func statusCommand(_ a: [String]) -> Int32 {
             if let t = x.waitingUntil { state += ", parked, waits for a reset until \(ProfileLimits.clock(t))" }
             if let p = x.pending { state += ", moving to \(p.to == "-" ? "next with room" : p.to) at turn end" }
             else if let sug = x.suggestion, !sug.dismissed { state += ", suggest: \(HookHandler.suggestionText(sug).replacingOccurrences(of: "[sessionhopper] ", with: ""))" }
-            out("  \(x.record.session.prefix(8))  \(pad(x.record.profile, 10)) \(env.tilde(x.record.cwd))  \(state)")
+            out("  \(x.record.session.prefix(8))  \(pad(x.record.profile, 10)) \(s.names[x.id].map { "\($0)  " } ?? "")\(env.tilde(x.record.cwd))  \(state)")
         }
     }
     if !s.events.isEmpty {

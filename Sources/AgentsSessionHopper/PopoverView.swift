@@ -192,7 +192,7 @@ struct SessionsMenu: View {
 
     /// "~/Code/app · working · 1a2b3c4d": the id tells apart sessions in one folder and matches `status`.
     private func title(_ session: LiveSession) -> String {
-        var parts = [model.tilde(session.record.cwd), session.busy ? "working" : "idle"]
+        var parts = (model.snapshot.names[session.id].map { [$0] } ?? []) + [model.tilde(session.record.cwd), session.busy ? "working" : "idle"]
         if session.held { parts.append("held") }
         if let t = session.waitingUntil { parts.append("parked, waits for a reset until \(ProfileLimits.clock(t))") }
         if let p = session.pending {
