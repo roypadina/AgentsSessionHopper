@@ -54,6 +54,10 @@ final class PauseTests: XCTestCase {
         a.rejected = ("seven_day", now + 5000)
         OneShot.markFull(profile("b"), .limit(until: now + 5000, weekly: true), attempt: a, paths: paths, now: now, model: "fable")
         XCTAssertEqual(LimitStore.read("b", paths)?.sevenDay?.usedPercentage, 100, "an account-wide limit still marks the profile")
+        a.rejected = ("seven_day_sonnet", now + 5000)
+        OneShot.markFull(profile("c"), .limit(until: now + 5000, weekly: true), attempt: a, paths: paths, now: now)
+        XCTAssertTrue(ModelLimits.isFull("c", model: ModelLimits.defaultModel, paths, now: now), "no --model: the default model's key")
+        XCTAssertNil(Profile.pauseEnd("infm", limits: nil, now: now))
         XCTAssertEqual(OneShot.modelArg(["-p", "--model", "fable"]), "fable")
         XCTAssertEqual(OneShot.modelArg(["--model=opus"]), "opus")
     }

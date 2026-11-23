@@ -221,7 +221,7 @@ private struct PercentStepper: View {
 private struct SessionRulesSection: View {
     @ObservedObject var model: AppModel
     @State private var text = ""
-    static let example = "When you need Fable for a subagent and this account's Fable or Opus limit is spent, run the task on another account instead: `sessionhopper delegate --model fable \"<a self-contained task>\"` (add `-- --permission-mode bypassPermissions` if it must edit files) and use its answer."
+    static let example = "When you need Fable for a subagent and this account's Fable or Opus limit is spent, run the task on another account instead: `sessionhopper delegate --model fable \"<a self-contained task>\"` (add `-- --permission-mode acceptEdits` if it must edit files) and use its answer."
 
     var body: some View {
         Section {
@@ -237,7 +237,7 @@ private struct SessionRulesSection: View {
                 Button("Clear") { text = "" }.disabled(text.isEmpty)
             }
         } header: { Text("Session Rules") } footer: {
-            Text("Your own instructions, given to every session started or resumed through AgentsSessionHopper. `sessionhopper delegate` runs one self-contained task on another account with room and prints the answer: a session can keep its account and still get a model that account has used up.").formFooter()
+            Text("Your own instructions, given to every session started or resumed through AgentsSessionHopper. `sessionhopper delegate` hands one self-contained task to another of your accounts that still has that model and prints the answer; it counts against that account's own limits, and a spent account stays spent until its reset.").formFooter()
         }
         .onAppear { text = model.config.sessionRules ?? "" }
     }

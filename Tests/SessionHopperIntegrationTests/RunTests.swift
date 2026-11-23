@@ -215,6 +215,9 @@ final class RunTests: XCTestCase {
         r = try h.run(["delegate", "--model", "fable", "--here", "again"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
         XCTAssertEqual(r.stdout, "answer from default\n", "--here allows this profile; work is skipped for fable")
         XCTAssertTrue(r.stderr.contains("fable is spent on work"), r.stderr)
+        r = try h.run(["delegate", "--modle", "fable", "typo"], extraEnv: ["SESSIONHOPPER_PROFILE": "default"])
+        XCTAssertNotEqual(r.code, 0)
+        XCTAssertTrue(r.stderr.contains("unknown option --modle"), r.stderr)
     }
 
 }

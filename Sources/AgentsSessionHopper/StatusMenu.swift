@@ -45,7 +45,7 @@ import SessionHopperCore
                 let i = NSMenuItem(title: "\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))", action: #selector(moveAll(_:)), keyEquivalent: "")
                 i.target = self
                 i.representedObject = p.name
-                i.isEnabled = model.snapshot.sessions.contains { $0.record.profile != p.name }
+                i.isEnabled = !p.isPaused(now: model.snapshot.now) && model.snapshot.sessions.contains { $0.record.profile != p.name }
                 sub.addItem(i)
             }
             sub.autoenablesItems = false
@@ -64,10 +64,12 @@ import SessionHopperCore
                 }
                 let item = NSMenuItem(title: "Pause \(p.displayName)", action: nil, keyEquivalent: "")
                 let sub = NSMenu()
+                sub.autoenablesItems = false
                 for (title, spec) in PauseMenu.choices {
                     let i = NSMenuItem(title: title, action: #selector(pauseProfile(_:)), keyEquivalent: "")
                     i.target = self
                     i.representedObject = [p.name, spec]
+                    i.isEnabled = Profile.pauseEnd(spec, limits: model.snapshot.limits[p.name], now: model.snapshot.now) != nil
                     sub.addItem(i)
                 }
                 item.submenu = sub

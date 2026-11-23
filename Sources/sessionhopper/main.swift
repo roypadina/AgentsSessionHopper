@@ -144,7 +144,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let pct = s.percent(p.name), pct >= s.config.suggest(p.name) { note += ", near limit" }
         let n = s.sessions(on: p.name).count
-        out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) \(pad(p.isGateway ? Gateway.kindName(p) : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(s.emails[p.name].map { "  \($0)" } ?? "")")
+        out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) \(pad(p.isGateway ? Gateway.kindName(p) : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(pausedNote(p))\(s.emails[p.name].map { "  \($0)" } ?? "")")
     }
     let c = s.config
     out("Hand-off: suggest at \(Int(c.suggestThreshold))%, park at \(Int(c.hardThreshold))% (\(c.parkBeforePaid ? "on" : "off")), move without asking: \(c.autoMove ? "on" : "off")")
@@ -286,7 +286,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         }
         let policy = Policy(config: config, limits: [:], now: 0)
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "\(Gateway.kindName(p)), pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")")
+            out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "\(Gateway.kindName(p)), pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")\(pausedNote(p))")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))
@@ -542,6 +542,12 @@ func tokenLogin(_ p: Profile) -> Int32 {
     return 0
 }
 
+/// "  paused until 14:00" / "  paused until you unpause it", or "".
+func pausedNote(_ p: Profile) -> String {
+    guard let u = p.pausedUntil, u > Date().timeIntervalSince1970 else { return "" }
+    return u >= Profile.pausedForever ? "  paused until you unpause it" : "  paused until \(ProfileLimits.clock(u))"
+}
+
 /// `alerts [status] | set … | ntfy … | test | log | deliver <id>`.
 func alertsCommand(_ a: [String]) -> Int32 {
     var a = a
@@ -716,19 +722,23 @@ func delegateCommand(_ a: [String]) -> Int32 {
     var a = a
     var extra: [String] = []
     if let i = a.firstIndex(of: "--") { extra = Array(a[(i + 1)...]); a = Array(a[..<i]) }
-    let model = take("--model", from: &a)
+    let usage = "usage: sessionhopper delegate [--model M] [-P a,b] [--here] \"<self-contained task>\" [-- <claude args>]   (or the task on stdin)"
+    var model: String?
+    if let i = a.firstIndex(where: { $0.hasPrefix("--model=") }) { model = String(a.remove(at: i).dropFirst(8)) }
+    if a.contains("--model") { guard let m = take("--model", from: &a), !m.hasPrefix("-") else { die(usage) }; model = m }
     let here = has("--here", in: &a)
+    let named = take("-P", from: &a) ?? take("--profile", from: &a)
+    // Anything else flag-like before the task is a typo, not task text: claude's own flags go after `--`.
+    if let bad = a.first(where: { $0.hasPrefix("-") }) { die("unknown option \(bad). \(usage)") }
     let config = HopperConfig.load(env.paths)
     let current = env.vars["SESSIONHOPPER_PROFILE"]
-    var prefer = (take("-P", from: &a) ?? take("--profile", from: &a)).map { $0.split(separator: ",").map(String.init) }
-        ?? config.profiles.map(\.name)
+    // Pay-per-use profiles only when named with -P: an agent following session rules must not spend credit unasked.
+    var prefer = named.map { $0.split(separator: ",").map(String.init) } ?? config.profiles.filter { !$0.isGateway }.map(\.name)
     if !here, let current { prefer.removeAll { $0 == current } }
     guard !prefer.isEmpty else { die("no other profile to delegate to") }
     var task = a.joined(separator: " ")
     if task.isEmpty, isatty(0) == 0 { task = String(decoding: readStdin(), as: UTF8.self) }
-    guard !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-        die("usage: sessionhopper delegate [--model M] [-P a,b] [--here] \"<self-contained task>\" [-- <claude args>]   (or the task on stdin)")
-    }
+    guard !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { die(usage) }
     let args = ["-p"] + (model.map { ["--model", $0] } ?? []) + extra
     return OneShot.run(env: env, prefer: prefer, only: true, args: args, stdin: InputFeed(Data(task.utf8)), say: say)
 }

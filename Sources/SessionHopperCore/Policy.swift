@@ -113,7 +113,7 @@ public struct Policy: Sendable {
             let free = limits[p.name]?.freeAt(under: config.hard(p.name), now: now) ?? (paused(p.name) ? now : nil)
             guard let free else { return nil }
             // shortcut: "forever" has no end to wait for.
-            if let until = p.pausedUntil, until > now { return until >= Profile.pausedForever ? nil : (p, max(free, until)) }
+            if let until = config.profile(named: p.name)?.pausedUntil, until > now { return until >= Profile.pausedForever ? nil : (p, max(free, until)) }
             return (p, free)
         }
             .min { $0.1 < $1.1 }

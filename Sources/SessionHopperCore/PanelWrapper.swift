@@ -27,7 +27,10 @@ public enum PanelWrapper {
 
     /// Profiles a panel session may use: gateways only with their key.
     static func usable(_ config: HopperConfig, env: HopperEnvironment, excluding: Set<String> = []) -> [Profile] {
-        config.profiles.filter { !excluding.contains($0.name) && (!$0.isGateway || Claude.isLoggedIn($0, env: env) == true) }
+        // The panel runs the account's default model: a profile where that one is spent waits for its reset.
+        let now = FileIO.now()
+        return config.profiles.filter { !excluding.contains($0.name) && (!$0.isGateway || Claude.isLoggedIn($0, env: env) == true)
+            && !ModelLimits.isFull($0.name, model: ModelLimits.defaultModel, env.paths, now: now) }
     }
 
     /// The profile for this start: by policy (keeping the session's last profile among equals); with every profile

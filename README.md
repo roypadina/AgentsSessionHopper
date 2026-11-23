@@ -65,8 +65,9 @@ brew install --cask roypadina/tap/agents-session-hopper
   or `sessionhopper profiles pause <name> 2h|5h-reset|weekly-reset|forever`). It counts as full: nothing lands
   there and its sessions move off at their turn end.
 - **Session rules and `delegate`.** Give every session your own instructions (Settings → Hand-off → Session
-  Rules). `sessionhopper delegate --model fable "<task>"` runs one self-contained task on another profile with
-  room and prints the answer, so a session can stay on its account and still use a model that account has used up.
+  Rules). `sessionhopper delegate --model fable "<task>"` hands one self-contained task to another of your accounts
+  that still has that model and prints the answer. It counts against that account's own limits; the spent account
+  stays spent until its reset.
 - **Alerts on your Mac and your phone** (Settings → Alerts, or `sessionhopper alerts`): when sessions
   move off a profile and where to, when no profile has room, and when a profile passes the warning or
   critical threshold. Each kind is switched on per profile, as a Mac notification and/or an
@@ -358,7 +359,8 @@ sessionhopper mcp status                  # which profiles share, which MCP serv
   which downloads it from GitHub.) Alerts you send to ntfy go to the server and topic you set, and only there.
   To refresh usage it runs `claude`: one tiny `claude -p` on Haiku per profile, a request to Anthropic on that account that uses a little of its usage and can start an idle account's 5-hour window. It runs by itself for a profile not seen for 6 hours, or when you click Refresh / run `sessionhopper refresh`.
 - **It does not change or get around any account's limits.** Each account keeps its own; you decide
-  when a conversation continues elsewhere.
+  when a conversation continues elsewhere. With session rules you may let an agent use `sessionhopper delegate`:
+  the task then runs on another of your accounts and counts against that account's limits.
 
 **Your part:** use it only with accounts that are yours, never shared with anyone. Each account is
 subject to Anthropic's Consumer Terms, Usage Policy and Claude Code usage rules, which Anthropic may

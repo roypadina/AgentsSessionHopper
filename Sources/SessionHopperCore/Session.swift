@@ -88,6 +88,7 @@ public enum Control {
         if let to {
             guard config.profile(named: to) != nil else { throw HopperError("unknown profile '\(to)'") }
             guard to != s.record.profile else { throw HopperError("session already runs on \(to)") }
+            if config.profile(named: to)?.isPaused(now: FileIO.now()) == true { throw HopperError("\(to) is paused (sessionhopper profiles unpause \(to))") }
         }
         let move = PendingMove(to: to ?? PendingMove.anywhere, trigger: now ? "now" : "confirm", source: source)
         let f = env.paths.session(s.record.session)

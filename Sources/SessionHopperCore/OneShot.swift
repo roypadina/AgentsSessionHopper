@@ -171,7 +171,7 @@ public enum OneShot {
     /// `model`: the run's `--model`; a limit that covers only that model marks only it (`ModelLimits`), not the profile.
     static func markFull(_ p: Profile, _ f: Failure, attempt: Attempt, paths: StatePaths, now: Double, model: String? = nil) {
         if case .limit(let until, _) = f, let r = attempt.rejected, !ModelLimits.accountWide.contains(r.type) {
-            ModelLimits.markFull(p.name, keys: [r.type, model ?? ""], until: until ?? now + 3600, paths, now: now)
+            ModelLimits.markFull(p.name, keys: [r.type, model ?? ModelLimits.defaultModel], until: until ?? now + 3600, paths, now: now)
             return
         }
         switch f {
@@ -197,8 +197,8 @@ public enum OneShot {
         var order: [Profile]
         do { order = try config.order(prefer: prefer, only: only) } catch { say("\(error)"); return 2 }
         // A model spent on a profile (its own weekly limit) skips that profile for runs on that model.
-        let model = modelArg(callerArgs)
-        if let model {
+        let model = modelArg(callerArgs) ?? ModelLimits.defaultModel
+        do {
             let now = FileIO.now()
             let spent = Set(order.filter { ModelLimits.isFull($0.name, model: model, env.paths, now: now) }.map(\.name))
             if !spent.isEmpty { say("\(model) is spent on \(spent.sorted().joined(separator: ", ")) until its reset; skipping"); order.removeAll { spent.contains($0.name) } }

@@ -120,7 +120,9 @@ public enum HookHandler {
         if let p = FileIO.decode(PendingMove.self, from: f.pending), !FileIO.exists(f.warned) {
             FileIO.touch(f.warned)
             if p.to == PendingMove.park {
-                out["systemMessage"] = "[sessionhopper] This account is past its limit threshold: the session ends when this turn ends, so it does not run into paid usage. Resume it later or on another profile."
+                out["systemMessage"] = p.trigger == "paused"
+                    ? "[sessionhopper] This account is paused and no other has room: the session ends when this turn ends. Resume it later or on another profile."
+                    : "[sessionhopper] This account is past its limit threshold: the session ends when this turn ends, so it does not run into paid usage. Resume it later or on another profile."
             } else {
                 out["hookSpecificOutput"] = ["hookEventName": event, "additionalContext": agentNotice]
                 out["systemMessage"] = "[sessionhopper] This conversation moves to \(p.to == PendingMove.anywhere ? "the next profile with room" : p.to) when this turn ends."
@@ -136,7 +138,8 @@ public enum HookHandler {
     public static func suggestionText(_ s: Suggestion) -> String {
         let pct = s.percent.map { " (\(Int($0.rounded()))%)" } ?? ""
         let head = s.reason == "login" ? "\(s.from) can't run: its Claude login expired (sessionhopper login \(s.from))."
-            : s.reason == "limit" ? "\(s.from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")." : "\(s.from) is near its usage limit\(pct)."
+            : s.reason == "limit" ? "\(s.from) hit its usage limit\(s.detail.map { " (\($0))" } ?? "")."
+            : s.reason == "paused" ? "\(s.from) is paused." : "\(s.from) is near its usage limit\(pct)."
         return "[sessionhopper] " + head + (s.to.map { " \($0) has room." } ?? "")
     }
 }

@@ -188,7 +188,7 @@ struct MoveAllMenu: View {
             ForEach(model.config.profiles) { p in
                 let n = sessions.filter { $0.record.profile != p.name }.count
                 Button("\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.moveAll(to: p.name) }
-                    .disabled(n == 0)
+                    .disabled(n == 0 || p.isPaused(now: model.snapshot.now))
             }
         }
         .disabled(sessions.isEmpty)
@@ -216,6 +216,7 @@ struct SessionsMenu: View {
                 Menu(title(session)) {
                     ForEach(model.config.profiles.filter { $0.name != session.record.profile }) { p in
                         Button("Move to \(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.confirmMove(session, to: p.name) }
+                            .disabled(p.isPaused(now: model.snapshot.now))
                     }
                     if session.pending != nil { Button("Cancel Move") { model.cancelMove(session) } }
                     Divider()

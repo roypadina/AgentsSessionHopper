@@ -151,6 +151,9 @@ public enum ModelLimits {
         read(profile, paths, now: now)[model.lowercased()] != nil
     }
 
+    /// The key for runs without `--model` (the account's default model).
+    public static let defaultModel = "default"
+
     /// Claude Code's rate-limit types that cover the whole account; anything else is one model's.
     static let accountWide: Set<String> = ["five_hour", "seven_day", "overage", "seven_day_overage_included"]
 }

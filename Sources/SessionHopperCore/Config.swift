@@ -47,7 +47,7 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
         case "5h-reset": return limits?.fiveHour?.resetsAt.flatMap { $0 > now ? $0 : nil }
         case "weekly-reset": return limits?.sevenDay?.resetsAt.flatMap { $0 > now ? $0 : nil }
         default:
-            guard let unit = spec.last, let n = Double(spec.dropLast()), n > 0,
+            guard let unit = spec.last, let n = Double(spec.dropLast()), n.isFinite, n > 0,
                   let mult = ["m": 60.0, "h": 3600.0, "d": 86400.0][unit] else { return nil }
             return now + n * mult
         }

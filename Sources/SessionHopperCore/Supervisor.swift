@@ -268,19 +268,21 @@ public final class Supervisor {
         case .none:
             break
         case .suggest(let to, let pct):
-            guard !pendingExists, !FileIO.exists(f.suggest), userTarget != profile.name else { return }
-            try? FileIO.encode(Suggestion(from: profile.name, to: to, percent: pct, reason: "threshold"), to: f.suggest)
+            // A pause outranks the user's earlier move onto this profile.
+            let paused = policy.paused(profile.name)
+            guard !pendingExists, !FileIO.exists(f.suggest), userTarget != profile.name || paused else { return }
+            try? FileIO.encode(Suggestion(from: profile.name, to: to, percent: pct, reason: paused ? "paused" : "threshold"), to: f.suggest)
             EventLog.append(HopperEvent(type: "suggest", session: sessionID, cwd: FileManager.default.currentDirectoryPath,
                                         from: profile.name, to: to, trigger: "threshold", source: "engine",
                                         profiles: EventLog.samples(config, env.paths, now: policy.now)), env.paths)
         case .autoMove(let to, _):
-            guard !pendingExists, userTarget != profile.name else { return }
-            try? FileIO.encode(PendingMove(to: to, trigger: "auto", source: "engine"), to: f.pending)
+            guard !pendingExists, userTarget != profile.name || policy.paused(profile.name) else { return }
+            try? FileIO.encode(PendingMove(to: to, trigger: policy.paused(profile.name) ? "paused" : "auto", source: "engine"), to: f.pending)
             FileIO.remove(f.suggest)
         case .park:
             // Not after a limit stop: nothing is billed while Claude Code is stopped, so ask instead.
             guard !pendingExists, !limitHit else { return }
-            try? FileIO.encode(PendingMove(to: PendingMove.park, trigger: "park", source: "engine"), to: f.pending)
+            try? FileIO.encode(PendingMove(to: PendingMove.park, trigger: policy.paused(profile.name) ? "paused" : "park", source: "engine"), to: f.pending)
         }
     }
 
@@ -350,7 +352,9 @@ public final class Supervisor {
                                     from: from?.name, to: next?.profile.name, trigger: request?.trigger ?? "launch", source: request?.source ?? "engine",
                                     detail: next.map { "waiting for a reset, continues on \($0.profile.name) at \(ProfileLimits.clock($0.at))" },
                                     profiles: EventLog.samples(config, env.paths, now: policy.now)))
-        if let from, request?.trigger == "park" {
+        if let from, request?.trigger == "paused" {
+            say("parked: \(from.name) is paused and no other profile has room")
+        } else if let from, request?.trigger == "park" {
             say("parked: \(from.name) reached \(Int(config.hard(from.name)))% and \"park before paid usage\" is on")
         } else if from != nil {
             say("parked: no other profile has room")
