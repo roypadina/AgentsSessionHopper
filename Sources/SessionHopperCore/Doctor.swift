@@ -81,6 +81,13 @@ public enum Doctor {
             if HookInstaller.isInstalled(p) { add(.info, "\(p.name): hooks installed (sessions started without sessionhopper report usage too)") }
         }
 
+        let sharing = PluginShare.sharing(config)
+        if !sharing.isEmpty {
+            let problems = PluginShare.problems(config)
+            add(problems.isEmpty ? .ok : .warn, "plugins: \(sharing.map(\.name).joined(separator: ", ")) use \(PluginShare.base(config)?.name ?? "")'s plugins"
+                + (problems.isEmpty ? "" : ": " + problems.joined(separator: "; ")))
+        }
+
         // Shared MCP logins rest on an undocumented Claude Code variable: check this claude still has it.
         if config.profiles.contains(where: { $0.mcpShare == true }) {
             McpShare.statusLines(config, env: env).forEach { add(.info, "MCP share: " + $0) }

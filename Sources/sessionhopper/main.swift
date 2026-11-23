@@ -60,6 +60,12 @@ let usage = """
                                               and the live-session list (messaging across accounts)
       sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park
                                               thresholds instead of the global ones (config suggest / park-at)
+      sessionhopper profiles share-plugins <name...>|--all | unshare-plugins …  use the first profile's plugins folder
+                                              (one plugin set, no drift); their on/off list follows it at each launch:
+                                              turn plugins on/off on that profile or with `sessionhopper plugins enable|disable`
+      sessionhopper plugins status | sync | <claude plugin args…>   e.g. `plugins update --all`, `plugins install x@m`:
+                                              run once on the first profile, under a lock, then synced
+                                              (Claude Code plugins; `sessionhopper plugin` installs sessionhopper's own skill)
       sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset> | profiles unpause <name>
                                               a paused profile counts as full: nothing starts or moves there, its sessions
                                               move off at turn end
@@ -361,6 +367,24 @@ func profilesCommand(_ a: [String]) -> Int32 {
         config.profiles[i].hardThreshold = a.count == 3 ? Double(a[2]) : nil
         save()
         out("\(a[0]): suggest at \(Int(config.suggest(a[0])))%, park at \(Int(config.hard(a[0])))%" + (a.count == 2 ? " (the global ones)" : ""))
+    case "share-plugins", "unshare-plugins":
+        let on = sub == "share-plugins"
+        let names = a == ["--all"] ? PluginShare.base(config).map { b in config.profiles.filter { !$0.isGateway && $0.name != b.name }.map(\.name) } ?? [] : a
+        guard !names.isEmpty else { die("usage: sessionhopper profiles \(sub) <name...>|--all") }
+        // Save after each profile: a later failure must not leave an earlier one sharing without its config flag.
+        var done: [String] = [], failed: [String] = []
+        for n in names {
+            do {
+                if let b = try PluginShare.set(on, profile: n, config: &config, backupsDir: env.paths.backupsDir) { out("\(n): backup \(env.tilde(b))") }
+                save(); done.append(n)
+            } catch { failed.append("\(n): \(error)") }
+        }
+        PluginShare.sync(config).forEach(out)
+        if !done.isEmpty {
+            out(on ? "\(done.joined(separator: ", ")) now use \(PluginShare.base(config)?.name ?? "")'s plugins (\(PluginShare.root(config) ?? "")). Their own plugins folders are left as they are. Restart their sessions to load them."
+                   : "\(done.joined(separator: ", ")) use their own plugins folders again (as they were when sharing started; update them: claude plugin update)")
+        }
+        if !failed.isEmpty { die(failed.joined(separator: "\n")) }
     case "pause":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }) else {
             die("usage: sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset>   (undo: profiles unpause <name>)")
@@ -536,6 +560,27 @@ func tokenLogin(_ p: Profile) -> Int32 {
 func pausedNote(_ p: Profile) -> String {
     guard let u = p.pausedUntil, u > Date().timeIntervalSince1970 else { return "" }
     return u >= Profile.pausedForever ? "  paused until you unpause it" : "  paused until \(ProfileLimits.clock(u))"
+}
+
+/// `plugins sync | status | <claude plugin args…>`: one plugin set for the profiles that share it (`PluginShare`).
+func pluginsCommand(_ a: [String]) -> Int32 {
+    let config = HopperConfig.load(env.paths)
+    switch a.first ?? "status" {
+    case "sync":
+        let lines = PluginShare.sync(config)
+        out(lines.isEmpty ? "plugin on/off lists already match" : lines.joined(separator: "\n"))
+        return 0
+    case "status":
+        let sharing = PluginShare.sharing(config)
+        out("base: \(PluginShare.base(config)?.name ?? "-") (\(PluginShare.root(config) ?? "-"))")
+        out("sharing: " + (sharing.isEmpty ? "none (sessionhopper profiles share-plugins <name...>|--all)" : sharing.map(\.name).joined(separator: ", ")))
+        let p = PluginShare.problems(config)
+        out(p.isEmpty ? "no problems" : p.map { "problem: " + $0 }.joined(separator: "\n"))
+        return p.isEmpty ? 0 : 1
+    default:
+        // Anything else is a `claude plugin` command, run once on the base profile (install, update, uninstall, …).
+        return PluginShare.run(a, env: env)
+    }
 }
 
 /// `alerts [status] | set … | ntfy … | test | log | deliver <id>`.
@@ -898,7 +943,7 @@ func pluginCommand(_ a: [String]) -> Int32 {
         case "status":
             let s = Setup.pluginInstalled(p, env: env)
             out("\(pad(p.name, 10)) \(s == true ? "installed" : s == false ? "not installed (sessionhopper plugin install)" : "unknown (claude not found)")")
-        default: die("usage: sessionhopper plugin [install|status] [--profile X]")
+        default: die("usage: sessionhopper plugin [install|status] [--profile X]   (Claude Code plugins: sessionhopper plugins …)")
         }
     }
     return rc
@@ -924,7 +969,7 @@ func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.vers
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand, "run": runCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "refresh": refreshCommand, "sessions": sessionsCommand,
-    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand, "alerts": alertsCommand, "delegate": delegateCommand,
+    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand, "alerts": alertsCommand, "delegate": delegateCommand, "plugins": pluginsCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },
