@@ -40,11 +40,17 @@ public enum PluginShare {
         guard var obj = data == nil ? [:] : FileIO.jsonObject(data) else {
             throw HopperError("\(url.path) is not a JSON object; left alone")
         }
-        let before = NSDictionary(dictionary: obj)
+        let before = obj
         change(&obj)
-        guard !before.isEqual(to: obj) else { return }
+        guard !same(before, obj) else { return }
         let out = try JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try FileIO.write(out + Data("\n".utf8), to: url)
+    }
+
+    /// JSON values equal? (`NSDictionary.isEqual` gets JSON booleans wrong on Linux.)
+    static func same(_ a: Any?, _ b: Any?) -> Bool {
+        let enc = { (v: Any?) in try? JSONSerialization.data(withJSONObject: ["v": v ?? NSNull()], options: [.sortedKeys]) }
+        return enc(a) == enc(b)
     }
 
     static func settings(_ p: Profile) -> [String: Any] { FileIO.jsonObject(FileIO.read(settingsURL(p))) ?? [:] }
@@ -113,14 +119,14 @@ public enum PluginShare {
             let before = settings(p)
             let own = before["enabledPlugins"] as? [String: Any] ?? [:]
             let changed = Set(own.keys).union(baseOn.keys)
-                .filter { !NSDictionary(dictionary: ["v": own[$0] ?? NSNull()]).isEqual(to: ["v": baseOn[$0] ?? NSNull()]) }
+                .filter { !same(own[$0], baseOn[$0]) }
             do {
                 try editSettings(p) { s in
                     s["enabledPlugins"] = baseOn
                     s["extraKnownMarketplaces"] = market
                 }
             } catch { lines.append("\(p.name): \(error)"); continue }
-            if !NSDictionary(dictionary: before).isEqual(to: settings(p)) {
+            if !same(before, settings(p)) {
                 lines.append("\(p.name): plugin on/off list now equals \(b.name)'s" + (changed.isEmpty ? "" : " (changed: \(changed.sorted().joined(separator: ", ")))"))
             }
         }
@@ -133,11 +139,11 @@ public enum PluginShare {
     public static func problems(_ config: HopperConfig) -> [String] {
         guard let b = base(config), let root = root(config) else { return [] }
         var out: [String] = []
-        let baseOn = NSDictionary(dictionary: settings(b)["enabledPlugins"] as? [String: Any] ?? [:])
+        let baseOn = settings(b)["enabledPlugins"] as? [String: Any] ?? [:]
         for p in sharing(config) {
             let env = settings(p)["env"] as? [String: Any]
             if env?[envVar] as? String != root { out.append("\(p.name): settings.json env \(envVar) is not \(root) (run: sessionhopper profiles share-plugins \(p.name))") }
-            if !baseOn.isEqual(to: settings(p)["enabledPlugins"] as? [String: Any] ?? [:]) {
+            if !same(baseOn, settings(p)["enabledPlugins"] as? [String: Any] ?? [:]) {
                 out.append("\(p.name): its plugin on/off list differs from \(b.name)'s (run: sessionhopper plugins sync)")
             }
         }
