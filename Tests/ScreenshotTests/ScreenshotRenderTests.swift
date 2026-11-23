@@ -144,9 +144,11 @@ final class ScreenshotRenderTests: XCTestCase {
         let nav = SettingsNav()
         let win = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(model: model, nav: nav)))
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        XCTAssertEqual(win.contentLayoutRect.size, CGSize(width: 600, height: SettingsView.Tab.general.height))
+        // The pane is capped to the screen (SettingsView): a CI runner's small screen gets less than the pane asks for.
+        let cap = (NSScreen.main?.visibleFrame.height ?? 800) - 90
+        XCTAssertEqual(win.contentLayoutRect.size, CGSize(width: 600, height: min(SettingsView.Tab.general.height, cap)))
         nav.tab = .about
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-        XCTAssertEqual(win.contentLayoutRect.size, CGSize(width: 600, height: SettingsView.Tab.about.height))
+        XCTAssertEqual(win.contentLayoutRect.size, CGSize(width: 600, height: min(SettingsView.Tab.about.height, cap)))
     }
 }
