@@ -8,12 +8,21 @@ import Foundation
 public enum PluginShare {
     public static let envVar = "CLAUDE_CODE_PLUGIN_CACHE_DIR"
 
-    /// The profile whose plugins everyone uses: the first Claude (non-gateway) profile.
-    public static func base(_ config: HopperConfig) -> Profile? { config.profiles.first { !$0.isGateway } }
+    /// The profile whose plugins everyone uses: the one the sharing profiles already point at (so reordering the
+    /// profiles does not move it), else the first Claude (non-gateway) profile.
+    public static func base(_ config: HopperConfig) -> Profile? {
+        let claude = config.profiles.filter { !$0.isGateway }
+        for p in claude where p.sharePlugins == true {
+            if let root = (settings(p)["env"] as? [String: Any])?[envVar] as? String,
+               let b = claude.first(where: { $0.dir + "/plugins" == root && $0.name != p.name }) { return b }
+        }
+        return claude.first
+    }
 
     public static func root(_ config: HopperConfig) -> String? { base(config).map { $0.dir + "/plugins" } }
 
-    static func settingsURL(_ p: Profile) -> URL { URL(fileURLWithPath: p.dir).appendingPathComponent("settings.json") }
+    // Write through a symlinked settings.json instead of replacing the link (as HookInstaller).
+    static func settingsURL(_ p: Profile) -> URL { URL(fileURLWithPath: p.dir).appendingPathComponent("settings.json").resolvingSymlinksInPath() }
 
     /// Opted-in Claude profiles other than the base.
     public static func sharing(_ config: HopperConfig) -> [Profile] {
@@ -41,19 +50,28 @@ public enum PluginShare {
     static func settings(_ p: Profile) -> [String: Any] { FileIO.jsonObject(FileIO.read(settingsURL(p))) ?? [:] }
 
     /// Turns sharing on or off for `p`: the env key in its `settings.json`, and the config flag. The profile's own
-    /// `plugins` folder is left as it is (rollback = turn it off again).
-    public static func set(_ on: Bool, profile name: String, config: inout HopperConfig) throws {
+    /// `plugins` folder is left as it is (rollback = turn it off again). With `backupsDir`, a copy of `settings.json`
+    /// is kept there first (the write reformats it); returns its path.
+    @discardableResult
+    public static func set(_ on: Bool, profile name: String, config: inout HopperConfig, backupsDir: URL? = nil) throws -> String? {
         guard let i = config.profiles.firstIndex(where: { $0.name == name }) else { throw HopperError("no profile named \(name)") }
         let p = config.profiles[i]
         guard !p.isGateway else { throw HopperError("\(name) runs on an API key; plugins are shared between Claude profiles") }
         guard let b = base(config), let root = root(config) else { throw HopperError("no Claude profile to share from") }
         guard p.name != b.name else { throw HopperError("\(name) is the base profile: the others share its plugins") }
+        var backup: String?
+        if let dir = backupsDir, let data = FileIO.read(settingsURL(p)), (settings(p)["env"] as? [String: Any])?[envVar] as? String != (on ? root : nil) {
+            let url = dir.appendingPathComponent("\(p.name)-settings-\(Int(FileIO.now())).json")
+            try FileIO.write(data, to: url)
+            backup = url.path
+        }
         try editSettings(p) { s in
             var env = s["env"] as? [String: Any] ?? [:]
             env[envVar] = on ? root : nil
             s["env"] = env.isEmpty ? nil : env
         }
         config.profiles[i].sharePlugins = on ? true : nil
+        return backup
     }
 
     // MARK: - Enablement
@@ -72,6 +90,10 @@ public enum PluginShare {
         guard let b = base(config), let root = root(config) else { return [] }
         let profiles = sharing(config)
         guard !profiles.isEmpty else { return [] }
+        // An unreadable base file (bad JSON, caught mid-write) must not wipe everyone's list; only a missing one is empty.
+        if let data = FileIO.read(settingsURL(b)), FileIO.jsonObject(data) == nil {
+            return ["\(b.name): settings.json is not a JSON object; plugin on/off lists not synced"]
+        }
         let have = installed(root: root)
         var baseOn = settings(b)["enabledPlugins"] as? [String: Any] ?? [:]
         var promoted: [String] = []
@@ -89,13 +111,18 @@ public enum PluginShare {
         let market = settings(b)["extraKnownMarketplaces"]
         for p in profiles {
             let before = settings(p)
+            let own = before["enabledPlugins"] as? [String: Any] ?? [:]
+            let changed = Set(own.keys).union(baseOn.keys)
+                .filter { !NSDictionary(dictionary: ["v": own[$0] ?? NSNull()]).isEqual(to: ["v": baseOn[$0] ?? NSNull()]) }
             do {
                 try editSettings(p) { s in
                     s["enabledPlugins"] = baseOn
                     s["extraKnownMarketplaces"] = market
                 }
             } catch { lines.append("\(p.name): \(error)"); continue }
-            if !NSDictionary(dictionary: before).isEqual(to: settings(p)) { lines.append("\(p.name): plugin on/off list now equals \(b.name)'s") }
+            if !NSDictionary(dictionary: before).isEqual(to: settings(p)) {
+                lines.append("\(p.name): plugin on/off list now equals \(b.name)'s" + (changed.isEmpty ? "" : " (changed: \(changed.sorted().joined(separator: ", ")))"))
+            }
         }
         return lines
     }
@@ -127,7 +154,8 @@ public enum PluginShare {
     /// marketplace clone at once fail with "File exists"), then syncs the on/off lists. Returns claude's exit code.
     public static func run(_ args: [String], env: HopperEnvironment) -> Int32 {
         let config = HopperConfig.load(env.paths)
-        guard let b = base(config), let root = root(config), let claude = Claude.locate(env) else { return 127 }
+        guard let b = base(config), let root = root(config) else { FileHandle.standardError.write(Data("no Claude profile to run plugin commands on\n".utf8)); return 127 }
+        guard let claude = Claude.locate(env) else { FileHandle.standardError.write(Data("claude not found on PATH\n".utf8)); return 127 }
         try? FileManager.default.createDirectory(atPath: root, withIntermediateDirectories: true)
         let fd = open(root + "/.sessionhopper.lock", O_RDWR | O_CREAT, 0o600)
         defer { if fd >= 0 { close(fd) } }

@@ -63,6 +63,7 @@ brew install --cask roypadina/tap/agents-session-hopper
   moves when its current turn ends.
 - **One plugin set for every profile** (`sessionhopper profiles share-plugins --all`): every profile uses the first
   profile's plugins folder, so installs and versions can't drift; `sessionhopper plugins update --all` updates them once.
+  Turn plugins on or off on the first profile (or `sessionhopper plugins enable|disable`): sharing profiles follow its list.
 - **Pause a profile** for a while, until its 5-hour or weekly reset, or until you resume it (right-click its row,
   or `sessionhopper profiles pause <name> 2h|5h-reset|weekly-reset|forever`). It counts as full: nothing lands
   there and its sessions move off at their turn end.

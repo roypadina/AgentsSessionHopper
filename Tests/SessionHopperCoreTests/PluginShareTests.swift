@@ -54,4 +54,34 @@ final class PluginShareTests: XCTestCase {
         box.write(#"{"plugins":{"a@m":[{"installPath":"/elsewhere/a"}]}}"#, "base/plugins/installed_plugins.json")
         XCTAssertTrue(PluginShare.problems(c).contains { $0.contains("outside") })
     }
+
+    func testBaseStaysPutWhenProfilesAreReordered() throws {
+        var c = try setup()
+        try PluginShare.set(true, profile: "two", config: &c)
+        c.profiles = [c.profiles[2], c.profiles[1], c.profiles[0]]   // three, two, base
+        XCTAssertEqual(PluginShare.base(c)?.name, "base", "the profile two points at, not the new first one")
+        XCTAssertEqual(PluginShare.sharing(c).map(\.name), ["two"])
+    }
+
+    func testUnreadableBaseSettingsStopsTheSync() throws {
+        var c = try setup()
+        try PluginShare.set(true, profile: "two", config: &c)
+        PluginShare.sync(c)
+        let before = json("two/settings.json")["enabledPlugins"] as? [String: Bool]
+        box.write("", "base/settings.json")
+        XCTAssertTrue(PluginShare.sync(c).first?.contains("not a JSON object") == true)
+        XCTAssertEqual(json("two/settings.json")["enabledPlugins"] as? [String: Bool], before, "nothing wiped")
+    }
+
+    func testSymlinkedSettingsStayALinkAndABackupIsKept() throws {
+        var c = try setup()
+        let real = box.root.appendingPathComponent("two-real.json")
+        try FileManager.default.moveItem(at: box.root.appendingPathComponent("two/settings.json"), to: real)
+        try FileManager.default.createSymbolicLink(at: box.root.appendingPathComponent("two/settings.json"), withDestinationURL: real)
+        let backup = try PluginShare.set(true, profile: "two", config: &c, backupsDir: box.root.appendingPathComponent("backups"))
+        XCTAssertNotNil(backup.flatMap { FileIO.read(URL(fileURLWithPath: $0)) })
+        XCTAssertNotNil(try? FileManager.default.destinationOfSymbolicLink(atPath: box.root.appendingPathComponent("two/settings.json").path))
+        XCTAssertNotNil((json("two-real.json")["env"] as? [String: String])?[PluginShare.envVar])
+        XCTAssertTrue(PluginShare.sync(c).contains { $0.hasPrefix("two:") && $0.contains("gone@m") }, "keys changed back are named")
+    }
 }

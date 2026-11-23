@@ -61,9 +61,11 @@ let usage = """
       sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park
                                               thresholds instead of the global ones (config suggest / park-at)
       sessionhopper profiles share-plugins <name...>|--all | unshare-plugins …  use the first profile's plugins folder
-                                              (one plugin set, no drift); their on/off list follows it at each launch
+                                              (one plugin set, no drift); their on/off list follows it at each launch:
+                                              turn plugins on/off on that profile or with `sessionhopper plugins enable|disable`
       sessionhopper plugins status | sync | <claude plugin args…>   e.g. `plugins update --all`, `plugins install x@m`:
                                               run once on the first profile, under a lock, then synced
+                                              (Claude Code plugins; `sessionhopper plugin` installs sessionhopper's own skill)
       sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset> | profiles unpause <name>
                                               a paused profile counts as full: nothing starts or moves there, its sessions
                                               move off at turn end
@@ -369,13 +371,20 @@ func profilesCommand(_ a: [String]) -> Int32 {
         let on = sub == "share-plugins"
         let names = a == ["--all"] ? PluginShare.base(config).map { b in config.profiles.filter { !$0.isGateway && $0.name != b.name }.map(\.name) } ?? [] : a
         guard !names.isEmpty else { die("usage: sessionhopper profiles \(sub) <name...>|--all") }
+        // Save after each profile: a later failure must not leave an earlier one sharing without its config flag.
+        var done: [String] = [], failed: [String] = []
         for n in names {
-            do { try PluginShare.set(on, profile: n, config: &config) } catch { die("\(error)") }
+            do {
+                if let b = try PluginShare.set(on, profile: n, config: &config, backupsDir: env.paths.backupsDir) { out("\(n): backup \(env.tilde(b))") }
+                save(); done.append(n)
+            } catch { failed.append("\(n): \(error)") }
         }
-        save()
         PluginShare.sync(config).forEach(out)
-        out(on ? "\(names.joined(separator: ", ")) now use \(PluginShare.base(config)?.name ?? "")'s plugins (\(PluginShare.root(config) ?? "")). Their own plugins folders are left as they are. Restart their sessions to load them."
-               : "\(names.joined(separator: ", ")) use their own plugins folders again (as they were when sharing started; update them: claude plugin update)")
+        if !done.isEmpty {
+            out(on ? "\(done.joined(separator: ", ")) now use \(PluginShare.base(config)?.name ?? "")'s plugins (\(PluginShare.root(config) ?? "")). Their own plugins folders are left as they are. Restart their sessions to load them."
+                   : "\(done.joined(separator: ", ")) use their own plugins folders again (as they were when sharing started; update them: claude plugin update)")
+        }
+        if !failed.isEmpty { die(failed.joined(separator: "\n")) }
     case "pause":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }) else {
             die("usage: sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset>   (undo: profiles unpause <name>)")
@@ -934,7 +943,7 @@ func pluginCommand(_ a: [String]) -> Int32 {
         case "status":
             let s = Setup.pluginInstalled(p, env: env)
             out("\(pad(p.name, 10)) \(s == true ? "installed" : s == false ? "not installed (sessionhopper plugin install)" : "unknown (claude not found)")")
-        default: die("usage: sessionhopper plugin [install|status] [--profile X]")
+        default: die("usage: sessionhopper plugin [install|status] [--profile X]   (Claude Code plugins: sessionhopper plugins …)")
         }
     }
     return rc
