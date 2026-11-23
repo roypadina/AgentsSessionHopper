@@ -59,7 +59,14 @@ brew install --cask roypadina/tap/agents-session-hopper
   leave a work account early and run a spare one to the edge. Each profile is measured against its own pair,
   both when sessions leave it and when it counts as having room.
 - **Move all sessions at once** to one profile (⋯ menu or right-click → Move All Sessions To, or
-  `sessionhopper switch <profile> --all`): each session moves when its current turn ends.
+  `sessionhopper switch <profile> --all`), or just one profile's (its sessions menu → Move All N To): each session
+  moves when its current turn ends.
+- **Pause a profile** for a while, until its 5-hour or weekly reset, or until you resume it (right-click its row,
+  or `sessionhopper profiles pause <name> 2h|5h-reset|weekly-reset|forever`). It counts as full: nothing lands
+  there and its sessions move off at their turn end.
+- **Session rules and `delegate`.** Give every session your own instructions (Settings → Hand-off → Session
+  Rules). `sessionhopper delegate --model fable "<task>"` runs one self-contained task on another profile with
+  room and prints the answer, so a session can stay on its account and still use a model that account has used up.
 - **Alerts on your Mac and your phone** (Settings → Alerts, or `sessionhopper alerts`): when sessions
   move off a profile and where to, when no profile has room, and when a profile passes the warning or
   critical threshold. Each kind is switched on per profile, as a Mac notification and/or an

@@ -168,7 +168,12 @@ public enum OneShot {
     }
 
     /// Records what a failed attempt says about its profile, so the next pick passes it over until the reset.
-    static func markFull(_ p: Profile, _ f: Failure, attempt: Attempt, paths: StatePaths, now: Double) {
+    /// `model`: the run's `--model`; a limit that covers only that model marks only it (`ModelLimits`), not the profile.
+    static func markFull(_ p: Profile, _ f: Failure, attempt: Attempt, paths: StatePaths, now: Double, model: String? = nil) {
+        if case .limit(let until, _) = f, let r = attempt.rejected, !ModelLimits.accountWide.contains(r.type) {
+            ModelLimits.markFull(p.name, keys: [r.type, model ?? ""], until: until ?? now + 3600, paths, now: now)
+            return
+        }
         switch f {
         case .credits:
             Gateway.markFull(p, until: Gateway.nextReset(p, now: now), paths: paths, now: now)
@@ -189,8 +194,15 @@ public enum OneShot {
         let config = HopperConfig.load(env.paths)
         guard !config.profiles.isEmpty else { say("no profiles yet. Run: sessionhopper profiles import"); return 1 }
         guard let claude = Claude.locate(env) else { say("claude not found on PATH"); return 127 }
-        let order: [Profile]
+        var order: [Profile]
         do { order = try config.order(prefer: prefer, only: only) } catch { say("\(error)"); return 2 }
+        // A model spent on a profile (its own weekly limit) skips that profile for runs on that model.
+        let model = modelArg(callerArgs)
+        if let model {
+            let now = FileIO.now()
+            let spent = Set(order.filter { ModelLimits.isFull($0.name, model: model, env.paths, now: now) }.map(\.name))
+            if !spent.isEmpty { say("\(model) is spent on \(spent.sorted().joined(separator: ", ")) until its reset; skipping"); order.removeAll { spent.contains($0.name) } }
+        }
         let projects = Profiles.projectsDir(config, home: env.home)
         var (args, format) = prepare(callerArgs)
         let session = sessionID(callerArgs)
@@ -228,7 +240,7 @@ public enum OneShot {
                 emit(a, format)
                 return a.exit
             case .limit, .credits, .login:
-                markFull(p, failure, attempt: a, paths: env.paths, now: FileIO.now())
+                markFull(p, failure, attempt: a, paths: env.paths, now: FileIO.now(), model: model)
                 let why = failure == .login ? "login" : failure == .credits ? "credits" : "limit"
                 EventLog.append(HopperEvent(type: "limit", session: session, cwd: FileManager.default.currentDirectoryPath, from: p.name,
                                             trigger: why, source: "run", detail: (a.resultText ?? a.stderr).prefix(200).description,
@@ -246,6 +258,15 @@ public enum OneShot {
         for p in order { say("  \(p.name.padding(toLength: 10, withPad: " ", startingAt: 0)) \(skipped.contains(p.name) && LimitStore.read(p.name, env.paths) == nil ? "unusable" : ProfileLimits.label(policy.limits[p.name], now: policy.now))") }
         if let last { emit(last, format) }
         return allFullExit
+    }
+
+    /// The value of `--model` / `--model=` in `args`.
+    static func modelArg(_ args: [String]) -> String? {
+        for (i, a) in args.enumerated() {
+            if a == "--model", i + 1 < args.count { return args[i + 1] }
+            if a.hasPrefix("--model=") { return String(a.dropFirst(8)) }
+        }
+        return nil
     }
 
     /// The caller's format: text = the result text, json = the result object. stream-json went out live.

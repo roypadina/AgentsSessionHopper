@@ -31,8 +31,27 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     /// This profile's own suggest / park thresholds (percent). nil = the global ones (`HopperConfig`).
     public var suggestThreshold: Double?
     public var hardThreshold: Double?
+    /// Paused until this epoch time: nothing starts or moves here and its sessions move off like on a full profile.
+    /// `Profile.pausedForever` = until turned off. nil = not paused.
+    public var pausedUntil: Double?
+    public static let pausedForever: Double = 253_402_300_799   // 9999-12-31
 
     public var id: String { name }
+    public func isPaused(now: Double) -> Bool { (pausedUntil ?? 0) > now }
+
+    /// `30m`, `2h`, `1d`, `forever`, `5h-reset`, `weekly-reset` → when a pause ends. nil = not understood, or that
+    /// window's reset time is not known.
+    public static func pauseEnd(_ spec: String, limits: ProfileLimits?, now: Double) -> Double? {
+        switch spec {
+        case "forever": return pausedForever
+        case "5h-reset": return limits?.fiveHour?.resetsAt.flatMap { $0 > now ? $0 : nil }
+        case "weekly-reset": return limits?.sevenDay?.resetsAt.flatMap { $0 > now ? $0 : nil }
+        default:
+            guard let unit = spec.last, let n = Double(spec.dropLast()), n > 0,
+                  let mult = ["m": 60.0, "h": 3600.0, "d": 86400.0][unit] else { return nil }
+            return now + n * mult
+        }
+    }
     public var displayName: String { label.flatMap { $0.isEmpty ? nil : $0 } ?? name }
     /// Billed per use (an API key), not a subscription: used only when no subscription profile has room.
     public var isGateway: Bool { Gateway.kinds.contains(kind ?? "") }
@@ -83,10 +102,12 @@ public struct HopperConfig: Codable, Equatable, Sendable {
     public var mcpStore: String?
     /// Which alerts go where, per profile (`Alerts`).
     public var alerts = AlertSettings()
+    /// The user's own instructions, given to every supervised session at its start (SessionStart context). nil = none.
+    public var sessionRules: String?
 
     public init() {}
 
-    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore, alerts }
+    enum CodingKeys: String, CodingKey { case profiles, suggestThreshold, hardThreshold, autoMove, parkBeforePaid, moveNowAtHard, waitForReset, continuePrompt, gatewayUse, onSwitch, mcpStore, alerts, sessionRules }
 
     // Missing keys keep their defaults, so older config files keep loading.
     public init(from decoder: Decoder) throws {
@@ -104,6 +125,7 @@ public struct HopperConfig: Codable, Equatable, Sendable {
         onSwitch = try c.decodeIfPresent(String.self, forKey: .onSwitch)
         mcpStore = try c.decodeIfPresent(String.self, forKey: .mcpStore)
         alerts = try c.decodeIfPresent(AlertSettings.self, forKey: .alerts) ?? d.alerts
+        sessionRules = try c.decodeIfPresent(String.self, forKey: .sessionRules)
     }
 
     public static func load(_ paths: StatePaths) -> HopperConfig {

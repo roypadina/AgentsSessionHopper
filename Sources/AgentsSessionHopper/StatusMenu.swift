@@ -52,6 +52,29 @@ import SessionHopperCore
             all.submenu = sub
             all.isEnabled = !model.snapshot.sessions.isEmpty
             m.addItem(all)
+            let pause = NSMenuItem(title: "Pause or Resume", action: nil, keyEquivalent: "")
+            let pm = NSMenu()
+            for p in model.config.profiles {
+                if p.isPaused(now: model.snapshot.now) {
+                    let i = NSMenuItem(title: "Resume \(p.displayName)", action: #selector(pauseProfile(_:)), keyEquivalent: "")
+                    i.target = self
+                    i.representedObject = [p.name]
+                    pm.addItem(i)
+                    continue
+                }
+                let item = NSMenuItem(title: "Pause \(p.displayName)", action: nil, keyEquivalent: "")
+                let sub = NSMenu()
+                for (title, spec) in PauseMenu.choices {
+                    let i = NSMenuItem(title: title, action: #selector(pauseProfile(_:)), keyEquivalent: "")
+                    i.target = self
+                    i.representedObject = [p.name, spec]
+                    sub.addItem(i)
+                }
+                item.submenu = sub
+                pm.addItem(item)
+            }
+            pause.submenu = pm
+            m.addItem(pause)
         }
         item("Show Hand-off Log", #selector(switchLog))
         item(Updates.menuTitle, #selector(checkForUpdates))
@@ -96,6 +119,10 @@ import SessionHopperCore
 
     static let log = Logger(subsystem: "com.padina.agents-session-hopper", category: "hotkey")
 
+    @objc private func pauseProfile(_ sender: NSMenuItem) {
+        guard let a = sender.representedObject as? [String], let name = a.first else { return }
+        SettingsWindow.model?.pause(name, a.count > 1 ? a[1] : nil)
+    }
     @objc private func moveAll(_ sender: NSMenuItem) {
         if let to = sender.representedObject as? String { SettingsWindow.model?.moveAll(to: to) }
     }

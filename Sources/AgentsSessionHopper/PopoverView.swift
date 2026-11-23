@@ -52,6 +52,9 @@ struct MoreMenu: View {
     var body: some View {
         Menu {
             MoveAllMenu(model: model)
+            Menu("Pause or Resume") {
+                ForEach(model.config.profiles) { p in PauseMenu(model: model, profile: p) }
+            }
             Button("Show Hand-off Log") { StatusMenu.shared.switchLog() }
             Divider()
             Button("Request a feature") { NSWorkspace.shared.open(StatusMenu.requestFeature) }
@@ -115,12 +118,17 @@ struct ProfileRow: View {
                 .disabled(sessions.isEmpty)
                 .accessibilityHidden(sessions.isEmpty)
         }
+        .contentShape(Rectangle())
+        .contextMenu { PauseMenu(model: model, profile: profile) }
     }
 
     private func spoken(_ v: Double?) -> String { v.map { "\(Int($0.rounded())) percent" } ?? "unknown" }
 
     /// `active`: the profile has live sessions, so it is spending and a pace means something.
     private func outlook(_ l: ProfileLimits?, active: Bool, now: Double) -> String {
+        if let until = profile.pausedUntil, until > now {
+            return until >= Profile.pausedForever ? "Paused until you resume it" : "Paused until \(ProfileLimits.clock(until))"
+        }
         if profile.isGateway { return "Pay per use" }
         guard let l else { return "No usage seen yet" }
         let c = model.config
@@ -144,6 +152,29 @@ struct ProfileRow: View {
         }
         if now - l.sampledAt >= ProfileLimits.staleAfter { text += " · seen \(ProfileLimits.age(now - l.sampledAt)) ago" }
         return text
+    }
+}
+
+/// Pause a profile (counts as full: nothing lands there, its sessions move off at turn end), or use it again.
+/// In the profile row's context menu, the ⋯ menu and the right-click menu (MNU-2).
+struct PauseMenu: View {
+    @ObservedObject var model: AppModel
+    let profile: Profile
+    static let choices: [(String, String)] = [("For 30 Minutes", "30m"), ("For 1 Hour", "1h"), ("For 4 Hours", "4h"),
+                                               ("Until Its 5-Hour Reset", "5h-reset"), ("Until Its Weekly Reset", "weekly-reset"),
+                                               ("Until I Resume It", "forever")]
+
+    var body: some View {
+        if profile.isPaused(now: model.snapshot.now) {
+            Button("Resume \(profile.displayName)") { model.pause(profile.name, nil) }
+        } else {
+            Menu("Pause \(profile.displayName)") {
+                ForEach(Self.choices, id: \.1) { title, spec in
+                    Button(title) { model.pause(profile.name, spec) }
+                        .disabled(spec.hasSuffix("-reset") && Profile.pauseEnd(spec, limits: model.snapshot.limits[profile.name], now: model.snapshot.now) == nil)
+                }
+            }
+        }
     }
 }
 
@@ -172,6 +203,15 @@ struct SessionsMenu: View {
 
     var body: some View {
         Menu("\(sessions.count) session\(sessions.count == 1 ? "" : "s")") {
+            if let from = sessions.first?.record.profile {
+                Menu(sessions.count == 1 ? "Move It To" : "Move All \(sessions.count) To") {
+                    ForEach(model.config.profiles.filter { $0.name != from }) { p in
+                        Button("\(p.displayName) (\(percentText(model.snapshot.percent(p.name))))") { model.moveAll(from: from, to: p.name) }
+                            .disabled(p.isPaused(now: model.snapshot.now))
+                    }
+                }
+                Divider()
+            }
             ForEach(sessions) { session in
                 Menu(title(session)) {
                     ForEach(model.config.profiles.filter { $0.name != session.record.profile }) { p in

@@ -115,7 +115,7 @@ public final class Supervisor {
             target = target ?? policy.pick(order, excluding: current?.name)
             if target == nil, !config.parkBeforePaid {
                 // The user accepts paid usage: keep going on the first profile in order.
-                target = order.first { $0.name != current?.name } ?? order.first
+                target = order.first { $0.name != current?.name && !policy.paused($0.name) } ?? order.first { !policy.paused($0.name) }
             }
             guard let profile = target else {
                 if let code = park(sessionID: resumeID, from: current, request: &request, policy: policy, order: order, files: files) { return code }

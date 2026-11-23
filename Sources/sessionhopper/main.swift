@@ -60,6 +60,9 @@ let usage = """
                                               and the live-session list (messaging across accounts)
       sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park
                                               thresholds instead of the global ones (config suggest / park-at)
+      sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset> | profiles unpause <name>
+                                              a paused profile counts as full: nothing starts or moves there, its sessions
+                                              move off at turn end
       sessionhopper profiles priority <name> <n>|default  lower is preferred (Claude 1, API keys 10): equal priorities
                                               don't trade places before a limit; a freed-up better one is moved back to
       sessionhopper profiles add <name> --openrouter [--model opus=anthropic/claude-opus-5 ...] [--key-file F] [--resets daily|weekly|monthly]
@@ -90,6 +93,10 @@ let usage = """
                             |gateway last|order|manual|on-switch "<command>"|off]  (gateway: when API-key profiles are
                             used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
+      sessionhopper config rules [--file F | --reset]   your own instructions, given to every session at its start
+      sessionhopper delegate [--model M] [-P a,b] [--here] "<task>" [-- <claude args>]  one self-contained `claude -p`
+                                              turn on another profile with room (skips profiles where that model is spent);
+                                              prints the answer. For a session whose own account ran out of a model
       sessionhopper version | --version | -v    this tool's version (does not start claude)
       sessionhopper log [-n 20] [--json]        the switch log
       sessionhopper doctor                      check claude, logins, shared history, thresholds
@@ -354,6 +361,23 @@ func profilesCommand(_ a: [String]) -> Int32 {
         config.profiles[i].hardThreshold = a.count == 3 ? Double(a[2]) : nil
         save()
         out("\(a[0]): suggest at \(Int(config.suggest(a[0])))%, park at \(Int(config.hard(a[0])))%" + (a.count == 2 ? " (the global ones)" : ""))
+    case "pause":
+        guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }) else {
+            die("usage: sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset>   (undo: profiles unpause <name>)")
+        }
+        let now = Date().timeIntervalSince1970
+        guard let until = Profile.pauseEnd(a[1], limits: LimitStore.read(a[0], env.paths), now: now) else {
+            die("\(a[1]): use 30m, 2h, 1d, forever, 5h-reset or weekly-reset (a reset needs a usage sample with its reset time: sessionhopper refresh \(a[0]))")
+        }
+        config.profiles[i].pausedUntil = until
+        save()
+        out("\(a[0]): paused " + (until >= Profile.pausedForever ? "until you unpause it" : "until \(ProfileLimits.clock(until))")
+            + ". Nothing starts or moves there; its sessions move off at their turn end. Undo: sessionhopper profiles unpause \(a[0])")
+    case "unpause":
+        guard a.count == 1, let i = config.profiles.firstIndex(where: { $0.name == a[0] }) else { die("usage: sessionhopper profiles unpause <name>") }
+        config.profiles[i].pausedUntil = nil
+        save()
+        out("\(a[0]): in use again")
     case "priority":
         guard a.count == 2, let i = config.profiles.firstIndex(where: { $0.name == a[0] }), let n = Int(a[1]) ?? (a[1] == "default" ? 0 : nil) else {
             die("usage: sessionhopper profiles priority <name> <n>|default   (lower is preferred; Claude 1, API keys 10 by default)")
@@ -637,6 +661,7 @@ func mcpCommand(_ a: [String]) -> Int32 {
 func configCommand(_ a: [String]) -> Int32 {
     var c = HopperConfig.load(env.paths)
     if a.first == "prompt" { return promptCommand(Array(a.dropFirst()), &c) }
+    if a.first == "rules" { return rulesCommand(Array(a.dropFirst()), &c) }
     if a.count == 2 {
         let v = a[1]
         switch a[0] {
@@ -669,6 +694,45 @@ func configCommand(_ a: [String]) -> Int32 {
 }
 
 /// Shows the continue prompt; `--file F` sets your own, `--reset` goes back to the built-in one.
+/// `config rules [--file F | --reset]`: the user's own instructions for every supervised session.
+func rulesCommand(_ a: [String], _ c: inout HopperConfig) -> Int32 {
+    if a == ["--reset"] {
+        c.sessionRules = nil
+    } else if a.count == 2, a[0] == "--file" {
+        guard let text = try? String(contentsOfFile: (a[1] as NSString).expandingTildeInPath, encoding: .utf8) else { die("cannot read \(a[1])") }
+        c.sessionRules = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+    } else if !a.isEmpty {
+        die("usage: sessionhopper config rules [--file F | --reset]")
+    }
+    if !a.isEmpty { do { try c.save(env.paths) } catch { die("\(error)") } }
+    out(c.sessionRules.map { "session rules (given to every session at its start; new sessions and resumes pick them up):\n\n" + $0 }
+        ?? "no session rules. Add: sessionhopper config rules --file rules.md")
+    return 0
+}
+
+/// `delegate [--model M] [-P a,b] [--here] <task…> [-- <claude args>]`: one `claude -p` turn on another profile with room
+/// (not this session's, unless --here), skipping profiles where that model is spent. The task may come on stdin.
+func delegateCommand(_ a: [String]) -> Int32 {
+    var a = a
+    var extra: [String] = []
+    if let i = a.firstIndex(of: "--") { extra = Array(a[(i + 1)...]); a = Array(a[..<i]) }
+    let model = take("--model", from: &a)
+    let here = has("--here", in: &a)
+    let config = HopperConfig.load(env.paths)
+    let current = env.vars["SESSIONHOPPER_PROFILE"]
+    var prefer = (take("-P", from: &a) ?? take("--profile", from: &a)).map { $0.split(separator: ",").map(String.init) }
+        ?? config.profiles.map(\.name)
+    if !here, let current { prefer.removeAll { $0 == current } }
+    guard !prefer.isEmpty else { die("no other profile to delegate to") }
+    var task = a.joined(separator: " ")
+    if task.isEmpty, isatty(0) == 0 { task = String(decoding: readStdin(), as: UTF8.self) }
+    guard !task.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        die("usage: sessionhopper delegate [--model M] [-P a,b] [--here] \"<self-contained task>\" [-- <claude args>]   (or the task on stdin)")
+    }
+    let args = ["-p"] + (model.map { ["--model", $0] } ?? []) + extra
+    return OneShot.run(env: env, prefer: prefer, only: true, args: args, stdin: InputFeed(Data(task.utf8)), say: say)
+}
+
 func promptCommand(_ a: [String], _ c: inout HopperConfig) -> Int32 {
     if a == ["--reset"] {
         c.continuePrompt = nil
@@ -860,7 +924,7 @@ func versionCommand(_: [String]) -> Int32 { out("sessionhopper \(HopperInfo.vers
 let commands: [String: ([String]) -> Int32] = [
     "shim": shimCommand, "run": runCommand,
     "hook": hookCommand, "statusline": statusLineCommand, "status": statusCommand, "refresh": refreshCommand, "sessions": sessionsCommand,
-    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand, "alerts": alertsCommand,
+    "switch": switchCommand, "hold": holdCommand, "profiles": profilesCommand, "login": loginCommand, "mcp": mcpCommand, "alerts": alertsCommand, "delegate": delegateCommand,
     "config": configCommand, "shell": shellCommand, "plugin": pluginCommand, "log": logCommand, "doctor": doctorCommand,
     "install-hooks": { hooksCommand($0, install: true) }, "uninstall-hooks": { hooksCommand($0, install: false) },
     "help": { _ in out(usage); return 0 }, "--help": { _ in out(usage); return 0 },

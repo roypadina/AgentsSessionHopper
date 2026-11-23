@@ -95,10 +95,14 @@ public enum HookHandler {
     /// Tells the agent it runs supervised (once per start, resume, /clear or compact; a few dozen tokens).
     static func sessionContext(env: HopperEnvironment) -> String? {
         guard let profile = env.vars["SESSIONHOPPER_PROFILE"] else { return nil }
-        let order = HopperConfig.load(env.paths).profiles.map(\.name).joined(separator: ", ")
-        let text = "This session runs under AgentsSessionHopper on profile \(profile) (profiles in order: \(order)). "
+        let config = HopperConfig.load(env.paths)
+        let order = config.profiles.map(\.name).joined(separator: ", ")
+        var text = "This session runs under AgentsSessionHopper on profile \(profile) (profiles in order: \(order)). "
             + "Near a usage limit it may move to another of the user's own Claude accounts; the conversation continues there. "
             + "For usage, switching or holding, use the sessionhopper skill or run `$SESSIONHOPPER_BIN help`."
+        if let rules = config.sessionRules?.trimmingCharacters(in: .whitespacesAndNewlines), !rules.isEmpty {
+            text += "\n\nThe user's rules for sessions under AgentsSessionHopper:\n" + rules
+        }
         let out: [String: Any] = ["hookSpecificOutput": ["hookEventName": "SessionStart", "additionalContext": text]]
         return (try? JSONSerialization.data(withJSONObject: out)).flatMap { String(data: $0, encoding: .utf8) }
     }
