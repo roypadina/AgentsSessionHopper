@@ -5,6 +5,11 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1] - 2026-11-23
+
+### Fixed
+- `sessionhopper login <profile> --token` and `sessionhopper login <profile>` no longer hang with a blank screen: Claude Code's sign-in screen now runs in the terminal's foreground process group, where it can take over the terminal.
+
 ## [1.17.0] - 2026-11-23
 
 ### Added

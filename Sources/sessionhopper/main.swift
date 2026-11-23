@@ -438,13 +438,8 @@ func runCommand(_ a: [String]) -> Int32 {
 /// The unmodified `claude auth login`, in the foreground: login completes in Anthropic's own flow.
 func runLogin(_ p: Profile) -> Int32 {
     out("Logging in \(p.name): \(Profiles.loginCommand(for: p, tilde: env.tilde))")
-    let proc = Process()
-    proc.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    proc.arguments = [env.claudeBin, "auth", "login"]
-    proc.environment = Profiles.environment(for: p, base: env.vars)
-    do { try proc.run() } catch { die("cannot start claude: \(error)") }
-    proc.waitUntilExit()
-    return proc.terminationStatus
+    guard let claude = Claude.locate(env) else { die("claude not found on PATH") }
+    return Claude.runInTerminal(claude, ["auth", "login"], env: Profiles.environment(for: p, base: env.vars))
 }
 
 func loginCommand(_ a: [String]) -> Int32 {
@@ -503,13 +498,8 @@ func tokenLogin(_ p: Profile) -> Int32 {
     for k in ["CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "DISABLE_LOGIN_COMMAND", "DISABLE_LOGOUT_COMMAND"] { e[k] = nil }
     e["CLAUDE_CONFIG_DIR"] = tmp.path
     e[McpShare.envVar] = tmp.path
-    let proc = Process()
-    proc.executableURL = URL(fileURLWithPath: claude)
-    proc.arguments = ["setup-token"]
-    proc.environment = e
-    do { try proc.run() } catch { fail("cannot start claude: \(error)") }
-    proc.waitUntilExit()
-    guard proc.terminationStatus == 0 else { fail("claude setup-token failed (exit \(proc.terminationStatus)). Nothing stored.") }
+    let status = Claude.runInTerminal(claude, ["setup-token"], env: e)
+    guard status == 0 else { fail("claude setup-token failed (exit \(status)). Nothing stored.") }
 
     out("Paste the token (hidden). It may span several lines; then press Enter on an empty line.")
     let token: String

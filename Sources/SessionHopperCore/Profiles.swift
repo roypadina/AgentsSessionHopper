@@ -145,6 +145,19 @@ public enum Claude {
         return e
     }
 
+    /// Runs an interactive `claude` command (`auth login`, `setup-token`) in this terminal and waits for it. It stays in
+    /// our process group, which owns the terminal: Foundation's `Process` gives the child its own group, and Claude Code's
+    /// full-screen UI is then stopped (SIGTTOU) before it draws anything. Returns its exit code.
+    public static func runInTerminal(_ exe: String, _ args: [String], env: [String: String]) -> Int32 {
+        guard let pid = try? Spawn.run(exe, args: args, env: env) else { return 127 }
+        // Ctrl-C belongs to claude; we only wait for it.
+        let old = signal(SIGINT, SIG_IGN)
+        defer { signal(SIGINT, old) }
+        var st: Int32 = 0
+        while waitpid(pid, &st, 0) < 0, errno == EINTR {}
+        return st & 0x7f == 0 ? (st >> 8) & 0xff : 128 + (st & 0x7f)
+    }
+
     /// A double-clickable script that runs the unmodified `claude auth login` for `profile` in Terminal.
     public static func loginScript(_ profile: Profile, env: HopperEnvironment) throws -> URL {
         let url = env.paths.root.appendingPathComponent("login-\(profile.name).command")
