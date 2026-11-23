@@ -22,6 +22,9 @@ sessionhopper profiles share <name> [--dry-run]  link history, task lists, /rewi
 sessionhopper profiles label <name> <text>|--clear  display name shown in the app, `status` and `profiles list`
                                           (the name used by aliases and -P never changes)
 sessionhopper profiles thresholds <name> <suggest %> <park %> | default  this profile's own move / park thresholds
+sessionhopper profiles share-plugins <name...>|--all | unshare-plugins …  use the first profile's plugins folder
+                                          (one plugin set, no drift); the on/off list follows it at each launch
+sessionhopper plugins status | sync | <claude plugin args…>   run once on the first profile, under a lock, then synced
 sessionhopper profiles pause <name> <30m|2h|1d|forever|5h-reset|weekly-reset> | profiles unpause <name>
                                           a paused profile counts as full: nothing starts or moves there, its sessions
                                           move off at turn end

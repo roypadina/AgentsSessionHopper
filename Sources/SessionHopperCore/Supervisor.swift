@@ -48,6 +48,8 @@ public final class Supervisor {
             say("no profiles yet. Run: sessionhopper profiles import   (or: sessionhopper profiles add <name>)")
             return 1
         }
+        // Profiles that share the base's plugins get its on/off list before claude reads it.
+        PluginShare.sync(config).forEach(say)
         let fm = FileManager.default
         let projects = Profiles.projectsDir(config, home: env.home)
         let cwd = fm.currentDirectoryPath

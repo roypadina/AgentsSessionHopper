@@ -5,6 +5,12 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-11-23
+
+### Added
+- One plugin set for all your profiles: `sessionhopper profiles share-plugins <name...>|--all` points a profile at the first profile's plugins folder through Claude Code's documented `CLAUDE_CODE_PLUGIN_CACHE_DIR` (written into that profile's `settings.json`, so a `claude` started without sessionhopper uses it too). Installs, versions, marketplaces and their cache exist once, so they cannot drift. Each launch makes the profile's plugin on/off list equal to the first profile's (a plugin turned on elsewhere and installed is added there first). `unshare-plugins` undoes it; the profile's own plugins folder is left untouched.
+- `sessionhopper plugins <claude plugin args>` (e.g. `plugins update --all`, `plugins install x@m`) runs once on the first profile under a lock, then syncs the on/off lists; `plugins status` and `plugins sync`; `doctor` checks the setup.
+
 ## [1.17.1] - 2026-11-23
 
 ### Fixed

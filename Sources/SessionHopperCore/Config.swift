@@ -34,6 +34,8 @@ public struct Profile: Codable, Equatable, Sendable, Identifiable {
     /// Paused until this epoch time: nothing starts or moves here and its sessions move off like on a full profile.
     /// `Profile.pausedForever` = until turned off. nil = not paused.
     public var pausedUntil: Double?
+    /// Opt-in: use the base profile's plugins folder instead of its own (`PluginShare`).
+    public var sharePlugins: Bool?
     public static let pausedForever: Double = 253_402_300_799   // 9999-12-31
 
     public var id: String { name }
