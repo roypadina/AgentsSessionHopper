@@ -894,6 +894,10 @@ let passthroughFlags: Set<String> = [
 /// Used as a tool's "Claude binary path": interactive launches become supervised sessions, everything else
 /// (subcommands, `-p`, `--version`, and any `claude` started inside a session) runs the real `claude`.
 func shimCommand(_ a: [String]) -> Int32 {
+    // Sessions started before 1.18.1 call `<shim> hook|statusline`: answer them here, never as a paid `claude` run.
+    if a.first == "hook" { return hookCommand(Array(a.dropFirst())) }
+    if a.first == "statusline" { return statusLineCommand(Array(a.dropFirst())) }
+    if a.first == "alerts", a.dropFirst().first == "deliver" { return alertsCommand(Array(a.dropFirst())) }
     let direct = env.currentSessionID != nil || a.first.map(passthroughCommands.contains) == true || a.contains(where: passthroughFlags.contains)
     // In a session on the shared MCP store, a login would land in that store and a logout would delete everyone's MCP logins.
     if McpShare.inSharedSession(env), a.first == "setup-token" || (a.first == "auth" && a.count > 1 && ["login", "logout"].contains(a[1])) {

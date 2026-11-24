@@ -5,6 +5,24 @@ final class InstallerTests: XCTestCase {
     let sb = Sandbox()
     let original = #"{"model":"opus","hooks":{"StopFailure":[{"hooks":[{"type":"command","command":"my-alert"}]}],"Stop":[{"hooks":[{"type":"command","command":"x"}]}]},"statusLine":{"type":"command","command":"~/.claude/sl.sh","padding":1}}"#
 
+    func testShimLinkSelfPathIsTheBinaryBehindIt() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ash-shim-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let shim = dir.appendingPathComponent("sessionhopper-shim").path
+        try FileManager.default.createSymbolicLink(atPath: shim, withDestinationPath: "/opt/x/sessionhopper")
+        XCTAssertEqual(HopperEnvironment.current(selfPath: shim).selfPath, "/opt/x/sessionhopper")
+        let rel = dir.appendingPathComponent("rel-shim").path
+        try FileManager.default.createSymbolicLink(atPath: rel, withDestinationPath: "sessionhopper")
+        XCTAssertEqual(HopperEnvironment.current(selfPath: rel).selfPath, dir.appendingPathComponent("sessionhopper").path)
+        let chained = dir.appendingPathComponent("chained-shim").path
+        try FileManager.default.createSymbolicLink(atPath: chained, withDestinationPath: shim)
+        XCTAssertEqual(HopperEnvironment.current(selfPath: chained).selfPath, "/opt/x/sessionhopper")
+        XCTAssertEqual(HopperEnvironment.current(selfPath: "/opt/homebrew/bin/sessionhopper").selfPath, "/opt/homebrew/bin/sessionhopper")
+        XCTAssertTrue(LaunchPlan.settingsJSON(selfPath: HopperEnvironment.current(selfPath: shim).selfPath, userStatusLine: nil)
+            .contains("'/opt/x/sessionhopper' hook"))
+    }
+
     func testInstallIsIdempotentAndUninstallRestores() throws {
         let dir = sb.profileDir(".claude-w", settings: original)
         let p = Profile(name: "w", dir: dir.path, exportConfigDir: true)

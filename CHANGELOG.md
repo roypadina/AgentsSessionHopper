@@ -5,6 +5,11 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-11-24
+
+### Fixed
+- Sessions started through the `sessionhopper-shim` link (cmux, Ghostex, JetBrains) ran the real `claude` for every hook and every status line refresh: each one was a paid `claude -p` run with its own transcript, and the hooks timed out after 10 s. The hooks, status line, `$SESSIONHOPPER_BIN` and alerts now name the `sessionhopper` binary behind the link, and a shim called as `hook`, `statusline` or `alerts deliver` answers itself, so the hooks and status line of sessions started before this update stop calling `claude` without a restart. Restart those sessions to fix `$SESSIONHOPPER_BIN` (used by `sessionhopper` commands the agent runs) as well.
+
 ## [1.18.0] - 2026-11-23
 
 ### Added
