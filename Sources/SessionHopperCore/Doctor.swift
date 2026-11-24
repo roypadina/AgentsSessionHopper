@@ -26,6 +26,10 @@ public enum Doctor {
         } else {
             add(.fail, "claude not found on PATH. Install Claude Code first.")
         }
+        if let bad = env.staleClaudeBin {
+            let from = staleCarrier(bad, chain: ancestors()).map { " Inherited from \($0.name) (pid \($0.pid)): restart it so new terminals stop getting it." } ?? ""
+            add(.warn, "SESSIONHOPPER_CLAUDE_BIN=\(bad) is missing, so sessions use the normal claude. Unset it or restart the app that set it.\(from)")
+        }
         let loose = unsupervised(ps: Shell.run("/bin/ps", ["-axo", "pid=,ppid=,command="], timeout: 10).stdout)
         if !loose.isEmpty {
             add(.warn, "\(loose.count) claude session(s) running without sessionhopper (pid \(loose.map(String.init).joined(separator: ", "))): they won't move. Restart each once: /exit, then `sessionhopper -c` in its folder (or `sessionhopper --resume <id>`)")
@@ -195,5 +199,38 @@ public enum Doctor {
             }
             return pid
         }.sorted()
+    }
+}
+
+extension Doctor {
+    public struct Proc: Sendable { public var pid: Int32; public var name: String; public var environ: [String] }
+
+    /// The oldest ancestor that still carries `NAME=value`: the long-running host that hands it to new terminals.
+    public static func staleCarrier(_ value: String, chain: [Proc]) -> Proc? {
+        let line = "SESSIONHOPPER_CLAUDE_BIN=\(value)"
+        return chain.prefix { $0.environ.contains(line) }.last
+    }
+
+    /// Parent, grandparent, … up to init, from /proc (Linux). macOS: none, the doctor shows the env check alone.
+    static func ancestors() -> [Proc] {
+        #if os(Linux)
+        var chain: [Proc] = []
+        var pid = getppid()
+        while pid > 1, chain.count < 64 {
+            guard let stat = try? String(contentsOfFile: "/proc/\(pid)/stat", encoding: .utf8),
+                  let close = stat.lastIndex(of: ")") else { break }
+            // stat = "pid (comm) state ppid …"; comm may hold spaces or ')'.
+            let after = stat[stat.index(after: close)...].split(separator: " ")
+            let name = (try? String(contentsOfFile: "/proc/\(pid)/comm", encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "?"
+            let environ = (FileManager.default.contents(atPath: "/proc/\(pid)/environ") ?? Data())
+                .split(separator: 0).map { String(decoding: $0, as: UTF8.self) }
+            chain.append(Proc(pid: pid, name: name, environ: environ))
+            guard after.count > 1, let ppid = Int32(after[1]) else { break }
+            pid = ppid
+        }
+        return chain
+        #else
+        return []
+        #endif
     }
 }

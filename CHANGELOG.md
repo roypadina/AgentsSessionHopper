@@ -5,6 +5,12 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.2] - 2026-11-24
+
+### Fixed
+- A `SESSIONHOPPER_CLAUDE_BIN` that points to a file that is gone no longer stops every session from starting. A long-running app that starts terminals (a terminal server, tmux) can keep an old value after you removed it from your shell setup; sessionhopper now prints one warning line and uses the normal `claude` instead. It still fails when no `claude` can be found at all.
+- `sessionhopper doctor` warns about such a value and, on Linux, names the parent process that still carries it (for example the terminal server), so you know what to restart.
+
 ## [1.18.1] - 2026-11-24
 
 ### Fixed

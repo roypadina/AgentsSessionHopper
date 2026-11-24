@@ -5,6 +5,25 @@ final class InstallerTests: XCTestCase {
     let sb = Sandbox()
     let original = #"{"model":"opus","hooks":{"StopFailure":[{"hooks":[{"type":"command","command":"my-alert"}]}],"Stop":[{"hooks":[{"type":"command","command":"x"}]}]},"statusLine":{"type":"command","command":"~/.claude/sl.sh","padding":1}}"#
 
+    func testStaleClaudeBinOverrideFallsBack() {
+        XCTAssertEqual(HopperEnvironment.claudeOverride([:]).bin, "claude")
+        XCTAssertEqual(HopperEnvironment.claudeOverride(["SESSIONHOPPER_CLAUDE_BIN": "/bin/sh"]).bin, "/bin/sh")
+        XCTAssertNil(HopperEnvironment.claudeOverride(["SESSIONHOPPER_CLAUDE_BIN": "/bin/sh"]).stale)
+        let gone = HopperEnvironment.claudeOverride(["SESSIONHOPPER_CLAUDE_BIN": "/nonexistent/claude"])
+        XCTAssertEqual(gone.bin, "claude")
+        XCTAssertEqual(gone.stale, "/nonexistent/claude")
+        XCTAssertEqual(HopperEnvironment.claudeOverride(["SESSIONHOPPER_CLAUDE_BIN": "my-claude"]).bin, "my-claude", "bare names are looked up later")
+    }
+
+    func testStaleCarrierIsTheOldestAncestorWithTheValue() {
+        let v = "SESSIONHOPPER_CLAUDE_BIN=/gone/claude"
+        let chain = [Doctor.Proc(pid: 30, name: "bash", environ: [v]), Doctor.Proc(pid: 20, name: "gxserver", environ: ["A=1", v]),
+                     Doctor.Proc(pid: 10, name: "systemd", environ: [])]
+        XCTAssertEqual(Doctor.staleCarrier("/gone/claude", chain: chain)?.name, "gxserver")
+        XCTAssertNil(Doctor.staleCarrier("/gone/claude", chain: [Doctor.Proc(pid: 5, name: "zsh", environ: [])]), "set by hand in this shell")
+        XCTAssertNil(Doctor.staleCarrier("/gone/claude", chain: []), "macOS: env check only")
+    }
+
     func testShimLinkSelfPathIsTheBinaryBehindIt() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ash-shim-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
