@@ -42,6 +42,28 @@ final class ShimTests: XCTestCase {
         XCTAssertNotNil(h.read("auths"), "status still passes through")
     }
 
+    func testMissingClaudeBinOverrideFallsBackToClaudeOnPath() throws {
+        let stale = ["SESSIONHOPPER_CLAUDE_BIN": "/nonexistent/claude", "PATH": "\(h.t.path):/usr/bin:/bin"]
+        let r = try h.run(["shim", "--version"], extraEnv: stale)
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertEqual(r.stdout, "9.9.9 (stub)\n")
+        XCTAssertEqual(r.stderr.components(separatedBy: "SESSIONHOPPER_CLAUDE_BIN=/nonexistent/claude is missing").count, 2, "one warning: \(r.stderr)")
+        try h.scenario("exit 0")
+        let launched = try h.run(["shim", "hello"], extraEnv: stale)
+        XCTAssertEqual(launched.code, 0, launched.stderr)
+        XCTAssertTrue(h.launches.last?.contains("--settings") == true, "supervised launch still starts")
+        XCTAssertEqual(launched.stderr.components(separatedBy: "is missing").count, 2, "shim + launch warn once: \(launched.stderr)")
+        let doctor = try h.run(["doctor"], extraEnv: stale)
+        XCTAssertTrue(doctor.stdout.contains("SESSIONHOPPER_CLAUDE_BIN=/nonexistent/claude is missing"), doctor.stdout)
+        XCTAssertFalse(doctor.stderr.contains("is missing"), "doctor reports it in its list only")
+    }
+
+    func testNoClaudeAnywhereStillFails() throws {
+        let r = try h.run(["shim", "--version"], extraEnv: ["SESSIONHOPPER_CLAUDE_BIN": "/nonexistent/claude", "SESSIONHOPPER_HOME": "/nonexistent-home"])
+        XCTAssertNotEqual(r.code, 0)
+        XCTAssertTrue(r.stderr.contains("claude not found"), r.stderr)
+    }
+
     func testLinkNamedShimActsAsShim() throws {
         let link = h.t.appendingPathComponent("sessionhopper-shim")
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: Harness.binary)

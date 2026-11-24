@@ -10,6 +10,14 @@ func say(_ s: String) { FileHandle.standardError.write(Data("\(colorErr ? "\u{1B
 func die(_ s: String) -> Never { say(s); exit(1) }
 func out(_ s: String) { print(s) }
 
+/// Once per process, only on paths that start claude (never in hooks or the status line).
+nonisolated(unsafe) var warnedStaleBin = false
+func warnStaleClaudeBin() {
+    guard let bad = env.staleClaudeBin, !warnedStaleBin else { return }
+    warnedStaleBin = true
+    say("SESSIONHOPPER_CLAUDE_BIN=\(bad) is missing — using the normal claude; unset it or restart the app that set it")
+}
+
 /// `--flag value` out of `args`, removing both.
 func take(_ flag: String, from a: inout [String]) -> String? {
     guard let i = a.firstIndex(of: flag), i + 1 < a.count else { return nil }
@@ -451,6 +459,7 @@ func addGateway(_ name: String, _ kind: String, _ a: inout [String], _ config: i
 
 /// `run [-P a,b] [--only] -- <claude args>`.
 func runCommand(_ a: [String]) -> Int32 {
+    warnStaleClaudeBin()
     var a = a
     let only = has("--only", in: &a)
     let prefer = (take("-P", from: &a) ?? take("--profile", from: &a)).map { $0.split(separator: ",").map(String.init) } ?? []
@@ -754,6 +763,7 @@ func rulesCommand(_ a: [String], _ c: inout HopperConfig) -> Int32 {
 /// `delegate [--model M] [-P a,b] [--here] <task…> [-- <claude args>]`: one `claude -p` turn on another profile with room
 /// (not this session's, unless --here), skipping profiles where that model is spent. The task may come on stdin.
 func delegateCommand(_ a: [String]) -> Int32 {
+    warnStaleClaudeBin()
     var a = a
     var extra: [String] = []
     if let i = a.firstIndex(of: "--") { extra = Array(a[(i + 1)...]); a = Array(a[..<i]) }
@@ -837,6 +847,7 @@ func hooksCommand(_ a: [String], install: Bool) -> Int32 {
 // MARK: - Launch
 
 func launch(_ a: [String]) -> Int32 {
+    warnStaleClaudeBin()
     var o = LaunchOptions()
     var i = 0
     var listOnly = false
@@ -898,6 +909,7 @@ func shimCommand(_ a: [String]) -> Int32 {
     if a.first == "hook" { return hookCommand(Array(a.dropFirst())) }
     if a.first == "statusline" { return statusLineCommand(Array(a.dropFirst())) }
     if a.first == "alerts", a.dropFirst().first == "deliver" { return alertsCommand(Array(a.dropFirst())) }
+    warnStaleClaudeBin()
     let direct = env.currentSessionID != nil || a.first.map(passthroughCommands.contains) == true || a.contains(where: passthroughFlags.contains)
     // In a session on the shared MCP store, a login would land in that store and a logout would delete everyone's MCP logins.
     if McpShare.inSharedSession(env), a.first == "setup-token" || (a.first == "auth" && a.count > 1 && ["login", "logout"].contains(a[1])) {

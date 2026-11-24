@@ -8,6 +8,8 @@ public struct HopperEnvironment: Sendable {
     public var paths: StatePaths
     /// `claude` (looked up on PATH) or an absolute path.
     public var claudeBin: String
+    /// A SESSIONHOPPER_CLAUDE_BIN path that names nothing runnable; `claudeBin` fell back to `claude`.
+    public var staleClaudeBin: String?
     /// Absolute path of the `sessionhopper` binary, used in the hook and status-line commands.
     public var selfPath: String
     /// Seconds Claude Code gets to exit after SIGTERM before SIGKILL.
@@ -51,15 +53,25 @@ public struct HopperEnvironment: Sendable {
             ?? FileManager.default.homeDirectoryForCurrentUser
         let state = vars["SESSIONHOPPER_STATE_DIR"].map { URL(fileURLWithPath: $0) }
             ?? defaultStateDir()
-        return HopperEnvironment(
+        let bin = claudeOverride(vars)
+        var env = HopperEnvironment(
             home: home,
             stateDir: state,
-            claudeBin: vars["SESSIONHOPPER_CLAUDE_BIN"] ?? "claude",
+            claudeBin: bin.bin,
             selfPath: realSelf(selfPath ?? Bundle.main.executablePath ?? CommandLine.arguments[0]),
             killGrace: vars["SESSIONHOPPER_KILL_GRACE"].flatMap(TimeInterval.init) ?? 10,
             pollInterval: vars["SESSIONHOPPER_POLL"].flatMap(TimeInterval.init) ?? 0.25,
             resetSlack: vars["SESSIONHOPPER_RESET_SLACK"].flatMap(TimeInterval.init) ?? 60,
             vars: vars)
+        env.staleClaudeBin = bin.stale
+        return env
+    }
+
+    /// SESSIONHOPPER_CLAUDE_BIN, or `claude` when it is a path to nothing runnable: a long-running parent (a terminal
+    /// server, tmux) can keep a removed value and must not stop every launch. Bare names stay (looked up later).
+    public static func claudeOverride(_ vars: [String: String]) -> (bin: String, stale: String?) {
+        guard let v = vars["SESSIONHOPPER_CLAUDE_BIN"], !v.isEmpty else { return ("claude", nil) }
+        return v.contains("/") && !FileManager.default.isExecutableFile(atPath: v) ? ("claude", v) : (v, nil)
     }
 
     public static func defaultStateDir() -> URL {
