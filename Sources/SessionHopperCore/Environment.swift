@@ -32,6 +32,19 @@ public struct HopperEnvironment: Sendable {
         self.vars = vars
     }
 
+    /// A `*-shim` link runs in shim mode (`shim hook` would exec the real claude), so the hooks, status line,
+    /// SESSIONHOPPER_BIN and alerts must name the binary behind it. Follows links only while the name ends in
+    /// `-shim`, so brew's stable path is kept.
+    static func realSelf(_ path: String) -> String {
+        var p = path
+        for _ in 0..<8 {
+            guard (p as NSString).lastPathComponent.hasSuffix("-shim"),
+                  let dest = try? FileManager.default.destinationOfSymbolicLink(atPath: p) else { break }
+            p = URL(fileURLWithPath: dest, relativeTo: URL(fileURLWithPath: p).deletingLastPathComponent()).path
+        }
+        return p
+    }
+
     public static func current(selfPath: String? = nil) -> HopperEnvironment {
         let vars = ProcessInfo.processInfo.environment
         let home = vars["SESSIONHOPPER_HOME"].map { URL(fileURLWithPath: $0) }
@@ -42,7 +55,7 @@ public struct HopperEnvironment: Sendable {
             home: home,
             stateDir: state,
             claudeBin: vars["SESSIONHOPPER_CLAUDE_BIN"] ?? "claude",
-            selfPath: selfPath ?? Bundle.main.executablePath ?? CommandLine.arguments[0],
+            selfPath: realSelf(selfPath ?? Bundle.main.executablePath ?? CommandLine.arguments[0]),
             killGrace: vars["SESSIONHOPPER_KILL_GRACE"].flatMap(TimeInterval.init) ?? 10,
             pollInterval: vars["SESSIONHOPPER_POLL"].flatMap(TimeInterval.init) ?? 0.25,
             resetSlack: vars["SESSIONHOPPER_RESET_SLACK"].flatMap(TimeInterval.init) ?? 60,
