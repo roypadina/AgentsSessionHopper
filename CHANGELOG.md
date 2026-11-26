@@ -5,7 +5,7 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.19.0] - 2026-11-26
 
 ### Added
 - A `paid` alert when a session moves onto a pay-per-use (API key) profile, also when you moved it yourself. A Mac notification by default; `sessionhopper alerts set <profile> paid ntfy on` sends it to ntfy too. Sessions moving there together give one alert, then it stays quiet for 10 minutes.
