@@ -74,6 +74,34 @@ final class PanelTests: XCTestCase {
         XCTAssertTrue(r.stderr.contains("moved this conversation from default to work (limit)"), r.stderr)
     }
 
+    func testALimitMoveOntoAnAPIKeyGivesAPaidAlertAndLabelsToTheHook() throws {
+        let key = h.t.appendingPathComponent("api.key")
+        try "sk-ant-api03-test".write(to: key, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: key.path)
+        let hook = h.t.appendingPathComponent("hook-env")
+        try h.config { c in
+            c.profiles = c.profiles.map { $0.name == "work"
+                ? Profile(name: "work", dir: $0.dir, exportConfigDir: false, kind: Gateway.anthropic, keyFile: key.path, label: "paid-key") : $0 }
+            c.onSwitch = "env | grep '^SESSIONHOPPER_' > '\(hook.path)'"
+        }
+        // The API-key profile is told apart by its key, not a config dir.
+        try h.scenario(try String(contentsOf: h.t.appendingPathComponent("scenario"), encoding: .utf8)
+            .replacingOccurrences(of: #"[ -n "$CLAUDE_CONFIG_DIR" ] && who=work"#, with: #"[ -n "$ANTHROPIC_API_KEY" ] && who=work"#))
+        try h.write("limit", "behave-default")
+        let r = try h.run([claude] + flags, stdin: initialize + "\n" + hello + "\n")
+        XCTAssertEqual(r.code, 0, r.stderr)
+        XCTAssertTrue(r.stdout.contains("panel answer from work"), r.stdout)
+        XCTAssertEqual(h.events().last.map { [$0.type, $0.from, $0.to] }, ["switch", "default", "work"])
+        XCTAssertEqual(Alerts.read(h.env.paths).filter { $0.kind == "paid" }.map(\.profile), ["work"])
+        let deadline = Date().addingTimeInterval(5)
+        while (try? String(contentsOf: hook, encoding: .utf8))?.contains("SESSIONHOPPER_TO_LABEL") != true && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        let env = (try? String(contentsOf: hook, encoding: .utf8)) ?? ""
+        XCTAssertTrue(env.contains("SESSIONHOPPER_TO=work\n"), env)
+        XCTAssertTrue(env.contains("SESSIONHOPPER_TO_LABEL=paid-key\n"), env)
+        XCTAssertTrue(env.contains("SESSIONHOPPER_FROM_LABEL=default\n"), env)
+        XCTAssertTrue(try h.run(["profiles"]).stdout.contains("paid-key (name: work)"))
+    }
+
     func testAConfirmedSwitchMovesAtTheTurnEnd() throws {
         try FileIO.encode(PendingMove(to: "work", trigger: "confirm", source: "cli"), to: h.env.paths.session(sid).pending)
         let r = try h.run([claude] + flags, stdin: initialize + "\n" + hello + "\n")
