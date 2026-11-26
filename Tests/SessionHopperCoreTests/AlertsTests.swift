@@ -53,6 +53,28 @@ final class AlertsTests: XCTestCase {
         XCTAssertEqual(alerts.map(\.profile), ["a", "b", "a"], "another profile alerts on its own; a again after its window reset")
     }
 
+    func testMovingOntoAnAPIKeyAlertsEvenWhenAskedFor() {
+        let (_, env) = setup { $0.profiles.append(Profile(name: "api", dir: "/p/base", exportConfigDir: false, kind: Gateway.anthropic, label: "paid-key")) }
+        for _ in 0..<3 { Alerts.event(move("a", "api", source: "cli", trigger: "now"), env: env, now: now) }
+        Alerts.event(move("a", "b", source: "cli", trigger: "now"), env: env, now: now)
+        var alerts = Alerts.read(env.paths)
+        XCTAssertEqual(alerts.map(\.kind), ["paid"], "on by default, once for sessions moving together, not for Claude profiles")
+        XCTAssertEqual(alerts[0].profile, "api")
+        XCTAssertTrue(alerts[0].title.contains("paid-key"))
+        Alerts.event(move("b", "api"), env: env, now: now + Alerts.paidQuiet + 1)
+        alerts = Alerts.read(env.paths)
+        XCTAssertEqual(alerts.map(\.kind), ["paid", "paid"], "again after the quiet time")
+        try? LimitStore.write(ProfileLimits(fiveHour: LimitWindow(usedPercentage: 100, resetsAt: now + 7200), sevenDay: nil, sampledAt: now), profile: "c", env.paths)
+        var c = HopperConfig.load(env.paths)
+        c.alerts.set(AlertSettings.everyProfile, .switched, mac: true)
+        try? c.save(env.paths)
+        Alerts.event(move("c", "api"), env: env, now: now + 2 * Alerts.paidQuiet + 2)
+        XCTAssertEqual(Alerts.read(env.paths).map(\.kind), ["paid", "paid", "paid"], "an automatic move onto a key is a paid alert, not also a switch")
+        XCTAssertEqual(AlertKind.kinds(gateway: true), [.paid])
+        XCTAssertFalse(AlertKind.kinds(gateway: false).contains(.paid))
+        XCTAssertEqual(AlertKind.kinds(gateway: nil), AlertKind.allCases)
+    }
+
     func testMovesTheUserAskedForAreNotAlerts() {
         let (_, env) = setup { $0.alerts.set(AlertSettings.everyProfile, .switched, mac: true) }
         Alerts.event(move("a", "b", source: "cli", trigger: "now"), env: env, now: now)

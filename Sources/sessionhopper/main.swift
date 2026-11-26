@@ -93,7 +93,7 @@ let usage = """
                                               profiles that run on a setup-token; /login and /logout are off there
       sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
       sessionhopper alerts [status]               which alerts go where: Mac notification and/or ntfy, per profile
-      sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
+      sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|paid|all> [mac on|off]
                               [ntfy on|off] [active-only on|off]  (active-only: usage alerts only while a session
                               here runs on that profile). Many sessions moving at once give one alert.
       sessionhopper alerts ntfy <server url> [<topic>] | ntfy off | ntfy token < file   where ntfy alerts go (topic on
@@ -105,7 +105,7 @@ let usage = """
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
       sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
                             |gateway last|order|manual|on-switch "<command>"|off]  (gateway: when API-key profiles are
-                            used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON)
+                            used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON, _FROM_LABEL, _TO_LABEL)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper config rules [--file F | --reset]   your own instructions, given to every session at its start
       sessionhopper delegate [--model M] [-P a,b] [--here] "<task>" [-- <claude args>]  one self-contained `claude -p`
@@ -158,7 +158,7 @@ func statusCommand(_ a: [String]) -> Int32 {
         var note = l.map { $0.note(now: s.now) } ?? "no sample yet"
         if let pct = s.percent(p.name), pct >= s.config.suggest(p.name) { note += ", near limit" }
         let n = s.sessions(on: p.name).count
-        out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) \(pad(p.isGateway ? Gateway.kindName(p) : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(pausedNote(p))\(s.emails[p.name].map { "  \($0)" } ?? "")")
+        out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (name: \(p.name))" : p.name, 10)) \(pad(p.isGateway ? Gateway.kindName(p) : env.tilde(p.dir), 20)) 5h \(pad(pct(five), 5)) 7d \(pad(pct(week), 5)) \(note)\(n > 0 ? ", \(n) session\(n == 1 ? "" : "s")" : "")\(pausedNote(p))\(s.emails[p.name].map { "  \($0)" } ?? "")")
     }
     let c = s.config
     out("Hand-off: suggest at \(Int(c.suggestThreshold))%, park at \(Int(c.hardThreshold))% (\(c.parkBeforePaid ? "on" : "off")), move without asking: \(c.autoMove ? "on" : "off")")
@@ -300,7 +300,7 @@ func profilesCommand(_ a: [String]) -> Int32 {
         }
         let policy = Policy(config: config, limits: [:], now: 0)
         for (i, p) in config.profiles.enumerated() {
-            out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (\(p.name))" : p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "\(Gateway.kindName(p)), pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")\(pausedNote(p))")
+            out("  \(i + 1). \(pad(p.displayName != p.name ? "\(p.displayName) (name: \(p.name))" : p.name, 10)) priority \(policy.priority(p))  \(pad(env.tilde(p.dir), 22)) \(p.isGateway ? "\(Gateway.kindName(p)), pay per use, key: \(Gateway.keySource(p, env: env))" : p.exportConfigDir ? "CLAUDE_CONFIG_DIR set" : "CLAUDE_CONFIG_DIR unset (default profile)")\(Profiles.email(of: p, home: env.home).map { "  \($0)" } ?? "")\(pausedNote(p))")
         }
     case "import":
         let known = Set(config.profiles.map(\.dir))
@@ -672,8 +672,10 @@ func alertsCommand(_ a: [String]) -> Int32 {
     let s = config.alerts
     out("ntfy: " + (s.ntfyOn ? "\(s.ntfyServer ?? "")/\(s.ntfyTopic ?? "")" + ((try? Gateway.key(Alerts.tokenEntry, env: env)) != nil ? " (with an access token)" : "") : "not set up"))
     out("\(pad("", 16)) " + AlertKind.allCases.map { pad($0.rawValue, 16) }.joined())
-    for name in [AlertSettings.everyProfile] + config.profiles.filter({ !$0.isGateway }).map(\.name) {
+    for name in [AlertSettings.everyProfile] + config.profiles.map(\.name) {
+        let shown = AlertKind.kinds(gateway: config.profile(named: name)?.isGateway)
         let cells = AlertKind.allCases.map { k -> String in
+            guard shown.contains(k) else { return pad("-", 16) }
             let e = s.effective(name, k)
             let ch = [e.mac ? "mac" : nil, e.ntfy ? "ntfy" : nil].compactMap { $0 }.joined(separator: "+")
             return pad((ch.isEmpty ? "off" : ch) + (k == .usageWarning || k == .usageCritical ? (e.activeOnly ? " (active)" : "") : ""), 16)

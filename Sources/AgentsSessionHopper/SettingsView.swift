@@ -625,9 +625,9 @@ private struct AlertsSettings: View {
             } header: { Text("ntfy") } footer: {
                 Text("Alerts can also go to your phone through ntfy (ntfy.sh or your own server): the only requests the app sends besides the update check, and only while a topic is set. Clear the topic to turn ntfy off. Press Return to store the token in the Keychain.").formFooter()
             }
-            ForEach([AlertSettings.everyProfile] + model.config.profiles.filter { !$0.isGateway }.map(\.name), id: \.self) { name in
+            ForEach([AlertSettings.everyProfile] + model.config.profiles.map(\.name), id: \.self) { name in
                 Section {
-                    ForEach(AlertKind.allCases, id: \.self) { kind in row(name, kind, ntfyOn: s.ntfyOn) }
+                    ForEach(AlertKind.kinds(gateway: model.config.profile(named: name)?.isGateway), id: \.self) { kind in row(name, kind, ntfyOn: s.ntfyOn) }
                 } header: {
                     Text(name == AlertSettings.everyProfile ? "All Profiles" : model.config.display(name))
                 } footer: {

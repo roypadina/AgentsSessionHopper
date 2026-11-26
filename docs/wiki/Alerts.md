@@ -8,8 +8,9 @@ AgentsSessionHopper can tell you, on your Mac and on your phone, when something 
 | `no-room` | No profile has room: a session waits for a reset or stopped. On by default as a Mac notification. |
 | `usage-warning` | A profile passed the suggest threshold (85% by default). |
 | `usage-critical` | A profile passed the park threshold (97% by default). |
+| `paid` | A session moved onto a pay-per-use (API key) profile (instead of `switch`). On by default as a Mac notification. Set on the API-key profile (`alerts set <api-key profile> paid ntfy on`) or All Profiles. Sessions moving there together give one alert, then 10 minutes of quiet. A session that starts there gives none. |
 
-A move you asked for yourself (menu, notification, `switch`) is not an alert.
+A move you asked for yourself (menu, notification, `switch`) is not an alert, except `paid`: money is spent either way.
 
 ## Where they go
 
