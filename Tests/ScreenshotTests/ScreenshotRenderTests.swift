@@ -80,16 +80,14 @@ final class ScreenshotRenderTests: XCTestCase {
         AboutView.iconOverride = NSImage(contentsOf: URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().appendingPathComponent("../../Assets/icons/AppIcon-1024.png").standardizedFileURL)
         try render(WelcomeView(onSetUp: {}, onDone: {}).background(Color(nsColor: .windowBackgroundColor)), name: "welcome.png", dir: dir)
-        try render(OnboardingView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "onboarding.png", dir: dir)
         try render(PopoverView(model: model).background(Color(nsColor: .windowBackgroundColor)), name: "popover.png", dir: dir)
-        for (tab, name) in [(SettingsView.Tab.general, "settings-general.png"), (.handOff, "settings-handoff.png"), (.alerts, "settings-alerts.png"), (.profiles, "settings-profiles.png"),
-                          (.commandLine, "settings-command-line.png"), (.log, "settings-log.png"), (.about, "settings-about.png")] {
+        // Only the images the README shows: an unshown render is an orphan file.
+        for (tab, name) in [(SettingsView.Tab.handOff, "settings-handoff.png"), (.alerts, "settings-alerts.png"), (.about, "settings-about.png")] {
             try render(SettingsView(model: model, nav: { let n = SettingsNav(); n.tab = tab; return n }()).background(Color(nsColor: .windowBackgroundColor)), name: name, dir: dir)
         }
         try render(RenameProfileSheet(model: model, profile: model.config.profiles[1]).background(Color(nsColor: .windowBackgroundColor)), name: "settings-rename.png", dir: dir)
         try render(AddProfileSheet(model: model, isPresented: .constant(true), kind: .openRouter).background(Color(nsColor: .windowBackgroundColor)), name: "add-openrouter.png", dir: dir)
         try render(AddProfileSheet(model: model, isPresented: .constant(true)).background(Color(nsColor: .windowBackgroundColor)), name: "add-claude.png", dir: dir)
-        try render(AboutView().background(Color(nsColor: .windowBackgroundColor)), name: "about.png", dir: dir)
     }
 
     /// Always runs: the views build and lay out with sample data.
