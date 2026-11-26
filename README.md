@@ -213,8 +213,9 @@ sessionhopper doctor
   Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
   for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
   without `--only` still starts on a Claude profile with room.
-- **A session landing on a pay-per-use profile** gives a `paid` alert (Mac notification by default), also
-  when you moved it yourself: `sessionhopper alerts set <profile> paid ntfy on` sends it to ntfy too.
+- **A session moving onto a pay-per-use profile** gives a `paid` alert (Mac notification by default, instead of
+  a `switch` alert), also when you moved it yourself. A session that starts there gives none.
+  `sessionhopper alerts set <api-key profile> paid ntfy on` sends it to ntfy too.
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 

@@ -46,7 +46,7 @@ sessionhopper mcp share on|off <profile...>  share one MCP login store between p
                                           setup-token; /login and /logout are off there (see Shared MCP logins)
 sessionhopper mcp status | mcp store <dir>|default  which profiles share, what the store holds (names only)
 sessionhopper alerts [status]             which alerts go where: Mac notification and/or ntfy, per profile
-sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|all> [mac on|off]
+sessionhopper alerts set <profile|all> <switch|no-room|usage-warning|usage-critical|paid|all> [mac on|off]
                         [ntfy on|off] [active-only on|off]
 sessionhopper alerts ntfy <server url> [<topic>] | ntfy off | ntfy token < file | ntfy fallback < file
                                           topic on stdin keeps a public one out of shell history; off also forgets

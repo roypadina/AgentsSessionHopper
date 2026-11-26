@@ -75,8 +75,9 @@ public enum EventLog {
     /// Runs the user's `onSwitch` command for `e`, detached: its output goes nowhere and it is never waited for,
     /// so a slow or failing command cannot hold up a session or a caller reading our output.
     static func notify(_ e: HopperEvent, _ paths: StatePaths) {
+        guard isSwitch(e) else { return }
         let config = HopperConfig.load(paths)
-        guard isSwitch(e), let cmd = config.onSwitch, !cmd.isEmpty else { return }
+        guard let cmd = config.onSwitch, !cmd.isEmpty else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = ["-c", cmd]

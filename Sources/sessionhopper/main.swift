@@ -105,7 +105,7 @@ let usage = """
       sessionhopper plugin [install|status] [--profile X]  the Claude skill in every profile
       sessionhopper config [suggest N|park-at N|park on|off|auto-move on|off|move-now on|off|wait on|off
                             |gateway last|order|manual|on-switch "<command>"|off]  (gateway: when API-key profiles are
-                            used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON)
+                            used, default last; on-switch: runs on every move/limit/park with SESSIONHOPPER_EVENT, _FROM, _TO, _REASON, _FROM_LABEL, _TO_LABEL)
       sessionhopper config prompt [--file F | --reset]  the prompt a cut-off session resumes with
       sessionhopper config rules [--file F | --reset]   your own instructions, given to every session at its start
       sessionhopper delegate [--model M] [-P a,b] [--here] "<task>" [-- <claude args>]  one self-contained `claude -p`
@@ -672,8 +672,10 @@ func alertsCommand(_ a: [String]) -> Int32 {
     let s = config.alerts
     out("ntfy: " + (s.ntfyOn ? "\(s.ntfyServer ?? "")/\(s.ntfyTopic ?? "")" + ((try? Gateway.key(Alerts.tokenEntry, env: env)) != nil ? " (with an access token)" : "") : "not set up"))
     out("\(pad("", 16)) " + AlertKind.allCases.map { pad($0.rawValue, 16) }.joined())
-    for name in [AlertSettings.everyProfile] + config.profiles.filter({ !$0.isGateway }).map(\.name) {
+    for name in [AlertSettings.everyProfile] + config.profiles.map(\.name) {
+        let shown = AlertKind.kinds(gateway: config.profile(named: name)?.isGateway)
         let cells = AlertKind.allCases.map { k -> String in
+            guard shown.contains(k) else { return pad("-", 16) }
             let e = s.effective(name, k)
             let ch = [e.mac ? "mac" : nil, e.ntfy ? "ntfy" : nil].compactMap { $0 }.joined(separator: "+")
             return pad((ch.isEmpty ? "off" : ch) + (k == .usageWarning || k == .usageCritical ? (e.activeOnly ? " (active)" : "") : ""), 16)

@@ -13,7 +13,7 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
     case usageWarning = "usage-warning"
     /// A profile passed its park threshold (`HopperConfig.hard`).
     case usageCritical = "usage-critical"
-    /// A session started billing a pay-per-use (API key) profile, including moves the user asked for.
+    /// A session moved onto a pay-per-use (API key) profile, including moves the user asked for.
     case paid = "paid"
 
     public var label: String {
@@ -24,6 +24,11 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
         case .usageCritical: return "Usage critical"
         case .paid: return "Moved to a pay-per-use profile"
         }
+    }
+    /// The kinds a profile's own settings row shows: `paid` only on API-key profiles, the rest only on
+    /// subscription profiles; nil (every profile) shows all.
+    public static func kinds(gateway: Bool?) -> [AlertKind] {
+        gateway.map { g in allCases.filter { ($0 == .paid) == g } } ?? allCases
     }
     /// ntfy priority: high for the ones that need a look, default for the early warning. Never urgent.
     var priority: Int { self == .usageWarning ? 3 : 4 }
@@ -131,6 +136,8 @@ public enum Alerts {
                      body: "A session now runs on \(config.display(to)), billed per token. More moves there stay quiet for \(Int(paidQuiet / 60)) minutes.") { old in
                     (old?.until ?? 0) > now ? nil : Memory(until: now + paidQuiet)
                 }
+                // One alert per move: a move onto an API key is a `paid` alert, not also a `switch`.
+                return
             }
             // A move the user asked for is not news.
             guard let from = e.from, let to = e.to, from != to, !userSources.contains(e.source ?? ""),

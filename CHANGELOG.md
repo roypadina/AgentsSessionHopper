@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.19.0] - 2026-11-26
 
 ### Added
-- A `paid` alert when a session moves onto a pay-per-use (API key) profile, also when you moved it yourself. A Mac notification by default; `sessionhopper alerts set <profile> paid ntfy on` sends it to ntfy too. Sessions moving there together give one alert, then it stays quiet for 10 minutes.
+- A `paid` alert when a session moves onto a pay-per-use (API key) profile, also when you moved it yourself (an automatic move there gives this alert instead of `switch`). A Mac notification by default; `sessionhopper alerts set <api-key profile> paid ntfy on` sends it to ntfy too. Sessions moving there together give one alert, then it stays quiet for 10 minutes. Settings → Alerts and `sessionhopper alerts` show the `paid` row on API-key profiles only.
 - The `on-switch` command also gets `SESSIONHOPPER_FROM_LABEL` and `SESSIONHOPPER_TO_LABEL`, the profile labels you see; `SESSIONHOPPER_FROM`/`_TO` stay the profile names.
 
 ### Changed
