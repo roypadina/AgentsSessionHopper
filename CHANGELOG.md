@@ -5,6 +5,15 @@ All notable changes to AgentsSessionHopper are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- A `paid` alert when a session moves onto a pay-per-use (API key) profile, also when you moved it yourself. A Mac notification by default; `sessionhopper alerts set <profile> paid ntfy on` sends it to ntfy too. Sessions moving there together give one alert, then it stays quiet for 10 minutes.
+- The `on-switch` command also gets `SESSIONHOPPER_FROM_LABEL` and `SESSIONHOPPER_TO_LABEL`, the profile labels you see; `SESSIONHOPPER_FROM`/`_TO` stay the profile names.
+
+### Changed
+- `sessionhopper profiles` and `status` show a labelled profile as `label (name: x)`, so the name you type in commands is not mistaken for its kind.
+
 ## [1.18.2] - 2026-11-24
 
 ### Fixed

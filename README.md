@@ -213,6 +213,8 @@ sessionhopper doctor
   Claude subscription is full), `order` (by its place in the profile list) or `manual` (only when you ask
   for it: `-P openrouter --only`, `switch openrouter`). Under `last` and `manual`, `-P openrouter`
   without `--only` still starts on a Claude profile with room.
+- **A session landing on a pay-per-use profile** gives a `paid` alert (Mac notification by default), also
+  when you moved it yourself: `sessionhopper alerts set <profile> paid ntfy on` sends it to ntfy too.
 - A revoked or wrong key makes `claude` retry for minutes before it fails. `CLAUDE_CODE_MAX_RETRIES=2` in
   the caller's environment shortens that.
 
@@ -287,7 +289,8 @@ sessionhopper run -- -p --resume <uuid> --model opus --permission-mode bypassPer
   (or `sessionhopper profiles key <name> < file`, or log it in inside its folder); `doctor` shows which one each profile uses.
 - **Notify on a switch:** `sessionhopper config on-switch "<command>"` runs the command, not waited for,
   on every move, limit stop and park, with `SESSIONHOPPER_EVENT`, `SESSIONHOPPER_FROM`, `SESSIONHOPPER_TO`,
-  `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `off` removes it.
+  `SESSIONHOPPER_REASON`, `SESSIONHOPPER_DETAIL` and `SESSIONHOPPER_SESSION` set. `_FROM`/`_TO` are profile
+  names; `SESSIONHOPPER_FROM_LABEL`/`SESSIONHOPPER_TO_LABEL` carry the label you gave it. `off` removes it.
 - On Linux a killed `sessionhopper` (a caller's timeout) takes the running `claude` with it.
 
 **Linux install** (x86_64, glibc 2.35 or newer, e.g. Ubuntu 22.04+ or Debian 12+; the Swift runtime is built in):

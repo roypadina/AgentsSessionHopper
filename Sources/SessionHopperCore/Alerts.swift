@@ -13,6 +13,8 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
     case usageWarning = "usage-warning"
     /// A profile passed its park threshold (`HopperConfig.hard`).
     case usageCritical = "usage-critical"
+    /// A session started billing a pay-per-use (API key) profile, including moves the user asked for.
+    case paid = "paid"
 
     public var label: String {
         switch self {
@@ -20,6 +22,7 @@ public enum AlertKind: String, CaseIterable, Codable, Sendable {
         case .noRoom: return "No profile has room"
         case .usageWarning: return "Usage warning"
         case .usageCritical: return "Usage critical"
+        case .paid: return "Moved to a pay-per-use profile"
         }
     }
     /// ntfy priority: high for the ones that need a look, default for the early warning. Never urgent.
@@ -53,11 +56,12 @@ public struct AlertSettings: Codable, Equatable, Sendable {
         public var mac: Bool, ntfy: Bool, activeOnly: Bool
     }
 
-    /// Defaults: a Mac notification when no profile has room (what the app always did), nothing else;
+    /// Defaults: a Mac notification when no profile has room (what the app always did) or a session starts billing
+    /// an API key, nothing else;
     /// usage alerts only for profiles a session here runs on.
     public func effective(_ profile: String, _ kind: AlertKind) -> Effective {
         let own = rules[profile]?[kind.rawValue], any = rules[Self.everyProfile]?[kind.rawValue]
-        return Effective(mac: own?.mac ?? any?.mac ?? (kind == .noRoom),
+        return Effective(mac: own?.mac ?? any?.mac ?? (kind == .noRoom || kind == .paid),
                          ntfy: own?.ntfy ?? any?.ntfy ?? false,
                          activeOnly: own?.activeOnly ?? any?.activeOnly ?? true)
     }
@@ -102,6 +106,8 @@ public enum Alerts {
     static let windowTolerance: Double = 120
     /// Quiet time when no reset time is known.
     static let cooldown: Double = 3600
+    /// Quiet time after a `paid` alert for the same profile.
+    static let paidQuiet: Double = 600
 
     struct Memory: Codable, Equatable {
         /// switch / no-room: quiet until then.
@@ -118,6 +124,14 @@ public enum Alerts {
         let userSources: Set<String> = ["menu", "cli", "notification"]
         switch e.type {
         case "switch", "run":
+            if let from = e.from, let to = e.to, from != to, config.profile(named: to)?.isGateway == true {
+                // Money: alerted even when the user asked for the move; sessions moving together give one alert.
+                fire(.paid, profile: to, key: "paid|\(to)", config: config, env: env, now: now, active: true,
+                     title: "\(config.display(from)) → \(config.display(to)) (pay per use)",
+                     body: "A session now runs on \(config.display(to)), billed per token. More moves there stay quiet for \(Int(paidQuiet / 60)) minutes.") { old in
+                    (old?.until ?? 0) > now ? nil : Memory(until: now + paidQuiet)
+                }
+            }
             // A move the user asked for is not news.
             guard let from = e.from, let to = e.to, from != to, !userSources.contains(e.source ?? ""),
                   !["confirm", "now"].contains(e.trigger ?? "") else { return }

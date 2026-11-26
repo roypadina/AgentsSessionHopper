@@ -75,7 +75,8 @@ public enum EventLog {
     /// Runs the user's `onSwitch` command for `e`, detached: its output goes nowhere and it is never waited for,
     /// so a slow or failing command cannot hold up a session or a caller reading our output.
     static func notify(_ e: HopperEvent, _ paths: StatePaths) {
-        guard isSwitch(e), let cmd = HopperConfig.load(paths).onSwitch, !cmd.isEmpty else { return }
+        let config = HopperConfig.load(paths)
+        guard isSwitch(e), let cmd = config.onSwitch, !cmd.isEmpty else { return }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = ["-c", cmd]
@@ -83,6 +84,9 @@ public enum EventLog {
         for (k, v) in [("EVENT", e.type), ("FROM", e.from), ("TO", e.to), ("REASON", e.trigger), ("DETAIL", e.detail), ("SESSION", e.session)] {
             vars["SESSIONHOPPER_\(k)"] = v ?? ""
         }
+        // _FROM/_TO carry the profile name; a hook matching what the user sees needs the label.
+        vars["SESSIONHOPPER_FROM_LABEL"] = e.from.map(config.display) ?? ""
+        vars["SESSIONHOPPER_TO_LABEL"] = e.to.map(config.display) ?? ""
         p.environment = vars
         p.standardInput = FileHandle.nullDevice
         p.standardOutput = FileHandle.nullDevice
